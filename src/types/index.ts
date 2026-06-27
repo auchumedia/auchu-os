@@ -22,7 +22,13 @@ export interface Client {
   monthly_budget: number | null
   brand_tone: string | null
   brand_notes: string | null
+  internal_notes: string | null
   platforms: string[]
+  logo_url: string | null
+  brand_primary: string
+  brand_secondary: string
+  portal_token: string | null
+  portal_enabled: boolean
   created_at: string
   updated_at: string
 }

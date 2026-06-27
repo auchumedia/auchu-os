@@ -25,11 +25,16 @@
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
   }
 
-  .badge-blue   { @apply bg-blue-50  text-blue-700; }
-  .badge-green  { @apply bg-green-50 text-green-700; }
-  .badge-amber  { @apply bg-amber-50 text-amber-700; }
-  .badge-gray   { @apply bg-gray-100 text-gray-600; }
-  .badge-red    { @apply bg-red-50   text-red-700; }
+  .badge-blue   { @apply bg-blue-50   text-blue-700;  }
+  .badge-green  { @apply bg-green-50  text-green-700; }
+  .badge-amber  { @apply bg-amber-50  text-amber-700; }
+  .badge-gray   { @apply bg-gray-100  text-gray-600;  }
+  .badge-red    { @apply bg-red-50    text-red-700;   }
+
+  /* ─── Labels (form) ──────────────────────────────────────────────────────── */
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1.5;
+  }
 
   /* ─── Table ──────────────────────────────────────────────────────────────── */
   .table-wrapper {
