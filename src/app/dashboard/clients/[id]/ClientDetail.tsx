@@ -62,6 +62,7 @@ export default function ClientDetail({ client: initial, invoices, content, appUr
 
   // Portal
   const [generatingPortal, setGeneratingPortal] = useState(false)
+  const [portalError, setPortalError] = useState<string | null>(null)
   const [portalUrl, setPortalUrl] = useState<string | null>(
     client.portal_token ? `${appUrl}/portail/${client.portal_token}` : null
   )
@@ -153,19 +154,30 @@ export default function ClientDetail({ client: initial, invoices, content, appUr
 
   const generatePortal = async () => {
     setGeneratingPortal(true)
-    const res = await fetch(`/api/clients/${client.id}/portal`, { method: 'POST' })
-    if (res.ok) {
-      const { portal_url, token } = await res.json()
-      setPortalUrl(portal_url)
-      setClient(c => ({ ...c, portal_token: token, portal_enabled: true }))
+    setPortalError(null)
+    try {
+      const res = await fetch(`/api/clients/${client.id}/portal`, { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) {
+        setPortalError(json.error ?? `Erreur ${res.status}`)
+      } else {
+        setPortalUrl(json.portal_url)
+        setClient(c => ({ ...c, portal_token: json.token, portal_enabled: true }))
+      }
+    } catch (e) {
+      setPortalError('Erreur réseau — réessaie.')
+    } finally {
+      setGeneratingPortal(false)
     }
-    setGeneratingPortal(false)
   }
 
   const revokePortal = async () => {
-    await fetch(`/api/clients/${client.id}/portal`, { method: 'DELETE' })
-    setPortalUrl(null)
-    setClient(c => ({ ...c, portal_token: null, portal_enabled: false }))
+    const res = await fetch(`/api/clients/${client.id}/portal`, { method: 'DELETE' })
+    if (res.ok) {
+      setPortalUrl(null)
+      setPortalError(null)
+      setClient(c => ({ ...c, portal_token: null, portal_enabled: false }))
+    }
   }
 
   const copyPortalUrl = async () => {
@@ -307,17 +319,24 @@ export default function ClientDetail({ client: initial, invoices, content, appUr
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={generatePortal}
-                  disabled={generatingPortal}
-                  className="btn-primary text-sm gap-1.5 disabled:opacity-50"
-                  style={{ background: accentBg, border: 'none' }}
-                >
-                  {generatingPortal
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Globe className="w-3.5 h-3.5" />}
-                  Générer un lien portail
-                </button>
+                <div className="flex flex-col items-end gap-1.5">
+                  <button
+                    onClick={generatePortal}
+                    disabled={generatingPortal}
+                    className="btn-primary text-sm gap-1.5 disabled:opacity-50"
+                    style={{ background: accentBg, border: 'none' }}
+                  >
+                    {generatingPortal
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Globe className="w-3.5 h-3.5" />}
+                    Générer un lien portail
+                  </button>
+                  {portalError && (
+                    <p className="text-xs text-red-600 bg-white/90 rounded-lg px-2 py-1 max-w-[280px] text-right">
+                      {portalError}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -581,6 +600,7 @@ export default function ClientDetail({ client: initial, invoices, content, appUr
         <PortalTab
           client={client}
           portalUrl={portalUrl}
+          portalError={portalError}
           copied={copied}
           generatingPortal={generatingPortal}
           accentBg={accentBg}
@@ -712,11 +732,12 @@ function ContentCalendar({ content }: { content: ContentPiece[] }) {
 }
 
 function PortalTab({
-  client, portalUrl, copied, generatingPortal, accentBg,
+  client, portalUrl, portalError, copied, generatingPortal, accentBg,
   invoices, onGenerate, onRevoke, onCopy, onOpen,
 }: {
   client: Client
   portalUrl: string | null
+  portalError: string | null
   copied: boolean
   generatingPortal: boolean
   accentBg: string
@@ -804,6 +825,11 @@ function PortalTab({
                 {generatingPortal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
                 Générer un lien portail
               </button>
+              {portalError && (
+                <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {portalError}
+                </p>
+              )}
             </div>
           )}
         </div>
