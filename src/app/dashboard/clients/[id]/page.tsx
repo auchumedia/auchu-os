@@ -14,7 +14,6 @@ export default async function ClientPage({ params }: { params: { id: string } })
 
   const [
     { data: client, error },
-    { data: projects },
     { data: invoices },
     { data: content },
   ] = await Promise.all([
@@ -24,13 +23,6 @@ export default async function ClientPage({ params }: { params: { id: string } })
       .eq('id', params.id)
       .eq('user_id', user!.id)
       .single(),
-
-    supabase
-      .from('projects')
-      .select('*')
-      .eq('client_id', params.id)
-      .eq('user_id', user!.id)
-      .order('created_at', { ascending: false }),
 
     supabase
       .from('invoices')
@@ -54,7 +46,6 @@ export default async function ClientPage({ params }: { params: { id: string } })
   return (
     <ClientDetail
       client={client}
-      projects={projects ?? []}
       invoices={invoices ?? []}
       content={content ?? []}
       appUrl={process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}

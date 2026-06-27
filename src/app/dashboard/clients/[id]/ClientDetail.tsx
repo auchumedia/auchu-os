@@ -1,23 +1,18 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Camera, ExternalLink, Copy, Check, Plus, Loader2,
-  Calendar, FileText, FolderKanban, CreditCard, Globe, Pencil,
-  Save, X, Trash2, CheckCircle, Send, AlertCircle,
+  Calendar, FileText, CreditCard, Globe, Pencil,
+  Save, X, CheckCircle,
 } from 'lucide-react'
-import { Client, Project, Invoice, ContentPiece } from '@/types'
-import {
-  cn, formatCurrency, formatDate, getInitials,
-  PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS,
-  PRIORITY_LABELS, PRIORITY_COLORS,
-} from '@/lib/utils'
+import { Client, Invoice, ContentPiece } from '@/types'
+import { cn, formatCurrency, formatDate, getInitials } from '@/lib/utils'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Config ───────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'projects' | 'content' | 'invoices' | 'portal'
+type Tab = 'overview' | 'content' | 'invoices' | 'portal'
 
 const PLATFORMS = ['instagram', 'facebook', 'tiktok', 'linkedin', 'google', 'meta']
 
@@ -26,7 +21,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   linkedin: 'LinkedIn', google: 'Google Ads', meta: 'Meta Ads',
 }
 
-const STATUS_CONFIG = {
+const INVOICE_STATUS_CONFIG = {
   draft:     { label: 'Brouillon', cls: 'badge-gray'  },
   envoye:    { label: 'Envoyé',    cls: 'badge-blue'  },
   paye:      { label: 'Payé',      cls: 'badge-green' },
@@ -43,19 +38,10 @@ const CONTENT_PLATFORM_COLORS: Record<string, string> = {
   meta:      'bg-indigo-100 text-indigo-700',
 }
 
-const CONTENT_STATUS_COLORS: Record<string, string> = {
-  draft:    'bg-gray-100   text-gray-600',
-  review:   'bg-amber-100  text-amber-700',
-  approuve: 'bg-blue-100   text-blue-700',
-  publie:   'bg-green-100  text-green-700',
-  refuse:   'bg-red-100    text-red-700',
-}
-
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
   client:   Client
-  projects: Project[]
   invoices: Invoice[]
   content:  ContentPiece[]
   appUrl:   string
@@ -63,15 +49,14 @@ interface Props {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ClientDetail({ client: initial, projects, invoices, content, appUrl }: Props) {
-  const router = useRouter()
+export default function ClientDetail({ client: initial, invoices, content, appUrl }: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
   const [saving, setSaving] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Logo upload
+  // Logo
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -81,12 +66,12 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
     client.portal_token ? `${appUrl}/portail/${client.portal_token}` : null
   )
 
-  // Notes editing
-  const [notesValue, setNotesValue] = useState(client.internal_notes ?? '')
+  // Notes
+  const [notesValue, setNotesValue]   = useState(client.internal_notes ?? '')
   const notesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Overview editing
-  const [editing, setEditing]   = useState(false)
+  // Overview edit
+  const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({
     name:           client.name,
     email:          client.email ?? '',
@@ -100,7 +85,7 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
     platforms:      client.platforms,
   })
 
-  // ─── Patch helper ──────────────────────────────────────────────────────────
+  // ─── Helpers ───────────────────────────────────────────────────────────────
 
   const patch = useCallback(async (fields: Partial<Client>) => {
     const res = await fetch(`/api/clients/${client.id}`, {
@@ -115,15 +100,11 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
     }
   }, [client.id])
 
-  // ─── Debounced color save ──────────────────────────────────────────────────
-
   const saveColor = (field: 'brand_primary' | 'brand_secondary', value: string) => {
     setClient(c => ({ ...c, [field]: value }))
     if (saveTimeout.current) clearTimeout(saveTimeout.current)
     saveTimeout.current = setTimeout(() => patch({ [field]: value }), 600)
   }
-
-  // ─── Debounced notes save ──────────────────────────────────────────────────
 
   const handleNotesChange = (value: string) => {
     setNotesValue(value)
@@ -135,16 +116,12 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
     }, 800)
   }
 
-  // ─── Logo upload ───────────────────────────────────────────────────────────
-
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploadingLogo(true)
-
     const fd = new FormData()
     fd.append('file', file)
-
     const res = await fetch(`/api/clients/${client.id}/logo`, { method: 'POST', body: fd })
     if (res.ok) {
       const { logo_url } = await res.json()
@@ -153,8 +130,6 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
     setUploadingLogo(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
-
-  // ─── Overview save ─────────────────────────────────────────────────────────
 
   const saveOverview = async () => {
     setSaving('overview')
@@ -197,7 +172,7 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
     if (!portalUrl) return
     await navigator.clipboard.writeText(portalUrl)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopied(false), 2500)
   }
 
   // ─── Derived ───────────────────────────────────────────────────────────────
@@ -206,25 +181,26 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
   const accentBg = `linear-gradient(135deg, ${client.brand_primary}, ${client.brand_secondary})`
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'overview',  label: 'Vue d\'ensemble', icon: FileText },
-    { id: 'projects',  label: `Projets (${projects.length})`, icon: FolderKanban },
-    { id: 'content',   label: `Contenu (${content.length})`,  icon: Calendar },
-    { id: 'invoices',  label: `Factures (${invoices.length})`, icon: CreditCard },
-    { id: 'portal',    label: 'Portail',          icon: Globe },
+    { id: 'overview', label: 'Vue d\'ensemble', icon: FileText },
+    { id: 'content',  label: `Contenu (${content.length})`,   icon: Calendar },
+    { id: 'invoices', label: `Factures (${invoices.length})`, icon: CreditCard },
+    { id: 'portal',   label: 'Portail',                       icon: Globe },
   ]
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-0">
-      {/* ─── Header ──────────────────────────────────────────────────────────── */}
+
+      {/* ─── Header card ─────────────────────────────────────────────────────── */}
       <div
         className="rounded-2xl border border-gray-200 overflow-hidden mb-6"
         style={{ background: headerBg }}
       >
         <div className="px-6 py-5">
           <div className="flex items-start gap-5">
-            {/* Logo / Avatar */}
+
+            {/* Logo */}
             <div className="relative flex-shrink-0">
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -236,11 +212,7 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
                   <Loader2 className="w-6 h-6 text-white animate-spin" />
                 ) : client.logo_url ? (
                   <>
-                    <img
-                      src={client.logo_url}
-                      alt={client.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={client.logo_url} alt={client.name} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <Camera className="w-5 h-5 text-white" />
                     </div>
@@ -271,13 +243,11 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
                   actif:    'badge-green',
                   inactif:  'badge-gray',
                   prospect: 'badge-blue',
-                }[client.status])}>
-                  {client.status === 'actif' ? 'Actif' : client.status === 'prospect' ? 'Prospect' : 'Inactif'}
+                }[client.status] ?? 'badge-gray')}>
+                  {{ actif: 'Actif', inactif: 'Inactif', prospect: 'Prospect' }[client.status]}
                 </span>
               </div>
               {client.company && <p className="text-sm text-gray-500 mt-0.5">{client.company}</p>}
-
-              {/* Platforms */}
               {client.platforms?.length > 0 && (
                 <div className="flex gap-1.5 mt-2 flex-wrap">
                   {client.platforms.map(p => (
@@ -285,8 +255,6 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
                   ))}
                 </div>
               )}
-
-              {/* Budget */}
               {client.monthly_budget && (
                 <p className="text-sm text-gray-500 mt-1.5">
                   Budget mensuel : <span className="font-semibold text-gray-700">{formatCurrency(client.monthly_budget)}</span>
@@ -294,7 +262,7 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
               )}
             </div>
 
-            {/* Right controls */}
+            {/* Right — colors + portal */}
             <div className="flex flex-col items-end gap-3 flex-shrink-0">
               {/* Color pickers */}
               <div className="flex items-center gap-3">
@@ -310,15 +278,34 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
                 />
               </div>
 
-              {/* Portal button */}
+              {/* Portal — inline URL when active */}
               {portalUrl ? (
-                <button
-                  onClick={() => window.open(portalUrl, '_blank')}
-                  className="btn-secondary text-sm gap-1.5"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Portail client
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 px-3 py-2 max-w-[220px]">
+                    <Globe className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <span className="text-xs font-mono text-gray-500 truncate">{portalUrl}</span>
+                  </div>
+                  <button
+                    onClick={copyPortalUrl}
+                    title="Copier le lien"
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all',
+                      copied
+                        ? 'bg-green-50 border-green-200 text-green-700'
+                        : 'bg-white/80 border-gray-200 text-gray-700 hover:border-gray-300'
+                    )}
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copied ? 'Copié !' : 'Copier'}
+                  </button>
+                  <button
+                    onClick={() => window.open(portalUrl, '_blank')}
+                    title="Ouvrir le portail"
+                    className="p-2 rounded-xl border border-gray-200 bg-white/80 text-gray-500 hover:text-gray-800 hover:border-gray-300 transition-all"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               ) : (
                 <button
                   onClick={generatePortal}
@@ -326,23 +313,25 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
                   className="btn-primary text-sm gap-1.5 disabled:opacity-50"
                   style={{ background: accentBg, border: 'none' }}
                 >
-                  {generatingPortal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
-                  Créer portail client
+                  {generatingPortal
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Globe className="w-3.5 h-3.5" />}
+                  Générer un lien portail
                 </button>
               )}
             </div>
           </div>
         </div>
 
-        {/* Back link */}
-        <div className="px-6 pb-4">
+        {/* Back */}
+        <div className="px-6 pb-3">
           <Link href="/dashboard/clients" className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
             Retour aux clients
           </Link>
         </div>
 
-        {/* Tabs */}
+        {/* Tab nav */}
         <div className="border-t border-white/60 bg-white/40 px-6">
           <nav className="flex gap-1 -mb-px">
             {tabs.map(t => (
@@ -367,7 +356,6 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
       {/* ─── Tab: Vue d'ensemble ─────────────────────────────────────────────── */}
       {tab === 'overview' && (
         <div className="grid grid-cols-3 gap-5">
-          {/* Left — contact + brand info */}
           <div className="col-span-2 space-y-5">
             <div className="card">
               <div className="flex items-center justify-between mb-4">
@@ -462,11 +450,11 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <InfoRow label="Email"    value={client.email} />
-                  <InfoRow label="Téléphone" value={client.phone} />
-                  <InfoRow label="Entreprise" value={client.company} />
-                  <InfoRow label="Secteur"   value={client.industry} />
-                  <InfoRow label="Budget"    value={client.monthly_budget ? formatCurrency(client.monthly_budget) : null} />
+                  <InfoRow label="Email"       value={client.email} />
+                  <InfoRow label="Téléphone"   value={client.phone} />
+                  <InfoRow label="Entreprise"  value={client.company} />
+                  <InfoRow label="Secteur"     value={client.industry} />
+                  <InfoRow label="Budget"      value={client.monthly_budget ? formatCurrency(client.monthly_budget) : null} />
                   {client.brand_tone && (
                     <div>
                       <p className="text-xs text-gray-400 font-medium mb-0.5">Ton de marque</p>
@@ -484,7 +472,6 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
             </div>
           </div>
 
-          {/* Right — internal notes */}
           <div className="space-y-4">
             <div className="card">
               <div className="flex items-center justify-between mb-3">
@@ -494,7 +481,7 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
               <textarea
                 value={notesValue}
                 onChange={e => handleNotesChange(e.target.value)}
-                placeholder="Notes privées sur ce client (non visibles dans le portail)..."
+                placeholder="Notes privées — jamais visibles dans le portail client..."
                 rows={10}
                 className="input text-sm resize-none w-full"
               />
@@ -502,68 +489,26 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
             </div>
 
             <div className="card">
-              <h2 className="text-sm font-semibold text-gray-900 mb-2">Couleurs de marque</h2>
-              <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">Couleurs de marque</h2>
+              <div className="space-y-2.5">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg border border-gray-200" style={{ background: client.brand_primary }} />
+                  <div className="w-8 h-8 rounded-lg border border-gray-200 flex-shrink-0" style={{ background: client.brand_primary }} />
                   <div>
-                    <p className="text-xs font-medium text-gray-700">Couleur principale</p>
+                    <p className="text-xs font-medium text-gray-700">Principale</p>
                     <p className="text-xs text-gray-400 font-mono">{client.brand_primary}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg border border-gray-200" style={{ background: client.brand_secondary }} />
+                  <div className="w-8 h-8 rounded-lg border border-gray-200 flex-shrink-0" style={{ background: client.brand_secondary }} />
                   <div>
-                    <p className="text-xs font-medium text-gray-700">Couleur secondaire</p>
+                    <p className="text-xs font-medium text-gray-700">Secondaire</p>
                     <p className="text-xs text-gray-400 font-mono">{client.brand_secondary}</p>
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 pt-1">Modifiables via les pastilles dans le header</p>
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ─── Tab: Projets ────────────────────────────────────────────────────── */}
-      {tab === 'projects' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">{projects.length} projet{projects.length !== 1 ? 's' : ''}</p>
-            <Link href={`/dashboard/projets`} className="btn-secondary text-sm gap-1.5">
-              <Plus className="w-3.5 h-3.5" />
-              Nouveau projet
-            </Link>
-          </div>
-
-          {projects.length === 0 ? (
-            <div className="card text-center py-12">
-              <FolderKanban className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">Aucun projet pour ce client</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {projects.map(p => (
-                <div key={p.id} className="card py-3 flex items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{p.title}</p>
-                    {p.deadline && (
-                      <p className="text-xs text-gray-400 mt-0.5">Échéance : {formatDate(p.deadline)}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {p.priority !== 'normale' && (
-                      <span className={cn('text-xs font-medium', PRIORITY_COLORS[p.priority])}>
-                        {PRIORITY_LABELS[p.priority]}
-                      </span>
-                    )}
-                    <span className={cn('badge text-xs', PROJECT_STATUS_COLORS[p.status])}>
-                      {PROJECT_STATUS_LABELS[p.status]}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -577,7 +522,7 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500">
-              {invoices.length} facture{invoices.length !== 1 ? 's' : ''} · {' '}
+              {invoices.length} facture{invoices.length !== 1 ? 's' : ''} ·{' '}
               <span className="font-medium text-gray-700">
                 {formatCurrency(invoices.filter(i => i.status === 'paye').reduce((s, i) => s + i.total, 0))} encaissé
               </span>
@@ -608,7 +553,7 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
                 </thead>
                 <tbody>
                   {invoices.map(inv => {
-                    const cfg = STATUS_CONFIG[inv.status as keyof typeof STATUS_CONFIG]
+                    const cfg = INVOICE_STATUS_CONFIG[inv.status as keyof typeof INVOICE_STATUS_CONFIG]
                     return (
                       <tr key={inv.id}>
                         <td>
@@ -639,11 +584,11 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
           copied={copied}
           generatingPortal={generatingPortal}
           accentBg={accentBg}
-          projects={projects}
           invoices={invoices}
           onGenerate={generatePortal}
           onRevoke={revokePortal}
           onCopy={copyPortalUrl}
+          onOpen={() => portalUrl && window.open(portalUrl, '_blank')}
         />
       )}
     </div>
@@ -654,14 +599,11 @@ export default function ClientDetail({ client: initial, projects, invoices, cont
 
 function ColorPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <label className="flex items-center gap-1.5 cursor-pointer group" title={label}>
+    <label className="cursor-pointer" title={label}>
       <div
-        className="w-6 h-6 rounded-md border-2 border-white shadow-sm group-hover:scale-110 transition-transform"
+        className="w-6 h-6 rounded-md border-2 border-white shadow-sm hover:scale-110 transition-transform"
         style={{ background: value }}
       />
-      <span className="text-xs text-gray-500 hidden group-hover:block absolute mt-8 bg-gray-800 text-white px-2 py-1 rounded text-[10px]">
-        {label}
-      </span>
       <input
         type="color"
         value={value}
@@ -684,17 +626,15 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 
 function ContentCalendar({ content }: { content: ContentPiece[] }) {
   const [viewDate, setViewDate] = useState(new Date())
-
   const year  = viewDate.getFullYear()
   const month = viewDate.getMonth()
 
   const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
   const DAYS   = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
 
-  // Build calendar grid
   const firstDay = new Date(year, month, 1)
   const lastDay  = new Date(year, month + 1, 0)
-  const startDow = (firstDay.getDay() + 6) % 7 // Mon = 0
+  const startDow = (firstDay.getDay() + 6) % 7
 
   const cells: (Date | null)[] = [
     ...Array(startDow).fill(null),
@@ -702,7 +642,6 @@ function ContentCalendar({ content }: { content: ContentPiece[] }) {
   ]
   while (cells.length % 7 !== 0) cells.push(null)
 
-  // Group content by day
   const byDay: Record<string, ContentPiece[]> = {}
   content.forEach(c => {
     if (!c.scheduled_at) return
@@ -715,61 +654,29 @@ function ContentCalendar({ content }: { content: ContentPiece[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Nav */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-900">
-          {MONTHS[month]} {year}
-        </h2>
+        <h2 className="text-sm font-semibold text-gray-900">{MONTHS[month]} {year}</h2>
         <div className="flex gap-2">
-          <button
-            onClick={() => setViewDate(new Date(year, month - 1, 1))}
-            className="btn-secondary text-sm py-1.5 px-3"
-          >
-            ←
-          </button>
-          <button
-            onClick={() => setViewDate(new Date())}
-            className="btn-secondary text-sm py-1.5 px-3"
-          >
-            Aujourd'hui
-          </button>
-          <button
-            onClick={() => setViewDate(new Date(year, month + 1, 1))}
-            className="btn-secondary text-sm py-1.5 px-3"
-          >
-            →
-          </button>
+          <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="btn-secondary text-sm py-1.5 px-3">←</button>
+          <button onClick={() => setViewDate(new Date())} className="btn-secondary text-sm py-1.5 px-3">Aujourd'hui</button>
+          <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="btn-secondary text-sm py-1.5 px-3">→</button>
         </div>
       </div>
 
-      {/* Calendar grid */}
       <div className="card p-0 overflow-hidden">
-        {/* Day headers */}
         <div className="grid grid-cols-7 border-b border-gray-100">
           {DAYS.map(d => (
-            <div key={d} className="py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wide">
-              {d}
-            </div>
+            <div key={d} className="py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wide">{d}</div>
           ))}
         </div>
-
-        {/* Weeks */}
         <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
           {cells.map((date, i) => {
             if (!date) return <div key={i} className="min-h-[80px] bg-gray-50/50" />
-
             const key      = date.toDateString()
             const dayItems = byDay[key] ?? []
             const isToday  = key === today
-
             return (
-              <div
-                key={i}
-                className={cn(
-                  'min-h-[80px] p-1.5 relative',
-                  isToday && 'bg-auchu-50/40'
-                )}
-              >
+              <div key={i} className={cn('min-h-[80px] p-1.5', isToday && 'bg-auchu-50/40')}>
                 <span className={cn(
                   'text-xs font-medium w-5 h-5 flex items-center justify-center rounded-full',
                   isToday ? 'bg-auchu-500 text-white' : 'text-gray-500'
@@ -780,18 +687,13 @@ function ContentCalendar({ content }: { content: ContentPiece[] }) {
                   {dayItems.slice(0, 3).map(item => (
                     <div
                       key={item.id}
-                      className={cn(
-                        'text-[10px] px-1 py-0.5 rounded truncate font-medium',
-                        CONTENT_PLATFORM_COLORS[item.platform] ?? 'bg-gray-100 text-gray-600'
-                      )}
+                      className={cn('text-[10px] px-1 py-0.5 rounded truncate font-medium', CONTENT_PLATFORM_COLORS[item.platform] ?? 'bg-gray-100 text-gray-600')}
                       title={item.title}
                     >
                       {item.title}
                     </div>
                   ))}
-                  {dayItems.length > 3 && (
-                    <div className="text-[10px] text-gray-400 pl-1">+{dayItems.length - 3}</div>
-                  )}
+                  {dayItems.length > 3 && <div className="text-[10px] text-gray-400 pl-1">+{dayItems.length - 3}</div>}
                 </div>
               </div>
             )
@@ -799,7 +701,6 @@ function ContentCalendar({ content }: { content: ContentPiece[] }) {
         </div>
       </div>
 
-      {/* Legend */}
       {content.length === 0 && (
         <div className="card text-center py-10">
           <Calendar className="w-8 h-8 text-gray-200 mx-auto mb-2" />
@@ -812,88 +713,132 @@ function ContentCalendar({ content }: { content: ContentPiece[] }) {
 
 function PortalTab({
   client, portalUrl, copied, generatingPortal, accentBg,
-  projects, invoices, onGenerate, onRevoke, onCopy,
+  invoices, onGenerate, onRevoke, onCopy, onOpen,
 }: {
   client: Client
   portalUrl: string | null
   copied: boolean
   generatingPortal: boolean
   accentBg: string
-  projects: Project[]
   invoices: Invoice[]
   onGenerate: () => void
   onRevoke: () => void
   onCopy: () => void
+  onOpen: () => void
 }) {
+  const INVOICE_STATUS_CONFIG = {
+    draft: { label: 'Brouillon', cls: 'badge-gray' },
+    envoye: { label: 'Envoyé', cls: 'badge-blue' },
+    paye: { label: 'Payé', cls: 'badge-green' },
+    en_retard: { label: 'En retard', cls: 'badge-red' },
+    annule: { label: 'Annulé', cls: 'badge-gray' },
+  }
+
   return (
     <div className="grid grid-cols-2 gap-6">
       {/* Left — controls */}
       <div className="space-y-4">
         <div className="card space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900">Lien de partage</h3>
+          <h3 className="text-sm font-semibold text-gray-900">Lien de partage sécurisé</h3>
 
           {portalUrl ? (
-            <>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 flex items-center gap-2">
-                <Globe className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                <p className="text-xs text-gray-600 font-mono truncate flex-1">{portalUrl}</p>
+            <div className="space-y-3">
+              {/* URL display */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                <p className="text-xs text-gray-400 mb-1 font-medium">Lien unique du portail</p>
+                <div className="flex items-center gap-2">
+                  <Globe className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  <p className="text-xs font-mono text-gray-700 break-all">{portalUrl}</p>
+                </div>
               </div>
+
+              {/* Actions */}
               <div className="flex gap-2">
-                <button onClick={onCopy} className="btn-primary flex-1 gap-1.5 text-sm justify-center">
+                <button
+                  onClick={onCopy}
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border text-sm font-medium transition-all',
+                    copied
+                      ? 'bg-green-50 border-green-200 text-green-700'
+                      : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                  )}
+                >
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   {copied ? 'Copié !' : 'Copier le lien'}
                 </button>
-                <button
-                  onClick={() => window.open(portalUrl, '_blank')}
-                  className="btn-secondary gap-1.5 text-sm"
-                >
+                <button onClick={onOpen} className="btn-secondary gap-1.5 text-sm">
                   <ExternalLink className="w-3.5 h-3.5" />
+                  Ouvrir
                 </button>
               </div>
-              <button onClick={onRevoke} className="text-xs text-red-400 hover:text-red-600 transition-colors">
-                Révoquer l'accès au portail
+
+              {/* Mailto shortcut */}
+              {client.email && (
+                <a
+                  href={`mailto:${client.email}?subject=Votre portail ${client.name}&body=Bonjour,%0A%0AVoici votre portail client pour suivre vos projets, contenus et factures :%0A%0A${encodeURIComponent(portalUrl)}%0A%0AN'hésitez pas à le consulter à tout moment.%0A%0ACordialement,`}
+                  className="btn-primary w-full justify-center text-sm gap-1.5"
+                  style={{ background: accentBg, border: 'none' }}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Envoyer par email à {client.name}
+                </a>
+              )}
+
+              <button onClick={onRevoke} className="text-xs text-red-400 hover:text-red-600 transition-colors w-full text-center pt-1">
+                Révoquer l'accès et générer un nouveau lien
               </button>
-            </>
+            </div>
           ) : (
-            <div className="text-center py-4">
-              <Globe className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-              <p className="text-sm text-gray-500 mb-3">Le portail client n'est pas encore activé</p>
+            <div className="text-center py-6">
+              <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: accentBg }}>
+                <Globe className="w-6 h-6 text-white" />
+              </div>
+              <p className="text-sm font-medium text-gray-700 mb-1">Portail client non activé</p>
+              <p className="text-xs text-gray-400 mb-4">Génère un lien unique et sécurisé à partager avec {client.name}</p>
               <button
                 onClick={onGenerate}
                 disabled={generatingPortal}
                 className="btn-primary gap-1.5 disabled:opacity-50"
+                style={{ background: accentBg, border: 'none' }}
               >
                 {generatingPortal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-                Activer le portail client
+                Générer un lien portail
               </button>
             </div>
           )}
         </div>
 
-        <div className="card text-sm text-gray-600 space-y-2">
-          <p className="font-medium text-gray-800">Ce que voit le client :</p>
-          <ul className="space-y-1 text-gray-500">
-            <li className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Ses projets actifs et leurs statuts</li>
-            <li className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Ses factures et montants</li>
-            <li className="flex items-center gap-2"><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Le contenu planifié</li>
-            <li className="flex items-center gap-2"><X className="w-3.5 h-3.5 text-red-400" /> Notes internes (jamais visibles)</li>
+        <div className="card">
+          <p className="text-sm font-medium text-gray-800 mb-3">Ce que voit le client :</p>
+          <ul className="space-y-2">
+            {[
+              { ok: true,  text: 'Calendrier éditorial du mois' },
+              { ok: true,  text: 'Contenus en attente d\'approbation' },
+              { ok: true,  text: 'Factures et statuts de paiement' },
+              { ok: false, text: 'Notes internes (jamais exposées)' },
+              { ok: false, text: 'Accès au dashboard interne' },
+            ].map((item, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm text-gray-500">
+                {item.ok
+                  ? <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                  : <X className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />}
+                {item.text}
+              </li>
+            ))}
           </ul>
         </div>
       </div>
 
-      {/* Right — portal preview */}
+      {/* Right — preview */}
       <div>
         <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">Aperçu du portail</p>
         <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          {/* Portal mini header */}
           <div className="p-4" style={{ background: `linear-gradient(135deg, ${client.brand_primary}, ${client.brand_secondary})` }}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                {client.logo_url ? (
-                  <img src={client.logo_url} alt={client.name} className="w-full h-full object-cover rounded-xl" />
-                ) : (
-                  <span className="text-white font-bold text-sm">{getInitials(client.name)}</span>
-                )}
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center overflow-hidden">
+                {client.logo_url
+                  ? <img src={client.logo_url} alt="" className="w-full h-full object-cover" />
+                  : <span className="text-white font-bold text-sm">{getInitials(client.name)}</span>}
               </div>
               <div>
                 <p className="text-white font-semibold text-sm">{client.name}</p>
@@ -901,41 +846,28 @@ function PortalTab({
               </div>
             </div>
           </div>
-
-          {/* Portal mini content */}
           <div className="p-4 bg-gray-50 space-y-3">
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Projets actifs</p>
-              {projects.filter(p => p.status !== 'termine' && p.status !== 'annule').slice(0, 2).map(p => (
-                <div key={p.id} className="bg-white rounded-lg border border-gray-100 px-3 py-2 mb-1.5 flex items-center justify-between">
-                  <p className="text-xs font-medium text-gray-700 truncate">{p.title}</p>
-                  <span className={cn('badge text-[10px]', PROJECT_STATUS_COLORS[p.status])}>
-                    {PROJECT_STATUS_LABELS[p.status]}
-                  </span>
-                </div>
-              ))}
-              {projects.filter(p => p.status !== 'termine' && p.status !== 'annule').length === 0 && (
-                <p className="text-xs text-gray-400">Aucun projet actif</p>
-              )}
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Calendrier éditorial</p>
+              <div className="bg-white rounded-lg border border-gray-100 px-3 py-2 text-xs text-gray-400 italic">
+                Contenu planifié du mois…
+              </div>
             </div>
-
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Dernières factures</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Factures</p>
               {invoices.slice(0, 2).map(inv => {
-                const cfg = STATUS_CONFIG[inv.status as keyof typeof STATUS_CONFIG]
+                const cfg = INVOICE_STATUS_CONFIG[inv.status as keyof typeof INVOICE_STATUS_CONFIG]
                 return (
-                  <div key={inv.id} className="bg-white rounded-lg border border-gray-100 px-3 py-2 mb-1.5 flex items-center justify-between">
+                  <div key={inv.id} className="bg-white rounded-lg border border-gray-100 px-3 py-2 mb-1 flex items-center justify-between">
                     <p className="text-xs font-medium text-gray-700">{inv.invoice_number}</p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <span className="text-xs font-medium text-gray-700">{formatCurrency(inv.total)}</span>
                       <span className={cn('badge text-[10px]', cfg?.cls)}>{cfg?.label}</span>
                     </div>
                   </div>
                 )
               })}
-              {invoices.length === 0 && (
-                <p className="text-xs text-gray-400">Aucune facture</p>
-              )}
+              {invoices.length === 0 && <p className="text-xs text-gray-400">Aucune facture</p>}
             </div>
           </div>
         </div>
