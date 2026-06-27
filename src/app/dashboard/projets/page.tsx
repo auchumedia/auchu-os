@@ -1,15 +1,31 @@
+import { createClient } from '@/lib/supabase/server'
+import KanbanBoard from './KanbanBoard'
+
 export const metadata = { title: 'Projets' }
 
-export default function ProjetsPage() {
+export default async function ProjetsPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const [{ data: projects }, { data: clients }] = await Promise.all([
+    supabase
+      .from('projects')
+      .select('*, client:clients(id, name, company)')
+      .eq('user_id', user!.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('clients')
+      .select('id, name, company')
+      .eq('user_id', user!.id)
+      .order('name'),
+  ])
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Projets</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Suivi des livrables et deadlines</p>
-      </div>
-      <div className="card text-center py-16">
-        <p className="text-gray-400 text-sm">Module projets — en construction 🚧</p>
-      </div>
+      <KanbanBoard
+        initialProjects={projects ?? []}
+        clients={clients ?? []}
+      />
     </div>
   )
 }
