@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAnonClient } from '@/lib/supabase/anon'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { formatCurrency, formatDate, getInitials, PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS } from '@/lib/utils'
@@ -50,7 +50,7 @@ export default async function PortailPage({
   params: { token: string }
   searchParams?: { m?: string }
 }) {
-  const supabase = await createClient()
+  const supabase = createAnonClient()
 
   const { data: client } = await supabase
     .from('clients')
