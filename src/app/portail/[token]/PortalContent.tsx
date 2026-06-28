@@ -1,9 +1,52 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { X, ThumbsUp, ThumbsDown, Loader2, MessageSquare, ChevronRight } from 'lucide-react'
-import { ContentPiece, CalendarEvent } from '@/types'
+import { X, ThumbsUp, ThumbsDown, Loader2, MessageSquare, ChevronRight, ExternalLink, Link2 } from 'lucide-react'
+import { ContentPiece, CalendarEvent, ReferenceLink } from '@/types'
 import { cn, formatDate } from '@/lib/utils'
+
+// ─── Reference helpers ────────────────────────────────────────────────────────
+
+const REF_PLATFORMS: Record<string, { label: string; bg: string; color: string; emoji: string }> = {
+  instagram: { label: 'Instagram', bg: '#fce7f3', color: '#be185d', emoji: '📸' },
+  tiktok:    { label: 'TikTok',    bg: '#f1f5f9', color: '#0f172a', emoji: '🎵' },
+  youtube:   { label: 'YouTube',   bg: '#fee2e2', color: '#dc2626', emoji: '▶' },
+  facebook:  { label: 'Facebook',  bg: '#dbeafe', color: '#1d4ed8', emoji: '👥' },
+  linkedin:  { label: 'LinkedIn',  bg: '#e0f2fe', color: '#0284c7', emoji: '💼' },
+  x:         { label: 'X / Twitter', bg: '#f1f5f9', color: '#0f172a', emoji: '𝕏' },
+  web:       { label: 'Lien web',  bg: '#f3f4f6', color: '#374151', emoji: '🔗' },
+}
+
+function getYouTubeThumbnail(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+  return m ? `https://img.youtube.com/vi/${m[1]}/mqdefault.jpg` : null
+}
+
+function RefCard({ link }: { link: ReferenceLink }) {
+  const cfg    = REF_PLATFORMS[link.platform] ?? REF_PLATFORMS.web
+  const ytThumb = link.platform === 'youtube' ? getYouTubeThumbnail(link.url) : null
+  return (
+    <div className="flex items-center gap-3 p-2.5 rounded-xl border border-gray-100 bg-white">
+      {ytThumb ? (
+        <img src={ytThumb} alt="" className="w-16 h-10 object-cover rounded-lg flex-shrink-0" />
+      ) : (
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-base" style={{ background: cfg.bg }}>
+          {cfg.emoji}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-gray-800 truncate">{link.title || link.url}</p>
+        {link.title && <p className="text-[11px] text-gray-400 truncate">{link.url}</p>}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium mt-0.5" style={{ background: cfg.bg, color: cfg.color }}>
+          {cfg.emoji} {cfg.label}
+        </span>
+      </div>
+      <a href={link.url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0">
+        <ExternalLink className="w-3.5 h-3.5" />
+      </a>
+    </div>
+  )
+}
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -377,6 +420,22 @@ export default function PortalContent({ content: initial, events, token, primary
                   </h3>
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap font-mono">
                     {selected.script}
+                  </div>
+                </section>
+              )}
+
+              {/* Reference links */}
+              {selected.reference_links?.length > 0 && (
+                <section>
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <Link2 className="w-3.5 h-3.5" />
+                    Références &amp; inspiration
+                    <span className="font-normal text-gray-300">({selected.reference_links.length})</span>
+                  </h3>
+                  <div className="space-y-2">
+                    {selected.reference_links.map((lnk, i) => (
+                      <RefCard key={i} link={lnk} />
+                    ))}
                   </div>
                 </section>
               )}

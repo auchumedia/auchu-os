@@ -71,8 +71,9 @@ export interface ContentPiece {
   description: string | null
   script: string | null
   assigned_to: string | null
-  client_notes: string | null
-  variants: ContentVariant[]
+  client_notes:    string | null
+  reference_links: ReferenceLink[]
+  variants:        ContentVariant[]
   scheduled_at: string | null
   published_at: string | null
   ai_generated: boolean
@@ -85,6 +86,12 @@ export interface ContentVariant {
   id: string
   label: string
   body: string
+}
+
+export interface ReferenceLink {
+  url:      string
+  title:    string
+  platform: string
 }
 
 // ─── Calendrier d'événements ──────────────────────────────────────────────────
