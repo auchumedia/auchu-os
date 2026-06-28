@@ -51,7 +51,6 @@ export default async function ClientPage({ params }: { params: { id: string } })
       invoices={invoices ?? []}
       content={content ?? []}
       events={events ?? []}
-      appUrl={process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}
     />
   )
 }

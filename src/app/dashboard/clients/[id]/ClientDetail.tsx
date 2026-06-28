@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, Camera, ExternalLink, Copy, Check, Plus, Loader2,
@@ -47,12 +47,11 @@ interface Props {
   invoices: Invoice[]
   content:  ContentPiece[]
   events:   CalendarEvent[]
-  appUrl:   string
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ClientDetail({ client: initial, invoices, content, events, appUrl }: Props) {
+export default function ClientDetail({ client: initial, invoices, content, events }: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
   const [saving, setSaving] = useState<string | null>(null)
@@ -66,9 +65,13 @@ export default function ClientDetail({ client: initial, invoices, content, event
   // Portal
   const [generatingPortal, setGeneratingPortal] = useState(false)
   const [portalError, setPortalError] = useState<string | null>(null)
-  const [portalUrl, setPortalUrl] = useState<string | null>(
-    client.portal_token ? `${appUrl}/portail/${client.portal_token}` : null
-  )
+  const [portalUrl, setPortalUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (client.portal_token) {
+      setPortalUrl(`${window.location.origin}/portail/${client.portal_token}`)
+    }
+  }, [client.portal_token])
 
   // Notes
   const [notesValue, setNotesValue]   = useState(client.internal_notes ?? '')
@@ -164,7 +167,7 @@ export default function ClientDetail({ client: initial, invoices, content, event
       if (!res.ok) {
         setPortalError(json.error ?? `Erreur ${res.status}`)
       } else {
-        setPortalUrl(json.portal_url)
+        setPortalUrl(`${window.location.origin}/portail/${json.token}`)
         setClient(c => ({ ...c, portal_token: json.token, portal_enabled: true }))
       }
     } catch (e) {
