@@ -3,17 +3,22 @@ import { formatCurrency } from '@/lib/utils'
 import { Plus, Users } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Clients' }
 
 export default async function ClientsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: clients } = await supabase
+  const { data: clients, error } = await supabase
     .from('clients')
     .select('*')
     .eq('user_id', user!.id)
     .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('[clients] Supabase error:', error.message, '| code:', error.code, '| user:', user?.id)
+  }
 
   return (
     <div className="space-y-6">
@@ -28,7 +33,15 @@ export default async function ClientsPage() {
         </Link>
       </div>
 
-      {!clients || clients.length === 0 ? (
+      {error && (
+        <div className="card border-red-200 bg-red-50 text-red-700 text-sm p-4">
+          <p className="font-semibold">Erreur Supabase</p>
+          <p className="font-mono text-xs mt-1">{error.message} (code: {error.code})</p>
+          <p className="text-xs mt-1 text-red-500">user_id: {user?.id}</p>
+        </div>
+      )}
+
+      {!error && (!clients || clients.length === 0) ? (
         <div className="card text-center py-16">
           <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <h3 className="text-sm font-medium text-gray-700 mb-1">Aucun client encore</h3>
@@ -51,7 +64,7 @@ export default async function ClientsPage() {
               </tr>
             </thead>
             <tbody>
-              {clients.map((client: any) => (
+              {(clients ?? []).map((client: any) => (
                 <tr key={client.id}>
                   <td>
                     <div>
