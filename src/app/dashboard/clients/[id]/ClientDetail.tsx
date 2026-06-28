@@ -7,12 +7,14 @@ import {
   Calendar, FileText, CreditCard, Globe, Pencil,
   Save, X, CheckCircle,
 } from 'lucide-react'
-import { Client, Invoice, ContentPiece } from '@/types'
+import { Client, Invoice, ContentPiece, CalendarEvent } from '@/types'
+import ContentTable from './ContentTable'
+import CalendarView from './CalendarView'
 import { cn, formatCurrency, formatDate, getInitials } from '@/lib/utils'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'content' | 'invoices' | 'portal'
+type Tab = 'overview' | 'content' | 'calendar' | 'invoices' | 'portal'
 
 const PLATFORMS = ['instagram', 'facebook', 'tiktok', 'linkedin', 'google', 'meta']
 
@@ -44,12 +46,13 @@ interface Props {
   client:   Client
   invoices: Invoice[]
   content:  ContentPiece[]
+  events:   CalendarEvent[]
   appUrl:   string
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ClientDetail({ client: initial, invoices, content, appUrl }: Props) {
+export default function ClientDetail({ client: initial, invoices, content, events, appUrl }: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
   const [saving, setSaving] = useState<string | null>(null)
@@ -193,10 +196,11 @@ export default function ClientDetail({ client: initial, invoices, content, appUr
   const accentBg = `linear-gradient(135deg, ${client.brand_primary}, ${client.brand_secondary})`
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'overview', label: 'Vue d\'ensemble', icon: FileText },
-    { id: 'content',  label: `Contenu (${content.length})`,   icon: Calendar },
-    { id: 'invoices', label: `Factures (${invoices.length})`, icon: CreditCard },
-    { id: 'portal',   label: 'Portail',                       icon: Globe },
+    { id: 'overview',  label: 'Vue d\'ensemble',              icon: FileText  },
+    { id: 'content',   label: `Contenu (${content.length})`,  icon: FileText  },
+    { id: 'calendar',  label: 'Calendrier',                   icon: Calendar  },
+    { id: 'invoices',  label: `Factures (${invoices.length})`,icon: CreditCard},
+    { id: 'portal',    label: 'Portail',                      icon: Globe     },
   ]
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -531,9 +535,18 @@ export default function ClientDetail({ client: initial, invoices, content, appUr
         </div>
       )}
 
-      {/* ─── Tab: Contenu ────────────────────────────────────────────────────── */}
+      {/* ─── Tab: Contenu (table Notion) ─────────────────────────────────────── */}
       {tab === 'content' && (
-        <ContentCalendar content={content} />
+        <ContentTable initialContent={content} clientId={client.id} />
+      )}
+
+      {/* ─── Tab: Calendrier ─────────────────────────────────────────────────── */}
+      {tab === 'calendar' && (
+        <CalendarView
+          initialEvents={events}
+          contentPieces={content}
+          clientId={client.id}
+        />
       )}
 
       {/* ─── Tab: Factures ───────────────────────────────────────────────────── */}
@@ -644,92 +657,6 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
   )
 }
 
-function ContentCalendar({ content }: { content: ContentPiece[] }) {
-  const [viewDate, setViewDate] = useState(new Date())
-  const year  = viewDate.getFullYear()
-  const month = viewDate.getMonth()
-
-  const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
-  const DAYS   = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
-
-  const firstDay = new Date(year, month, 1)
-  const lastDay  = new Date(year, month + 1, 0)
-  const startDow = (firstDay.getDay() + 6) % 7
-
-  const cells: (Date | null)[] = [
-    ...Array(startDow).fill(null),
-    ...Array.from({ length: lastDay.getDate() }, (_, i) => new Date(year, month, i + 1)),
-  ]
-  while (cells.length % 7 !== 0) cells.push(null)
-
-  const byDay: Record<string, ContentPiece[]> = {}
-  content.forEach(c => {
-    if (!c.scheduled_at) return
-    const key = new Date(c.scheduled_at).toDateString()
-    if (!byDay[key]) byDay[key] = []
-    byDay[key].push(c)
-  })
-
-  const today = new Date().toDateString()
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-900">{MONTHS[month]} {year}</h2>
-        <div className="flex gap-2">
-          <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="btn-secondary text-sm py-1.5 px-3">←</button>
-          <button onClick={() => setViewDate(new Date())} className="btn-secondary text-sm py-1.5 px-3">Aujourd'hui</button>
-          <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="btn-secondary text-sm py-1.5 px-3">→</button>
-        </div>
-      </div>
-
-      <div className="card p-0 overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-gray-100">
-          {DAYS.map(d => (
-            <div key={d} className="py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wide">{d}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
-          {cells.map((date, i) => {
-            if (!date) return <div key={i} className="min-h-[80px] bg-gray-50/50" />
-            const key      = date.toDateString()
-            const dayItems = byDay[key] ?? []
-            const isToday  = key === today
-            return (
-              <div key={i} className={cn('min-h-[80px] p-1.5', isToday && 'bg-auchu-50/40')}>
-                <span className={cn(
-                  'text-xs font-medium w-5 h-5 flex items-center justify-center rounded-full',
-                  isToday ? 'bg-auchu-500 text-white' : 'text-gray-500'
-                )}>
-                  {date.getDate()}
-                </span>
-                <div className="mt-1 space-y-0.5">
-                  {dayItems.slice(0, 3).map(item => (
-                    <div
-                      key={item.id}
-                      className={cn('text-[10px] px-1 py-0.5 rounded truncate font-medium', CONTENT_PLATFORM_COLORS[item.platform] ?? 'bg-gray-100 text-gray-600')}
-                      title={item.title}
-                    >
-                      {item.title}
-                    </div>
-                  ))}
-                  {dayItems.length > 3 && <div className="text-[10px] text-gray-400 pl-1">+{dayItems.length - 3}</div>}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {content.length === 0 && (
-        <div className="card text-center py-10">
-          <Calendar className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Aucun contenu planifié ce mois</p>
-        </div>
-      )}
-    </div>
-  )
-}
 
 function PortalTab({
   client, portalUrl, portalError, copied, generatingPortal, accentBg,

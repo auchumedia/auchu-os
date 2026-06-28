@@ -54,8 +54,8 @@ export interface Project {
 }
 
 // ─── Contenu ──────────────────────────────────────────────────────────────────
-export type ContentType = 'post' | 'story' | 'reel' | 'ad' | 'caption' | 'script' | 'email'
-export type ContentStatus = 'draft' | 'review' | 'approuve' | 'publie' | 'refuse'
+export type ContentType = 'post' | 'reel' | 'story' | 'script_video' | 'ad' | 'caption' | 'script' | 'email'
+export type ContentStatus = 'idee' | 'en_redaction' | 'pret' | 'approuve' | 'refuse' | 'draft' | 'review' | 'publie'
 export type Platform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin' | 'google' | 'meta'
 
 export interface ContentPiece {
@@ -67,7 +67,11 @@ export interface ContentPiece {
   type: ContentType
   platform: Platform
   status: ContentStatus
-  body: string
+  body: string | null
+  description: string | null
+  script: string | null
+  assigned_to: string | null
+  client_notes: string | null
   variants: ContentVariant[]
   scheduled_at: string | null
   published_at: string | null
@@ -81,6 +85,24 @@ export interface ContentVariant {
   id: string
   label: string
   body: string
+}
+
+// ─── Calendrier d'événements ──────────────────────────────────────────────────
+export type CalendarEventType = 'tournage' | 'publication'
+
+export interface CalendarEvent {
+  id: string
+  user_id: string
+  client_id: string
+  type: CalendarEventType
+  title: string
+  date: string
+  location: string | null
+  participants: string[] | null
+  platform: string | null
+  content_piece_id: string | null
+  notes: string | null
+  created_at: string
 }
 
 // ─── Équipe ───────────────────────────────────────────────────────────────────

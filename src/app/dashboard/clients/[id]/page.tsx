@@ -8,14 +8,11 @@ export default async function ClientPage({ params }: { params: { id: string } })
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const now   = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
-
   const [
     { data: client, error },
     { data: invoices },
     { data: content },
+    { data: events },
   ] = await Promise.all([
     supabase
       .from('clients')
@@ -36,9 +33,14 @@ export default async function ClientPage({ params }: { params: { id: string } })
       .select('*')
       .eq('client_id', params.id)
       .eq('user_id', user!.id)
-      .gte('scheduled_at', start)
-      .lte('scheduled_at', end)
-      .order('scheduled_at', { ascending: true }),
+      .order('created_at', { ascending: false }),
+
+    supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('client_id', params.id)
+      .eq('user_id', user!.id)
+      .order('date', { ascending: true }),
   ])
 
   if (error || !client) notFound()
@@ -48,6 +50,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
       client={client}
       invoices={invoices ?? []}
       content={content ?? []}
+      events={events ?? []}
       appUrl={process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}
     />
   )
