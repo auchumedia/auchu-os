@@ -80,7 +80,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className="fixed left-0 top-0 h-full bg-white border-r border-gray-100 flex flex-col z-10"
+      className="fixed left-0 top-0 h-full bg-white border-r border-gray-100 flex-col z-10 hidden md:flex"
       style={{ width: 'var(--sidebar-width, 240px)' }}
     >
       {/* Logo */}

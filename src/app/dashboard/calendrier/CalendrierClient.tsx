@@ -72,6 +72,10 @@ interface Props {
 
 export default function CalendrierClient({ userId, canManageTeam, initialClients }: Props) {
   const [view,           setView]           = useState<ViewMode>('month')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) setView('week')
+  }, [])
   const [curDate,        setCurDate]        = useState(new Date())
   const [teamView,       setTeamView]       = useState(false)
   const [selectedMember, setSelectedMember] = useState<string>('')

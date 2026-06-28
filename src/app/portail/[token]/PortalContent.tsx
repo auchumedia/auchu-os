@@ -289,7 +289,40 @@ export default function PortalContent({ content: initial, events, token, primary
           <p className="text-sm text-gray-400 text-center py-8">Aucun contenu pour l'instant.</p>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-gray-50">
+              {items.map(c => {
+                const sc = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.idee
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => openItem(c)}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-gray-900 text-sm truncate">{c.title}</p>
+                          {c.client_notes && <MessageSquare className="w-3 h-3 text-amber-400 flex-shrink-0" />}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', PLATFORM_COLORS[c.platform] ?? 'bg-gray-100 text-gray-600')}>
+                            {PLATFORM_LABELS[c.platform] ?? c.platform}
+                          </span>
+                          <span className="text-xs text-gray-400">{TYPE_LABELS[c.type] ?? c.type}</span>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', sc.cls)}>{sc.label}</span>
+                        <ChevronRight className="w-4 h-4 text-gray-300" />
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            {/* Desktop table */}
+            <table className="w-full text-sm hidden md:table">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-4 py-3">Titre</th>
@@ -409,7 +442,7 @@ export default function PortalContent({ content: initial, events, token, primary
       {selected && (
         <>
           <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40" onClick={() => setSelected(null)} />
-          <aside className="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 flex flex-col overflow-hidden">
+          <aside className="fixed top-0 right-0 h-full w-full md:max-w-xl bg-white shadow-2xl z-50 flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-start justify-between p-6 border-b border-gray-100 flex-shrink-0" style={{ background: `linear-gradient(135deg, ${primary}10, ${secondary}10)` }}>
               <div className="flex-1 min-w-0 pr-4">

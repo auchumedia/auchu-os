@@ -264,8 +264,8 @@ export default function FinanceModule({
       </div>
 
       {/* Tab nav */}
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-1 -mb-px">
+      <div className="border-b border-gray-200 overflow-x-auto scrollbar-hide">
+        <nav className="flex gap-1 -mb-px min-w-max">
           {tabs.map(t => (
             <button
               key={t.id}
@@ -287,7 +287,7 @@ export default function FinanceModule({
       {tab === 'apercu' && (
         <div className="space-y-6">
           {/* KPI row 1 */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard
               label="Revenus ce mois"
               value={formatCurrency(currentMonth.revenue)}
@@ -319,7 +319,7 @@ export default function FinanceModule({
           </div>
 
           {/* KPI row 2 — taxes */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="card">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">TPS collectée (5%)</p>
               <p className="text-xl font-semibold text-gray-900 mt-1">{formatCurrency(tpsCollected)}</p>
@@ -426,7 +426,7 @@ export default function FinanceModule({
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Titre *</label>
                   <input
@@ -509,7 +509,7 @@ export default function FinanceModule({
             </form>
           )}
 
-          {/* Expenses table */}
+          {/* Expenses list */}
           {expenses.length === 0 ? (
             <div className="card text-center py-12">
               <TrendingDown className="w-8 h-8 text-gray-200 mx-auto mb-2" />
@@ -517,7 +517,33 @@ export default function FinanceModule({
             </div>
           ) : (
             <div className="card p-0 overflow-hidden">
-              <table className="table">
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-gray-100">
+                {expenses.map(exp => {
+                  const cat = EXPENSE_CATEGORIES.find(c => c.value === exp.category)
+                  return (
+                    <div key={exp.id} className="px-4 py-3 flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 text-sm">{exp.title}</p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className={cn('badge text-xs', cat?.color ?? 'badge-gray')}>{cat?.label ?? exp.category}</span>
+                          <span className="text-xs text-gray-400">{formatDate(exp.date)}</span>
+                          {exp.client?.name && <span className="text-xs text-gray-400">{exp.client.name}</span>}
+                        </div>
+                        {exp.notes && <p className="text-xs text-gray-400 mt-0.5">{exp.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-sm font-medium text-gray-900">{formatCurrency(exp.amount)}</span>
+                        <button onClick={() => deleteExpense(exp.id)} className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {/* Desktop table */}
+              <table className="table hidden md:table">
                 <thead>
                   <tr>
                     <th>Date</th>

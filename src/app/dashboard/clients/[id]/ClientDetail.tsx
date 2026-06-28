@@ -358,8 +358,8 @@ export default function ClientDetail({ client: initial, invoices, content, event
         </div>
 
         {/* Tab nav */}
-        <div className="border-t border-white/60 bg-white/40 px-6">
-          <nav className="flex gap-1 -mb-px">
+        <div className="border-t border-white/60 bg-white/40 px-6 overflow-x-auto scrollbar-hide">
+          <nav className="flex gap-1 -mb-px min-w-max">
             {tabs.map(t => (
               <button
                 key={t.id}
@@ -381,8 +381,8 @@ export default function ClientDetail({ client: initial, invoices, content, event
 
       {/* ─── Tab: Vue d'ensemble ─────────────────────────────────────────────── */}
       {tab === 'overview' && (
-        <div className="grid grid-cols-3 gap-5">
-          <div className="col-span-2 space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="md:col-span-2 space-y-5">
             <div className="card">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-gray-900">Informations</h2>
@@ -405,7 +405,7 @@ export default function ClientDetail({ client: initial, invoices, content, event
 
               {editing ? (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="label">Nom</label>
                       <input type="text" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} className="input text-sm" />
@@ -686,7 +686,7 @@ function PortalTab({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Left — controls */}
       <div className="space-y-4">
         <div className="card space-y-4">
