@@ -106,10 +106,18 @@ export default function PortalContent({ content: initial, events, token, primary
 
   // ─── Polling — re-fetch content every 10 s ────────────────────────────────
   const fetchContent = useCallback(async () => {
-    const res = await fetch(`/api/portail/${token}/contenu`)
-    if (!res.ok) return
-    const { data } = await res.json()
-    const fresh: ContentPiece[] = data ?? []
+    console.log('[portail] fetchContent triggered at', new Date().toISOString())
+    const res = await fetch(`/api/portail/${token}/contenu?t=${Date.now()}`, {
+      cache: 'no-store',
+    })
+    console.log('[portail] API status:', res.status)
+    if (!res.ok) {
+      console.error('[portail] fetch failed:', res.status)
+      return
+    }
+    const json = await res.json()
+    console.log('[portail] items received:', json.data?.length ?? 0, '| count:', json.count)
+    const fresh: ContentPiece[] = json.data ?? []
     setItems(fresh)
     setLastSync(new Date())
     // Sync the open panel: functional update avoids capturing `selected` in closure

@@ -1,6 +1,10 @@
 import { createAnonClient } from '@/lib/supabase/anon'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
+const NO_CACHE = { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+
 export async function GET(
   _req: Request,
   { params }: { params: { token: string } }
@@ -19,7 +23,7 @@ export async function GET(
     console.error('[portail/contenu] client lookup failed:', clientErr?.message, '| token:', params.token)
     return NextResponse.json(
       { error: 'Portail invalide', detail: clientErr?.message ?? 'no client found', token: params.token },
-      { status: 403 }
+      { status: 403, headers: NO_CACHE }
     )
   }
 
@@ -36,11 +40,11 @@ export async function GET(
     console.error('[portail/contenu] content_pieces error:', error)
     return NextResponse.json(
       { error: error.message, code: error.code, hint: error.hint, details: error.details },
-      { status: 500 }
+      { status: 500, headers: NO_CACHE }
     )
   }
 
   console.log('[portail/contenu] rows returned:', count)
 
-  return NextResponse.json({ data: data ?? [], count, client_id: client.id })
+  return NextResponse.json({ data: data ?? [], count, client_id: client.id }, { headers: NO_CACHE })
 }
