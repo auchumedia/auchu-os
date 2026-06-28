@@ -25,10 +25,10 @@ export async function GET(
 
   console.log('[portail/contenu] client found:', client.id, client.name)
 
-  // Step 2 — fetch content_pieces as anon
+  // Step 2 — fetch content_pieces as anon (explicit columns so nothing is ever omitted)
   const { data, error, count } = await supabase
     .from('content_pieces')
-    .select('*', { count: 'exact' })
+    .select('id, client_id, user_id, project_id, title, type, platform, status, body, description, script, assigned_to, client_notes, reference_links, scheduled_at, published_at, ai_generated, created_at, updated_at', { count: 'exact' })
     .eq('client_id', client.id)
     .order('created_at', { ascending: false })
 

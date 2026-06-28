@@ -413,19 +413,19 @@ export default function PortalContent({ content: initial, events, token, primary
                 </section>
               )}
 
-              {selected.script && (
+              {(selected.script || selected.body) && (
                 <section>
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
                     {selected.type === 'script_video' ? 'Script vidéo' : 'Texte / Script'}
                   </h3>
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap font-mono">
-                    {selected.script}
+                    {selected.script ?? selected.body}
                   </div>
                 </section>
               )}
 
               {/* Reference links */}
-              {selected.reference_links?.length > 0 && (
+              {(selected.reference_links ?? []).length > 0 && (
                 <section>
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
                     <Link2 className="w-3.5 h-3.5" />
@@ -433,7 +433,7 @@ export default function PortalContent({ content: initial, events, token, primary
                     <span className="font-normal text-gray-300">({selected.reference_links.length})</span>
                   </h3>
                   <div className="space-y-2">
-                    {selected.reference_links.map((lnk, i) => (
+                    {(selected.reference_links ?? []).map((lnk, i) => (
                       <RefCard key={i} link={lnk} />
                     ))}
                   </div>
