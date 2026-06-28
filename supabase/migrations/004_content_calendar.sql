@@ -104,6 +104,7 @@ end $$;
 
 -- ─── 4. Grants ────────────────────────────────────────────────────────────────
 
+grant select on public.content_pieces to anon;
 grant select on public.calendar_events to anon;
 grant update (client_notes, status) on public.content_pieces to anon;
 
