@@ -56,7 +56,8 @@ export default function PortalContent({ content: initial, events, token, primary
   const [selected, setSelected] = useState<ContentPiece | null>(null)
   const [notes, setNotes]       = useState('')
   const [saving, setSaving]     = useState<string | null>(null)
-  const [lastSync, setLastSync] = useState<Date>(new Date())
+  const [lastSync, setLastSync] = useState<Date | null>(null)
+  const [mounted, setMounted]   = useState(false)
 
   const gradient = `linear-gradient(135deg, ${primary}, ${secondary})`
 
@@ -66,12 +67,12 @@ export default function PortalContent({ content: initial, events, token, primary
     if (res.ok) {
       const { data } = await res.json()
       setItems(data ?? [])
-      setLastSync(new Date())
+      setLastSync(new Date())  // safe — only called client-side via useEffect
     }
   }, [token])
 
   useEffect(() => {
-    // Immediate fetch on mount (ensures fresh data even if server props were stale)
+    setMounted(true)
     fetchContent()
     const interval = setInterval(fetchContent, 10_000)
     return () => clearInterval(interval)
@@ -203,9 +204,11 @@ export default function PortalContent({ content: initial, events, token, primary
             <h2 className="font-semibold text-gray-900">Tous les contenus</h2>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">
-              Mis à jour {lastSync.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-            </span>
+            {mounted && lastSync && (
+              <span className="text-xs text-gray-400">
+                Mis à jour {lastSync.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            )}
             <button
               onClick={fetchContent}
               className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors"
