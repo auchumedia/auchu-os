@@ -107,11 +107,16 @@ export default function PortalContent({ content: initial, events, token, primary
   // ─── Polling — re-fetch content every 10 s ────────────────────────────────
   const fetchContent = useCallback(async () => {
     const res = await fetch(`/api/portail/${token}/contenu`)
-    if (res.ok) {
-      const { data } = await res.json()
-      setItems(data ?? [])
-      setLastSync(new Date())  // safe — only called client-side via useEffect
-    }
+    if (!res.ok) return
+    const { data } = await res.json()
+    const fresh: ContentPiece[] = data ?? []
+    setItems(fresh)
+    setLastSync(new Date())
+    // Sync the open panel: functional update avoids capturing `selected` in closure
+    setSelected(prev => {
+      if (!prev) return null
+      return fresh.find(i => i.id === prev.id) ?? prev
+    })
   }, [token])
 
   useEffect(() => {
@@ -125,6 +130,18 @@ export default function PortalContent({ content: initial, events, token, primary
     setSelected(item)
     setNotes(item.client_notes ?? '')
   }
+
+  // Keep notes textarea in sync with server value when the panel is open
+  // but the user hasn't started editing (notes matches last saved value)
+  useEffect(() => {
+    if (!selected) return
+    setNotes(prev => {
+      const savedValue = selected.client_notes ?? ''
+      // Only overwrite if the textarea still matches what was last saved
+      // (i.e. user hasn't typed unsaved changes)
+      return prev === savedValue || prev === '' ? savedValue : prev
+    })
+  }, [selected])
 
   const portalPatch = async (id: string, fields: Record<string, unknown>) => {
     setSaving(id)
