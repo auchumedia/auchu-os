@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getOrgContext } from '@/lib/org'
 import Sidebar from '@/components/layout/Sidebar'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -8,12 +9,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!user) redirect('/auth/login')
 
-  const agencyName = user.user_metadata?.agency_name || 'Mon agence'
-  const userName = user.user_metadata?.full_name || user.email || ''
+  const ctx = await getOrgContext()
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar agencyName={agencyName} userName={userName} />
+      <Sidebar
+        agencyName={ctx?.org?.name || user.user_metadata?.agency_name || 'Mon agence'}
+        userName={ctx?.userName || user.email || ''}
+        role={ctx?.role || 'owner'}
+      />
       <main
         className="flex-1 overflow-auto"
         style={{ marginLeft: 'var(--sidebar-width, 240px)' }}

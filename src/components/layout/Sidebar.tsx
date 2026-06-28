@@ -6,32 +6,62 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Users, FolderKanban, FileText,
-  Receipt, BarChart2, Sparkles, Brain, Settings, LogOut, Zap,
+  Receipt, Sparkles, Brain, Settings, LogOut, Zap,
+  UserCircle, UsersRound,
 } from 'lucide-react'
+import type { OrgRole } from '@/types'
 
-const navSections = [
-  {
-    label: 'Principal',
-    items: [
-      { href: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
-      { href: '/dashboard/clients', icon: Users, label: 'Clients' },
-      { href: '/dashboard/projets', icon: FolderKanban, label: 'Projets' },
-      { href: '/dashboard/contenu', icon: FileText, label: 'Contenu' },
-      { href: '/dashboard/finance', icon: Receipt, label: 'Finance' },
-    ],
-  },
-  {
-    label: 'Agents IA',
-    items: [
-      { href: '/agents/contenu', icon: Sparkles, label: 'Agent contenu' },
-      { href: '/agents/productivite', icon: Brain, label: 'Agent productivité' },
-    ],
-  },
-]
+type NavItem = { href: string; icon: React.ElementType; label: string }
 
-export default function Sidebar({ agencyName, userName }: { agencyName?: string; userName?: string }) {
+function buildNav(role: OrgRole): { label: string; items: NavItem[] }[] {
+  const isOwnerOrManager = role === 'owner' || role === 'manager'
+  const isEditor         = role === 'editor'
+
+  const principal: NavItem[] = [
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
+  ]
+
+  if (isOwnerOrManager || isEditor) {
+    principal.push({ href: '/dashboard/clients',  icon: Users,          label: 'Clients'  })
+    principal.push({ href: '/dashboard/projets',  icon: FolderKanban,   label: 'Projets'  })
+    principal.push({ href: '/dashboard/contenu',  icon: FileText,       label: 'Contenu'  })
+  } else {
+    // viewer
+    principal.push({ href: '/dashboard/projets', icon: FolderKanban, label: 'Projets' })
+  }
+
+  if (isOwnerOrManager) {
+    principal.push({ href: '/dashboard/finance', icon: Receipt, label: 'Finance' })
+  }
+
+  const team: NavItem[] = []
+  if (isOwnerOrManager) {
+    team.push({ href: '/dashboard/equipe', icon: UsersRound, label: 'Équipe' })
+  }
+  if (role !== 'owner') {
+    team.push({ href: '/dashboard/mon-espace', icon: UserCircle, label: 'Mon espace' })
+  }
+
+  const agents: NavItem[] = isOwnerOrManager ? [
+    { href: '/agents/contenu',      icon: Sparkles, label: 'Agent contenu'      },
+    { href: '/agents/productivite', icon: Brain,    label: 'Agent productivité' },
+  ] : []
+
+  const sections = [{ label: 'Principal', items: principal }]
+  if (team.length)   sections.push({ label: 'Équipe', items: team })
+  if (agents.length) sections.push({ label: 'Agents IA', items: agents })
+  return sections
+}
+
+export default function Sidebar({
+  agencyName, userName, role = 'owner',
+}: {
+  agencyName?: string
+  userName?: string
+  role?: OrgRole
+}) {
   const pathname = usePathname()
-  const router = useRouter()
+  const router   = useRouter()
 
   async function handleLogout() {
     const supabase = createClient()
@@ -39,9 +69,19 @@ export default function Sidebar({ agencyName, userName }: { agencyName?: string;
     router.push('/auth/login')
   }
 
+  const navSections = buildNav(role)
+
+  const ROLE_BADGES: Record<OrgRole, { label: string; cls: string }> = {
+    owner:   { label: 'Propriétaire', cls: 'bg-auchu-100 text-auchu-700' },
+    manager: { label: 'Manager',      cls: 'bg-blue-100  text-blue-700'  },
+    editor:  { label: 'Éditeur',      cls: 'bg-green-100 text-green-700' },
+    viewer:  { label: 'Observateur',  cls: 'bg-gray-100  text-gray-600'  },
+  }
+  const badge = ROLE_BADGES[role]
+
   return (
     <aside
-      className="fixed left-0 top-0 h-full bg-white border-r border-gray-100 flex flex-col"
+      className="fixed left-0 top-0 h-full bg-white border-r border-gray-100 flex flex-col z-10"
       style={{ width: 'var(--sidebar-width, 240px)' }}
     >
       {/* Logo */}
@@ -52,7 +92,14 @@ export default function Sidebar({ agencyName, userName }: { agencyName?: string;
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">{agencyName || 'AuchuOS'}</p>
-            <p className="text-xs text-gray-400 truncate">{userName || ''}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-xs text-gray-400 truncate">{userName || ''}</p>
+              {role !== 'owner' && (
+                <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0', badge.cls)}>
+                  {badge.label}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -71,13 +118,8 @@ export default function Sidebar({ agencyName, userName }: { agencyName?: string;
                   item.href === '/dashboard'
                     ? pathname === '/dashboard'
                     : pathname.startsWith(item.href)
-
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn('sidebar-link', isActive && 'active')}
-                  >
+                  <Link key={item.href} href={item.href} className={cn('sidebar-link', isActive && 'active')}>
                     <Icon className="w-4 h-4 flex-shrink-0" />
                     <span>{item.label}</span>
                   </Link>
@@ -90,10 +132,7 @@ export default function Sidebar({ agencyName, userName }: { agencyName?: string;
 
       {/* Bottom */}
       <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
-        <Link
-          href="/settings"
-          className={cn('sidebar-link', pathname.startsWith('/settings') && 'active')}
-        >
+        <Link href="/settings" className={cn('sidebar-link', pathname.startsWith('/settings') && 'active')}>
           <Settings className="w-4 h-4" />
           <span>Paramètres</span>
         </Link>

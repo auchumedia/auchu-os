@@ -9,6 +9,49 @@ export interface User {
   created_at: string
 }
 
+// ─── Organisation & équipe ────────────────────────────────────────────────────
+export type OrgPlan = 'free' | 'starter' | 'agence' | 'pro'
+export type OrgRole = 'owner' | 'manager' | 'editor' | 'viewer'
+
+export interface Organization {
+  id: string
+  name: string
+  owner_id: string
+  plan: OrgPlan
+  max_members: number
+  created_at: string
+  updated_at: string
+}
+
+export interface OrgMember {
+  id: string
+  org_id: string
+  user_id: string
+  role: OrgRole
+  status: 'actif' | 'inactif'
+  joined_at: string
+  profile?: { full_name: string | null; email: string | null; avatar_url: string | null }
+}
+
+export interface Invitation {
+  id: string
+  org_id: string
+  code: string
+  role: Exclude<OrgRole, 'owner'>
+  invited_by: string | null
+  expires_at: string
+  used_at: string | null
+  used_by: string | null
+  created_at: string
+}
+
+export interface UserProfile {
+  id: string
+  email: string | null
+  full_name: string | null
+  avatar_url: string | null
+}
+
 // ─── Clients ─────────────────────────────────────────────────────────────────
 export interface Client {
   id: string
