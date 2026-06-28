@@ -5,8 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard, Users, FolderKanban, FileText,
-  Receipt, Sparkles, Brain, Settings, LogOut, Zap,
+  LayoutDashboard, Users, FileText, CalendarDays,
+  Receipt, Brain, Settings, LogOut, Zap,
   UserCircle, UsersRound,
 } from 'lucide-react'
 import type { OrgRole } from '@/types'
@@ -22,12 +22,12 @@ function buildNav(role: OrgRole): { label: string; items: NavItem[] }[] {
   ]
 
   if (isOwnerOrManager || isEditor) {
-    principal.push({ href: '/dashboard/clients',  icon: Users,          label: 'Clients'  })
-    principal.push({ href: '/dashboard/projets',  icon: FolderKanban,   label: 'Projets'  })
-    principal.push({ href: '/dashboard/contenu',  icon: FileText,       label: 'Contenu'  })
+    principal.push({ href: '/dashboard/clients',    icon: Users,        label: 'Clients'    })
+    principal.push({ href: '/dashboard/contenu',    icon: FileText,     label: 'Contenu'    })
+    principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier' })
   } else {
     // viewer
-    principal.push({ href: '/dashboard/projets', icon: FolderKanban, label: 'Projets' })
+    principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier' })
   }
 
   if (isOwnerOrManager) {
@@ -43,8 +43,7 @@ function buildNav(role: OrgRole): { label: string; items: NavItem[] }[] {
   }
 
   const agents: NavItem[] = isOwnerOrManager ? [
-    { href: '/agents/contenu',      icon: Sparkles, label: 'Agent contenu'      },
-    { href: '/agents/productivite', icon: Brain,    label: 'Agent productivité' },
+    { href: '/agents/productivite', icon: Brain, label: 'Agent productivité' },
   ] : []
 
   const sections = [{ label: 'Principal', items: principal }]

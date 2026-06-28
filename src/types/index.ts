@@ -138,12 +138,12 @@ export interface ReferenceLink {
 }
 
 // ─── Calendrier d'événements ──────────────────────────────────────────────────
-export type CalendarEventType = 'tournage' | 'publication'
+export type CalendarEventType = 'tournage' | 'publication' | 'reunion' | 'deadline'
 
 export interface CalendarEvent {
   id: string
   user_id: string
-  client_id: string
+  client_id: string | null
   type: CalendarEventType
   title: string
   date: string
