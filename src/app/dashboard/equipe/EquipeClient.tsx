@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { cn, getInitials, formatDate } from '@/lib/utils'
 import { Plus, Copy, Check, X, ChevronDown, UserMinus, UserCheck, Loader2, Clock, Link2 } from 'lucide-react'
 import type { OrgMember, Invitation, Organization, OrgRole } from '@/types'
-import { PLAN_LIMITS } from '@/lib/org'
+import { PLAN_LIMITS } from '@/lib/plans'
 
 const ROLE_CONFIG: Record<OrgRole, { label: string; cls: string; desc: string }> = {
   owner:   { label: 'Propriétaire', cls: 'bg-auchu-100 text-auchu-700', desc: 'Accès complet, facturation, équipe'  },

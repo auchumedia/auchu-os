@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { getOrgContext, PLAN_LIMITS, OrgPlan } from '@/lib/org'
+import { getOrgContext, OrgPlan } from '@/lib/org'
+import { PLAN_LIMITS } from '@/lib/plans'
 import { redirect } from 'next/navigation'
 import { cn }       from '@/lib/utils'
 import { Check, Zap, Users, Building2, Crown } from 'lucide-react'
