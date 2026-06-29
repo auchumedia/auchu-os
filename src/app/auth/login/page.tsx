@@ -1,16 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Loader2 } from 'lucide-react'
 
-export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
+function LoginForm() {
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const nextUrl      = searchParams.get('next') || '/dashboard'
+
+  const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -26,7 +30,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/dashboard')
+    router.push(nextUrl)
     router.refresh()
   }
 
@@ -48,6 +52,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoFocus
             />
           </div>
 
@@ -70,8 +75,7 @@ export default function LoginPage() {
           )}
 
           <button type="submit" className="btn-primary w-full justify-center" disabled={loading}>
-            {loading ? <span className="spinner" /> : null}
-            {loading ? 'Connexion...' : 'Se connecter'}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Se connecter'}
           </button>
         </form>
 
@@ -83,5 +87,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }

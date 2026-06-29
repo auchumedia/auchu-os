@@ -1,0 +1,73 @@
+import { createAnonClient } from '@/lib/supabase/anon'
+import { createClient }     from '@/lib/supabase/server'
+import InviteClient         from './InviteClient'
+import { XCircle }          from 'lucide-react'
+import Link                 from 'next/link'
+
+export const dynamic = 'force-dynamic'
+
+interface InviteInfo {
+  id:         string
+  code:       string
+  role:       string
+  expires_at: string
+  org_id:     string
+  org_name:   string
+}
+
+async function getInvite(code: string): Promise<InviteInfo | null> {
+  const anon = createAnonClient()
+  const { data } = await anon
+    .from('invitations')
+    .select('id, code, role, expires_at, org_id, org:organizations(name)')
+    .eq('code', code.toUpperCase().trim())
+    .is('used_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .single()
+
+  if (!data) return null
+  const org = data.org as unknown as { name: string } | null
+  return {
+    id:         data.id,
+    code:       data.code,
+    role:       data.role,
+    expires_at: data.expires_at,
+    org_id:     data.org_id,
+    org_name:   org?.name ?? 'Cette agence',
+  }
+}
+
+export default async function InvitePage({ params }: { params: { code: string } }) {
+  const invite = await getInvite(params.code)
+
+  if (!invite) {
+    return (
+      <div className="w-full max-w-sm">
+        <div className="card text-center space-y-4 py-10">
+          <XCircle className="w-12 h-12 text-red-300 mx-auto" />
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">Lien invalide</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Ce lien d'invitation est expiré, déjà utilisé ou n'existe pas.
+            </p>
+          </div>
+          <Link href="/auth/login" className="btn-secondary inline-flex">
+            Retour à la connexion
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Detect if user already has a session
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  return (
+    <InviteClient
+      invite={invite}
+      isLoggedIn={!!user}
+      userEmail={user?.email ?? null}
+    />
+  )
+}

@@ -30,8 +30,9 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute   = request.nextUrl.pathname.startsWith('/auth')
   const isPublicRoute = request.nextUrl.pathname === '/'
   const isPortalRoute = request.nextUrl.pathname.startsWith('/portail')
+  const isInviteRoute = request.nextUrl.pathname.startsWith('/invite')
 
-  if (!user && !isAuthRoute && !isPublicRoute && !isPortalRoute) {
+  if (!user && !isAuthRoute && !isPublicRoute && !isPortalRoute && !isInviteRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     return NextResponse.redirect(url)
