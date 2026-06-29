@@ -95,21 +95,25 @@ function buildInviteHtml({
   const initials        = getInitials(orgName) || 'A'
   const permissionsRows = buildPermissionsRows(role, orgPrimaryColor)
 
-  // Cercle d'initiales : fond blanc, texte primary_color — fiable dans tous les clients email.
-  // Si logo_url fourni : on affiche l'image dans le même cercle ; onerror la masque si bloquée.
-  const orgAvatar = `<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 20px">
-    <tr>
-      <td width="80" height="80"
-          style="width:80px;height:80px;border-radius:50%;background:#ffffff;text-align:center;vertical-align:middle;overflow:hidden;font-size:28px;font-weight:800;letter-spacing:-1px;color:${orgPrimaryColor};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:80px">
-        ${orgLogoUrl
-          ? `<img src="${orgLogoUrl}" width="80" height="80" alt="${initials}"
-               style="width:80px;height:80px;object-fit:cover;border-radius:50%;display:block"
-               onerror="this.style.display='none'">`
-          : initials
-        }
-      </td>
-    </tr>
-  </table>`
+  // Logo dans boîte blanche si disponible, sinon cercle d'initiales.
+  const orgAvatar = orgLogoUrl
+    ? `<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 24px">
+        <tr>
+          <td style="background:#ffffff;padding:10px 20px;border-radius:8px;text-align:center;vertical-align:middle">
+            <img src="${orgLogoUrl}" alt="${orgName}"
+                 style="max-width:160px;max-height:50px;height:auto;width:auto;object-fit:contain;display:block;margin:0 auto"
+                 onerror="this.parentNode.parentNode.parentNode.parentNode.style.display='none'">
+          </td>
+        </tr>
+      </table>`
+    : `<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 24px">
+        <tr>
+          <td width="80" height="80"
+              style="width:80px;height:80px;border-radius:50%;background:#ffffff;text-align:center;vertical-align:middle;font-size:28px;font-weight:800;letter-spacing:-1px;color:${orgPrimaryColor};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:80px">
+            ${initials}
+          </td>
+        </tr>
+      </table>`
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -129,7 +133,7 @@ function buildInviteHtml({
 
       <!-- ─── Header ──────────────────────────────────────────────────── -->
       <tr>
-        <td style="background-color:${orgPrimaryColor};padding:48px 48px 40px;text-align:center">
+        <td style="background-color:#1a1a1a;padding:48px 48px 40px;text-align:center">
           ${orgAvatar}
           <h1 style="color:#ffffff;margin:0 0 8px;font-size:26px;font-weight:800;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">${orgName}</h1>
           <p style="color:rgba(255,255,255,0.72);margin:0;font-size:14px;font-weight:500;letter-spacing:0.1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">

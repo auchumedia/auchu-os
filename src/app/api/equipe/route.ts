@@ -112,15 +112,19 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Envoyer l'email d'invitation (non-bloquant — l'invitation est créée même si l'email échoue)
-  const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? 'https://auchu-os.vercel.app'
+  const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? 'https://auchu-os.vercel.app'
   const inviteUrl = `${appUrl}/invite/${code}`
 
+  const orgLogoUrl      = (org as any).logo_url      ?? null
+  const orgPrimaryColor = (org as any).primary_color ?? '#4f46e5'
+  console.log('[equipe] org.logo_url:', orgLogoUrl, '| org.primary_color:', orgPrimaryColor)
+
   const emailSent = await sendInvitationEmail({
-    to:               invited_email,
+    to:   invited_email,
     toName:           invited_name,
     orgName:          org.name,
-    orgLogoUrl:       (org as any).logo_url      ?? null,
-    orgPrimaryColor:  (org as any).primary_color ?? '#4f46e5',
+    orgLogoUrl,
+    orgPrimaryColor,
     role,
     inviteUrl,
   })
