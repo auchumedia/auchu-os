@@ -50,15 +50,6 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map(w => w[0]?.toUpperCase() ?? '')
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-}
-
 
 function buildPermissionsRows(role: string, checkColor: string): string {
   const perms = ROLE_PERMISSIONS[role] ?? []
@@ -78,7 +69,6 @@ function buildPermissionsRows(role: string, checkColor: string): string {
 function buildInviteHtml({
   firstName,
   orgName,
-  orgLogoUrl,
   orgPrimaryColor,
   roleLabel,
   role,
@@ -86,34 +76,12 @@ function buildInviteHtml({
 }: {
   firstName:       string
   orgName:         string
-  orgLogoUrl:      string | null
   orgPrimaryColor: string
   roleLabel:       string
   role:            string
   inviteUrl:       string
 }): string {
-  const initials        = getInitials(orgName) || 'A'
   const permissionsRows = buildPermissionsRows(role, orgPrimaryColor)
-
-  // Logo dans boîte blanche si disponible, sinon cercle d'initiales.
-  const orgAvatar = orgLogoUrl
-    ? `<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 24px">
-        <tr>
-          <td style="background:#ffffff;padding:10px 20px;border-radius:8px;text-align:center;vertical-align:middle">
-            <img src="${orgLogoUrl}" alt="${orgName}"
-                 style="max-width:160px;max-height:50px;height:auto;width:auto;object-fit:contain;display:block;margin:0 auto"
-                 onerror="this.parentNode.parentNode.parentNode.parentNode.style.display='none'">
-          </td>
-        </tr>
-      </table>`
-    : `<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 24px">
-        <tr>
-          <td width="80" height="80"
-              style="width:80px;height:80px;border-radius:50%;background:#ffffff;text-align:center;vertical-align:middle;font-size:28px;font-weight:800;letter-spacing:-1px;color:${orgPrimaryColor};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:80px">
-            ${initials}
-          </td>
-        </tr>
-      </table>`
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -133,12 +101,9 @@ function buildInviteHtml({
 
       <!-- ─── Header ──────────────────────────────────────────────────── -->
       <tr>
-        <td style="background-color:#1a1a1a;padding:48px 48px 40px;text-align:center">
-          ${orgAvatar}
-          <h1 style="color:#ffffff;margin:0 0 8px;font-size:26px;font-weight:800;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">${orgName}</h1>
-          <p style="color:rgba(255,255,255,0.72);margin:0;font-size:14px;font-weight:500;letter-spacing:0.1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
-            vous invite à rejoindre l'équipe
-          </p>
+        <td style="background-color:#1a1a1a;padding:40px 48px;text-align:center">
+          <h1 style="color:#ffffff;margin:0 0 6px;font-size:24px;font-weight:700;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">${orgName}</h1>
+          <p style="color:#a3a3a3;margin:0;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">vous invite à rejoindre l'équipe</p>
         </td>
       </tr>
 
@@ -281,7 +246,7 @@ export async function sendInvitationEmail({
   // Validation basique de la couleur hex
   const color = /^#[0-9a-fA-F]{6}$/.test(orgPrimaryColor) ? orgPrimaryColor : '#4f46e5'
 
-  const html = buildInviteHtml({ firstName, orgName, orgLogoUrl, orgPrimaryColor: color, roleLabel, role, inviteUrl })
+  const html = buildInviteHtml({ firstName, orgName, orgPrimaryColor: color, roleLabel, role, inviteUrl })
 
   const fromField = FROM_EMAIL === 'onboarding@resend.dev'
     ? FROM_EMAIL
