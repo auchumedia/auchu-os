@@ -24,12 +24,6 @@ const ROLE_LABELS: Record<string, string> = {
   viewer:  'Observateur',
 }
 
-const ROLE_STYLES: Record<string, { bg: string; color: string; border: string }> = {
-  manager: { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
-  partner: { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
-  editor:  { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
-  viewer:  { bg: '#f9fafb', color: '#374151', border: '#e5e7eb' },
-}
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   manager: [
@@ -65,6 +59,15 @@ function getInitials(name: string): string {
     .join('')
 }
 
+// Assombrit légèrement une couleur hex pour les effets de gradient
+function darkenHex(hex: string, amount = 40): string {
+  const n = parseInt(hex.replace('#', ''), 16)
+  const r = Math.max(0, (n >> 16)         - amount)
+  const g = Math.max(0, ((n >> 8) & 0xff) - amount)
+  const b = Math.max(0, (n & 0xff)        - amount)
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
 function buildPermissionsRows(role: string, checkColor: string): string {
   const perms = ROLE_PERMISSIONS[role] ?? []
   return perms.map(p => `
@@ -84,21 +87,22 @@ function buildInviteHtml({
   firstName,
   orgName,
   orgLogoUrl,
+  orgPrimaryColor,
   roleLabel,
-  roleStyle,
   role,
   inviteUrl,
 }: {
-  firstName:   string
-  orgName:     string
-  orgLogoUrl:  string | null
-  roleLabel:   string
-  roleStyle:   { bg: string; color: string; border: string }
-  role:        string
-  inviteUrl:   string
+  firstName:       string
+  orgName:         string
+  orgLogoUrl:      string | null
+  orgPrimaryColor: string
+  roleLabel:       string
+  role:            string
+  inviteUrl:       string
 }): string {
-  const initials       = getInitials(orgName) || 'A'
-  const permissionsRows = buildPermissionsRows(role, roleStyle.color)
+  const initials        = getInitials(orgName) || 'A'
+  const headerDark      = darkenHex(orgPrimaryColor, 45)
+  const permissionsRows = buildPermissionsRows(role, orgPrimaryColor)
 
   const orgAvatar = orgLogoUrl
     ? `<img src="${orgLogoUrl}" alt="${orgName}" width="72" height="72"
@@ -125,7 +129,7 @@ function buildInviteHtml({
 
       <!-- ─── Header ──────────────────────────────────────────────────── -->
       <tr>
-        <td style="background:linear-gradient(145deg,#312e81 0%,#4f46e5 45%,#7c3aed 100%);padding:48px 48px 40px;text-align:center">
+        <td style="background:linear-gradient(145deg,${headerDark} 0%,${orgPrimaryColor} 55%,${orgPrimaryColor} 100%);padding:48px 48px 40px;text-align:center">
           ${orgAvatar}
           <h1 style="color:#ffffff;margin:0 0 8px;font-size:26px;font-weight:800;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">${orgName}</h1>
           <p style="color:rgba(255,255,255,0.72);margin:0;font-size:14px;font-weight:500;letter-spacing:0.1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -149,7 +153,7 @@ function buildInviteHtml({
 
           <!-- Role card -->
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-                 style="background:${roleStyle.bg};border:1.5px solid ${roleStyle.border};border-radius:14px;margin-bottom:32px">
+                 style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;margin-bottom:32px">
             <tr>
               <td style="padding:20px 24px">
                 <!-- Role label -->
@@ -158,7 +162,7 @@ function buildInviteHtml({
                 </p>
                 <!-- Role badge -->
                 <div style="margin-bottom:18px">
-                  <span style="display:inline-block;background:${roleStyle.color};color:#ffffff;padding:7px 18px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:0.1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+                  <span style="display:inline-block;background:${orgPrimaryColor};color:#ffffff;padding:7px 18px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:0.1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
                     ${roleLabel}
                   </span>
                 </div>
@@ -175,7 +179,7 @@ function buildInviteHtml({
             <tr>
               <td align="center">
                 <a href="${inviteUrl}"
-                   style="display:inline-block;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#ffffff;text-decoration:none;padding:17px 44px;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:-0.1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-shadow:0 4px 14px rgba(79,70,229,0.35)">
+                   style="display:inline-block;background:${orgPrimaryColor};color:#ffffff;text-decoration:none;padding:17px 44px;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:-0.1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-shadow:0 4px 14px rgba(0,0,0,0.18)">
                   Rejoindre ${orgName} &nbsp;→
                 </a>
               </td>
@@ -197,7 +201,7 @@ function buildInviteHtml({
             Bouton inaccessible ? Copiez ce lien&nbsp;:
           </p>
           <a href="${inviteUrl}"
-             style="color:#6366f1;font-size:12px;word-break:break-all;text-decoration:underline;font-family:ui-monospace,'Cascadia Code','Fira Code',monospace">
+             style="color:${orgPrimaryColor};font-size:12px;word-break:break-all;text-decoration:underline;font-family:ui-monospace,'Cascadia Code','Fira Code',monospace">
             ${inviteUrl}
           </a>
         </td>
@@ -212,7 +216,7 @@ function buildInviteHtml({
               <td align="center" style="padding-bottom:12px">
                 <table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-table">
                   <tr>
-                    <td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);width:24px;height:24px;border-radius:6px;vertical-align:middle;text-align:center">
+                    <td style="background:${orgPrimaryColor};width:24px;height:24px;border-radius:6px;vertical-align:middle;text-align:center">
                       <span style="color:white;font-size:12px;font-weight:800;line-height:24px;display:block">A</span>
                     </td>
                     <td style="padding-left:8px;vertical-align:middle">
@@ -249,16 +253,18 @@ export async function sendInvitationEmail({
   to,
   toName,
   orgName,
-  orgLogoUrl = null,
+  orgLogoUrl      = null,
+  orgPrimaryColor = '#4f46e5',
   role,
   inviteUrl,
 }: {
-  to:          string
-  toName:      string
-  orgName:     string
-  orgLogoUrl?: string | null
-  role:        string
-  inviteUrl:   string
+  to:               string
+  toName:           string
+  orgName:          string
+  orgLogoUrl?:      string | null
+  orgPrimaryColor?: string
+  role:             string
+  inviteUrl:        string
 }): Promise<boolean> {
   if (!resend) {
     console.warn('[email] RESEND_API_KEY manquant — email non envoyé')
@@ -266,10 +272,12 @@ export async function sendInvitationEmail({
   }
 
   const roleLabel = ROLE_LABELS[role] ?? role
-  const roleStyle = ROLE_STYLES[role] ?? ROLE_STYLES.viewer
   const firstName = toName.split(' ')[0] || toName
 
-  const html = buildInviteHtml({ firstName, orgName, orgLogoUrl, roleLabel, roleStyle, role, inviteUrl })
+  // Validation basique de la couleur hex
+  const color = /^#[0-9a-fA-F]{6}$/.test(orgPrimaryColor) ? orgPrimaryColor : '#4f46e5'
+
+  const html = buildInviteHtml({ firstName, orgName, orgLogoUrl, orgPrimaryColor: color, roleLabel, role, inviteUrl })
 
   const fromField = FROM_EMAIL === 'onboarding@resend.dev'
     ? FROM_EMAIL
