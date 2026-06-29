@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { PLAN_LIMITS } from '@/lib/plans'
 
-export type OrgRole = 'owner' | 'manager' | 'editor' | 'viewer'
+export type OrgRole = 'owner' | 'manager' | 'partner' | 'editor' | 'viewer'
 export type OrgPlan = 'free' | 'starter' | 'agence' | 'pro'
 export { PLAN_LIMITS }
 
@@ -12,12 +12,15 @@ export interface OrgContext {
   org:         { id: string; name: string; plan: OrgPlan; max_members: number; owner_id: string; created_at?: string; updated_at?: string } | null
   role:        OrgRole
   isOwner:     boolean
+  isPartner:   boolean
   canManageTeam:    boolean  // owner or manager
   canAccessFinance: boolean  // owner or manager
-  canWrite:         boolean  // owner, manager, or editor
+  canWrite:         boolean  // owner, manager, partner, or editor
   dataOwnerId: string        // user_id to use for all data queries
   memberCount: number
 }
+
+const OWNER_EMAIL = 'raphael@auchumedia.com'
 
 export async function getOrgContext(): Promise<OrgContext | null> {
   const supabase = await createClient()
@@ -41,10 +44,15 @@ export async function getOrgContext(): Promise<OrgContext | null> {
       .eq('org_id', org.id)
       .eq('status', 'actif')
 
+    // Compte owner gratuit : toujours plan Pro sans restriction
+    const effectiveOrg = userEmail === OWNER_EMAIL
+      ? { ...org, plan: 'pro' as OrgPlan, max_members: 999 }
+      : org as OrgContext['org']
+
     return {
       userId: user.id, userName, userEmail,
-      org: org as OrgContext['org'],
-      role: 'owner', isOwner: true,
+      org: effectiveOrg,
+      role: 'owner', isOwner: true, isPartner: false,
       canManageTeam: true, canAccessFinance: true, canWrite: true,
       dataOwnerId: user.id,
       memberCount: count ?? 1,
@@ -62,13 +70,14 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   if (membership) {
     const role    = membership.role as OrgRole
     const orgData = membership.org as unknown as OrgContext['org']
+    const isPartner = role === 'partner'
     return {
       userId: user.id, userName, userEmail,
       org: orgData,
-      role, isOwner: false,
+      role, isOwner: false, isPartner,
       canManageTeam:    role === 'manager',
       canAccessFinance: role === 'manager',
-      canWrite:         role === 'manager' || role === 'editor',
+      canWrite:         role === 'manager' || role === 'partner' || role === 'editor',
       dataOwnerId: orgData?.owner_id ?? user.id,
       memberCount: 0,
     }
@@ -77,7 +86,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   // 3 — Utilisateur solo (pas encore d'org)
   return {
     userId: user.id, userName, userEmail,
-    org: null, role: 'owner', isOwner: true,
+    org: null, role: 'owner', isOwner: true, isPartner: false,
     canManageTeam: true, canAccessFinance: true, canWrite: true,
     dataOwnerId: user.id, memberCount: 1,
   }

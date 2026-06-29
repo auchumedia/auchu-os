@@ -35,6 +35,8 @@ export default function BottomNav({ role = 'owner', canManageTeam = false }: Pro
     router.push('/auth/login')
   }
 
+  const isPartner = role === 'partner'
+
   const menuItems = [
     { href: '/dashboard/contenu',    icon: FileText,    label: 'Contenu'     },
     ...(canManageTeam ? [
@@ -44,7 +46,9 @@ export default function BottomNav({ role = 'owner', canManageTeam = false }: Pro
     ...(role !== 'owner' ? [
       { href: '/dashboard/mon-espace', icon: UserCircle, label: 'Mon espace' },
     ] : []),
-    { href: '/settings',             icon: Settings,    label: 'Paramètres'  },
+    ...(!isPartner ? [
+      { href: '/settings',           icon: Settings,    label: 'Paramètres'  },
+    ] : []),
   ]
 
   const isActive = (href: string) =>

@@ -16,7 +16,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const body = await req.json()
   const allowed: Record<string, unknown> = {}
-  if (body.role   && ['manager','editor','viewer'].includes(body.role))   allowed.role   = body.role
+  if (body.role   && ['manager','partner','editor','viewer'].includes(body.role))   allowed.role   = body.role
   if (body.status && ['actif','inactif'].includes(body.status))           allowed.status = body.status
 
   if (!Object.keys(allowed).length) return NextResponse.json({ error: 'Aucune modification' }, { status: 400 })

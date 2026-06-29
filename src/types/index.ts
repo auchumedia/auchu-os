@@ -11,7 +11,7 @@ export interface User {
 
 // ─── Organisation & équipe ────────────────────────────────────────────────────
 export type OrgPlan = 'free' | 'starter' | 'agence' | 'pro'
-export type OrgRole = 'owner' | 'manager' | 'editor' | 'viewer'
+export type OrgRole = 'owner' | 'manager' | 'partner' | 'editor' | 'viewer'
 
 export interface Organization {
   id: string
@@ -45,6 +45,7 @@ export interface Invitation {
   created_at: string
 }
 
+
 export interface UserProfile {
   id: string
   email: string | null
@@ -72,6 +73,7 @@ export interface Client {
   brand_secondary: string
   portal_token: string | null
   portal_enabled: boolean
+  assigned_partner: string | null
   created_at: string
   updated_at: string
 }

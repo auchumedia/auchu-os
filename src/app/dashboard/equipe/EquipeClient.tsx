@@ -7,10 +7,11 @@ import type { OrgMember, Invitation, Organization, OrgRole } from '@/types'
 import { PLAN_LIMITS } from '@/lib/plans'
 
 const ROLE_CONFIG: Record<OrgRole, { label: string; cls: string; desc: string }> = {
-  owner:   { label: 'Propriétaire', cls: 'bg-auchu-100 text-auchu-700', desc: 'Accès complet, facturation, équipe'  },
-  manager: { label: 'Manager',      cls: 'bg-blue-100  text-blue-700',  desc: 'Clients, projets, assigner des tâches' },
-  editor:  { label: 'Éditeur',      cls: 'bg-green-100 text-green-700', desc: 'Créer du contenu, voir ses clients'  },
-  viewer:  { label: 'Observateur',  cls: 'bg-gray-100  text-gray-600',  desc: 'Lecture seule sur les projets'       },
+  owner:   { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700',  desc: 'Accès complet, facturation, équipe'              },
+  manager: { label: 'Manager',      cls: 'bg-blue-100   text-blue-700',   desc: 'Clients, projets, assigner des tâches'           },
+  partner: { label: 'Partenaire',   cls: 'bg-orange-100 text-orange-700', desc: 'Ses clients assignés, contenu, calendrier'       },
+  editor:  { label: 'Éditeur',      cls: 'bg-green-100  text-green-700',  desc: 'Créer du contenu, voir ses clients'              },
+  viewer:  { label: 'Observateur',  cls: 'bg-gray-100   text-gray-600',   desc: 'Lecture seule sur les projets'                   },
 }
 
 const APP_URL = typeof window !== 'undefined' ? window.location.origin : ''
@@ -27,7 +28,7 @@ export default function EquipeClient({ org, members: initial, invitations: initi
   const [members,     setMembers]     = useState(initial)
   const [invitations, setInvitations] = useState(initialInv)
   const [showInvite,  setShowInvite]  = useState(false)
-  const [newRole,     setNewRole]     = useState<Exclude<OrgRole, 'owner'>>('editor')
+  const [newRole,     setNewRole]     = useState<Exclude<OrgRole, 'owner'>>('partner')
   const [loading,     setLoading]     = useState<string | null>(null)
   const [copied,      setCopied]      = useState<string | null>(null)
 
@@ -176,9 +177,10 @@ export default function EquipeClient({ org, members: initial, invitations: initi
                       onChange={e => patchMember(member.id, { role: e.target.value as OrgRole })}
                       disabled={!!loading}
                       className="text-xs font-medium rounded-full pl-2.5 pr-6 py-1 border border-transparent appearance-none cursor-pointer transition-colors bg-transparent hover:border-gray-200"
-                      style={{ color: roleCfg.cls.includes('auchu') ? '#5254cc' : roleCfg.cls.includes('blue') ? '#1d4ed8' : roleCfg.cls.includes('green') ? '#15803d' : '#4b5563' }}
+                      style={{ color: roleCfg.cls.includes('auchu') ? '#5254cc' : roleCfg.cls.includes('blue') ? '#1d4ed8' : roleCfg.cls.includes('orange') ? '#c2410c' : roleCfg.cls.includes('green') ? '#15803d' : '#4b5563' }}
                     >
                       <option value="manager">Manager</option>
+                      <option value="partner">Partenaire</option>
                       <option value="editor">Éditeur</option>
                       <option value="viewer">Observateur</option>
                     </select>
@@ -298,7 +300,7 @@ export default function EquipeClient({ org, members: initial, invitations: initi
             <div>
               <label className="label">Rôle du nouveau membre</label>
               <div className="space-y-2 mt-1">
-                {(['manager', 'editor', 'viewer'] as const).map(r => (
+                {(['manager', 'partner', 'editor', 'viewer'] as const).map(r => (
                   <button
                     key={r}
                     onClick={() => setNewRole(r)}

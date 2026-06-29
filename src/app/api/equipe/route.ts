@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { role } = await req.json()
-  if (!['manager', 'editor', 'viewer'].includes(role)) {
+  if (!['manager', 'partner', 'editor', 'viewer'].includes(role)) {
     return NextResponse.json({ error: 'Rôle invalide' }, { status: 400 })
   }
 

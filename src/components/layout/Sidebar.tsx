@@ -16,6 +16,7 @@ type NavItem = { href: string; icon: React.ElementType; label: string }
 function buildNav(role: OrgRole): { label: string; items: NavItem[] }[] {
   const isOwnerOrManager = role === 'owner' || role === 'manager'
   const isEditor         = role === 'editor'
+  const isPartner        = role === 'partner'
 
   const principal: NavItem[] = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
@@ -25,6 +26,10 @@ function buildNav(role: OrgRole): { label: string; items: NavItem[] }[] {
     principal.push({ href: '/dashboard/clients',    icon: Users,        label: 'Clients'    })
     principal.push({ href: '/dashboard/contenu',    icon: FileText,     label: 'Contenu'    })
     principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier' })
+  } else if (isPartner) {
+    principal.push({ href: '/dashboard/clients',    icon: Users,        label: 'Mes clients' })
+    principal.push({ href: '/dashboard/contenu',    icon: FileText,     label: 'Contenu'     })
+    principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier'  })
   } else {
     // viewer
     principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier' })
@@ -42,7 +47,7 @@ function buildNav(role: OrgRole): { label: string; items: NavItem[] }[] {
     team.push({ href: '/dashboard/mon-espace', icon: UserCircle, label: 'Mon espace' })
   }
 
-  const agents: NavItem[] = isOwnerOrManager ? [
+  const agents: NavItem[] = (isOwnerOrManager || isPartner) ? [
     { href: '/agents/productivite', icon: Brain, label: 'Agent productivité' },
   ] : []
 
@@ -71,10 +76,11 @@ export default function Sidebar({
   const navSections = buildNav(role)
 
   const ROLE_BADGES: Record<OrgRole, { label: string; cls: string }> = {
-    owner:   { label: 'Propriétaire', cls: 'bg-auchu-100 text-auchu-700' },
-    manager: { label: 'Manager',      cls: 'bg-blue-100  text-blue-700'  },
-    editor:  { label: 'Éditeur',      cls: 'bg-green-100 text-green-700' },
-    viewer:  { label: 'Observateur',  cls: 'bg-gray-100  text-gray-600'  },
+    owner:   { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700'  },
+    manager: { label: 'Manager',      cls: 'bg-blue-100   text-blue-700'   },
+    partner: { label: 'Partenaire',   cls: 'bg-orange-100 text-orange-700' },
+    editor:  { label: 'Éditeur',      cls: 'bg-green-100  text-green-700'  },
+    viewer:  { label: 'Observateur',  cls: 'bg-gray-100   text-gray-600'   },
   }
   const badge = ROLE_BADGES[role]
 
@@ -131,10 +137,12 @@ export default function Sidebar({
 
       {/* Bottom */}
       <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
-        <Link href="/settings" className={cn('sidebar-link', pathname.startsWith('/settings') && 'active')}>
-          <Settings className="w-4 h-4" />
-          <span>Paramètres</span>
-        </Link>
+        {role !== 'partner' && (
+          <Link href="/settings" className={cn('sidebar-link', pathname.startsWith('/settings') && 'active')}>
+            <Settings className="w-4 h-4" />
+            <span>Paramètres</span>
+          </Link>
+        )}
         <button onClick={handleLogout} className="sidebar-link w-full text-left text-red-500 hover:bg-red-50 hover:text-red-600">
           <LogOut className="w-4 h-4" />
           <span>Déconnexion</span>
