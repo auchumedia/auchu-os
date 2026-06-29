@@ -1,10 +1,19 @@
 import { Resend } from 'resend'
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null
+// Vérification explicite au démarrage du module
+const apiKey = process.env.RESEND_API_KEY
+if (!apiKey) {
+  console.warn('[email] RESEND_API_KEY absent — les emails d\'invitation ne seront pas envoyés')
+} else {
+  console.log(`[email] RESEND_API_KEY chargée (${apiKey.slice(0, 8)}...)`)
+}
 
-const FROM_EMAIL  = process.env.RESEND_FROM_EMAIL  || 'onboarding@resend.dev'
+const resend = apiKey ? new Resend(apiKey) : null
+
+// IMPORTANT : onboarding@resend.dev ne peut envoyer QU'à l'email du propriétaire
+// du compte Resend (mode test). Pour envoyer à n'importe quelle adresse, il faut
+// vérifier un domaine dans Resend et définir RESEND_FROM_EMAIL=noreply@ton-domaine.com
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
 
 const ROLE_LABELS: Record<string, string> = {
   manager: 'Manager',
@@ -124,17 +133,33 @@ export async function sendInvitationEmail({
 
   const html = buildInviteHtml({ firstName, orgName, roleLabel, roleDesc, inviteUrl })
 
+  // Le champ "from" : utiliser seulement l'adresse si FROM_EMAIL est onboarding@resend.dev
+  // car Resend refuse les display names custom sur les domaines partagés dans certains cas.
+  const fromField = FROM_EMAIL === 'onboarding@resend.dev'
+    ? FROM_EMAIL
+    : `${orgName} via AuchuOS <${FROM_EMAIL}>`
+
+  const payload = {
+    from:    fromField,
+    to:      [to],
+    subject: `${orgName} vous invite à rejoindre l'équipe`,
+    html,
+  }
+
+  console.log('[email] Envoi vers:', to, '| from:', payload.from, '| subject:', payload.subject)
+
   try {
-    const { error } = await resend.emails.send({
-      from:    `${orgName} via AuchuOS <${FROM_EMAIL}>`,
-      to:      [to],
-      subject: `${orgName} vous invite à rejoindre l'équipe`,
-      html,
-    })
-    if (error) { console.error('[email] Resend error:', error); return false }
+    const { data, error } = await resend.emails.send(payload)
+
+    if (error) {
+      console.error('[email] Resend a retourné une erreur:', JSON.stringify(error, null, 2))
+      return false
+    }
+
+    console.log('[email] Email envoyé avec succès. ID:', data?.id)
     return true
   } catch (err) {
-    console.error('[email] sendInvitationEmail failed:', err)
+    console.error('[email] Exception lors de l\'appel Resend:', err)
     return false
   }
 }
