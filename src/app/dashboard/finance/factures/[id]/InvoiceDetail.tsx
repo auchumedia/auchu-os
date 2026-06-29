@@ -19,6 +19,20 @@ const STATUS_CONFIG: Record<InvoiceStatus, { label: string; class: string }> = {
   annule:    { label: 'Annulé',     class: 'badge-gray'  },
 }
 
+interface OrgInfo {
+  name:             string
+  logo_url:         string | null
+  primary_color:    string | null
+  email:            string | null
+  phone:            string | null
+  website:          string | null
+  address_street:   string | null
+  address_city:     string | null
+  address_province: string | null
+  address_postal:   string | null
+  address_country:  string | null
+}
+
 interface Props {
   invoice: Invoice & {
     client?: {
@@ -29,9 +43,10 @@ interface Props {
       company: string | null
     } | null
   }
+  org: OrgInfo | null
 }
 
-export default function InvoiceDetail({ invoice: initial }: Props) {
+export default function InvoiceDetail({ invoice: initial, org }: Props) {
   const router = useRouter()
   const [invoice, setInvoice] = useState(initial)
   const [updating, setUpdating] = useState(false)
@@ -77,14 +92,33 @@ export default function InvoiceDetail({ invoice: initial }: Props) {
   }
 
   const printInvoice = () => {
-    const items = (invoice.items as InvoiceItem[]) || []
+    const items       = (invoice.items as InvoiceItem[]) || []
+    const brandColor  = org?.primary_color || '#4f46e5'
+    const orgName     = org?.name || 'Votre agence'
+
+    // Adresse de l'émetteur
+    const orgAddressParts = [
+      org?.address_street,
+      [org?.address_city, org?.address_province].filter(Boolean).join(', '),
+      org?.address_postal,
+      org?.address_country,
+    ].filter(Boolean)
+    const orgAddressHtml = orgAddressParts.join('<br>')
+
+    // Logo ou initiales
+    const orgInitials = orgName.split(/\s+/).map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
+    const brandHeader = org?.logo_url
+      ? `<img src="${org.logo_url}" alt="${orgName}" style="height:48px;width:auto;object-fit:contain;display:block;margin-bottom:6px">`
+      : `<div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:${brandColor};color:white;font-size:18px;font-weight:800;margin-bottom:6px">${orgInitials}</div>`
+
     const html = `<!DOCTYPE html><html lang="fr"><head>
 <meta charset="UTF-8"><title>Facture ${invoice.invoice_number}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; color: #111827; font-size: 13px; padding: 48px; background: white; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-  .brand { font-size: 22px; font-weight: 700; color: #4f46e5; }
+  .brand-name { font-size: 18px; font-weight: 700; color: ${brandColor}; margin: 0; }
+  .brand-detail { color: #6b7280; font-size: 11px; line-height: 1.6; margin-top: 4px; }
   .invoice-meta { text-align: right; }
   .invoice-number { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
   .meta-row { color: #6b7280; font-size: 12px; margin-bottom: 2px; }
@@ -111,7 +145,14 @@ export default function InvoiceDetail({ invoice: initial }: Props) {
   @media print { @page { margin: 0.5in; } }
 </style></head><body>
 <div class="header">
-  <div class="brand">AuchuOS</div>
+  <div>
+    ${brandHeader}
+    <div class="brand-name">${orgName}</div>
+    ${orgAddressHtml ? `<div class="brand-detail">${orgAddressHtml}</div>` : ''}
+    ${org?.email  ? `<div class="brand-detail">${org.email}</div>` : ''}
+    ${org?.phone  ? `<div class="brand-detail">${org.phone}</div>` : ''}
+    ${org?.website ? `<div class="brand-detail">${org.website}</div>` : ''}
+  </div>
   <div class="invoice-meta">
     <div class="invoice-number">${invoice.invoice_number}</div>
     <div class="meta-row">Émise le ${formatDate(invoice.created_at)}</div>
@@ -125,7 +166,8 @@ export default function InvoiceDetail({ invoice: initial }: Props) {
 <div class="parties">
   <div>
     <div class="party-label">De</div>
-    <div class="party-name">Votre agence</div>
+    <div class="party-name">${orgName}</div>
+    ${orgAddressHtml ? `<div class="party-detail">${orgAddressHtml}</div>` : ''}
   </div>
   ${invoice.client ? `
   <div>

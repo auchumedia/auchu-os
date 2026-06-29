@@ -36,6 +36,7 @@ export default async function PortailPage({
     { data: invoices },
     { data: content },
     { data: events },
+    { data: orgInfo },
   ] = await Promise.all([
     supabase
       .from('projects')
@@ -62,6 +63,12 @@ export default async function PortailPage({
       .select('*')
       .eq('client_id', client.id)
       .order('date', { ascending: true }),
+
+    supabase
+      .from('organizations')
+      .select('name, logo_url, primary_color, secondary_color, website, email')
+      .eq('owner_id', client.user_id)
+      .maybeSingle(),
   ])
 
   const activeProjects    = (projects ?? []).filter(p => p.status !== 'termine')
@@ -71,9 +78,11 @@ export default async function PortailPage({
     .filter(i => i.status === 'envoye' || i.status === 'en_retard')
     .reduce((s, i) => s + i.total, 0)
 
-  const primary   = client.brand_primary   || '#6366f1'
-  const secondary = client.brand_secondary || '#f95640'
+  const primary   = client.brand_primary   || orgInfo?.primary_color   || '#6366f1'
+  const secondary = client.brand_secondary || orgInfo?.secondary_color || '#f95640'
   const gradient  = `linear-gradient(135deg, ${primary}, ${secondary})`
+
+  const orgInitials = (orgInfo?.name ?? 'A').split(/\s+/).map((w: string) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -206,8 +215,31 @@ export default async function PortailPage({
       </div>
 
       {/* Footer */}
-      <div className="border-t border-gray-200 mt-8 py-6 text-center">
-        <p className="text-xs text-gray-400">Portail propulsé par AuchuOS</p>
+      <div className="border-t border-gray-200 mt-8 py-6">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* Branding org */}
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0"
+              style={{ background: primary }}
+            >
+              {orgInfo?.logo_url
+                ? <img src={orgInfo.logo_url} alt={orgInfo.name ?? ''} className="w-full h-full object-cover" />
+                : <span className="text-white text-xs font-bold">{orgInitials}</span>
+              }
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700">{orgInfo?.name ?? 'Votre agence'}</p>
+              {orgInfo?.website && (
+                <a href={orgInfo.website} target="_blank" rel="noopener noreferrer"
+                   className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                  {orgInfo.website.replace(/^https?:\/\//, '')}
+                </a>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">Portail propulsé par AuchuOS</p>
+        </div>
       </div>
     </div>
   )

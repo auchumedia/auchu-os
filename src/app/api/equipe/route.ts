@@ -61,7 +61,7 @@ export async function POST(req: Request) {
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, name, plan, max_members')
+    .select('id, name, plan, max_members, logo_url')
     .eq('owner_id', user.id)
     .single()
 
@@ -116,9 +116,10 @@ export async function POST(req: Request) {
   const inviteUrl = `${appUrl}/invite/${code}`
 
   const emailSent = await sendInvitationEmail({
-    to:         invited_email,
-    toName:     invited_name,
-    orgName:    org.name,
+    to:          invited_email,
+    toName:      invited_name,
+    orgName:     org.name,
+    orgLogoUrl:  (org as any).logo_url ?? null,
     role,
     inviteUrl,
   })
