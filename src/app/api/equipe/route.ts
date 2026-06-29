@@ -1,5 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { createClient }         from '@/lib/supabase/server'
+import { sendInvitationEmail }   from '@/lib/email'
+import { NextResponse }          from 'next/server'
+
+const OWNER_EMAIL = 'raphael@auchumedia.com'
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -27,7 +30,7 @@ export async function GET() {
       .order('joined_at', { ascending: true }),
     supabase
       .from('invitations')
-      .select('id, code, role, expires_at, created_at')
+      .select('id, code, role, expires_at, created_at, invited_name, invited_email')
       .eq('org_id', org.id)
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
@@ -41,21 +44,24 @@ export async function GET() {
   })
 }
 
-const OWNER_EMAIL = 'raphael@auchumedia.com'
-
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { role } = await req.json()
+  const body = await req.json()
+  const { role, first_name, last_name, email } = body
+
   if (!['manager', 'partner', 'editor', 'viewer'].includes(role)) {
     return NextResponse.json({ error: 'Rôle invalide' }, { status: 400 })
+  }
+  if (!first_name?.trim() || !last_name?.trim() || !email?.trim()) {
+    return NextResponse.json({ error: 'Prénom, nom et email sont requis' }, { status: 400 })
   }
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, plan, max_members')
+    .select('id, name, plan, max_members')
     .eq('owner_id', user.id)
     .single()
 
@@ -79,23 +85,43 @@ export async function POST(req: Request) {
 
   // Générer un code unique
   let code = generateCode()
-  let attempts = 0
-  while (attempts < 5) {
-    const { data: clash } = await supabase.from('invitations').select('id').eq('code', code).single()
+  for (let i = 0; i < 5; i++) {
+    const { data: clash } = await supabase.from('invitations').select('id').eq('code', code).maybeSingle()
     if (!clash) break
     code = generateCode()
-    attempts++
   }
 
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  const invited_name  = `${first_name.trim()} ${last_name.trim()}`
+  const invited_email = email.trim().toLowerCase()
+  const expiresAt     = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: invitation, error } = await supabase
     .from('invitations')
-    .insert({ org_id: org.id, code, role, invited_by: user.id, expires_at: expiresAt })
+    .insert({
+      org_id:        org.id,
+      code,
+      role,
+      invited_by:    user.id,
+      expires_at:    expiresAt,
+      invited_name,
+      invited_email,
+    })
     .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ data: invitation })
+  // Envoyer l'email d'invitation (non-bloquant — l'invitation est créée même si l'email échoue)
+  const appUrl   = process.env.NEXT_PUBLIC_APP_URL ?? 'https://auchu-os.vercel.app'
+  const inviteUrl = `${appUrl}/invite/${code}`
+
+  const emailSent = await sendInvitationEmail({
+    to:         invited_email,
+    toName:     invited_name,
+    orgName:    org.name,
+    role,
+    inviteUrl,
+  })
+
+  return NextResponse.json({ data: invitation, email_sent: emailSent })
 }

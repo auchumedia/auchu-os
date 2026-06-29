@@ -4,20 +4,27 @@ import { useState, useCallback } from 'react'
 import { cn, getInitials, formatDate } from '@/lib/utils'
 import {
   Plus, Copy, Check, X, ChevronDown, UserMinus, UserCheck,
-  Loader2, Clock, Link2, Trash2, ShieldCheck,
+  Loader2, Clock, Link2, Trash2, ShieldCheck, Mail, CheckCircle2,
 } from 'lucide-react'
 import type { OrgMember, Invitation, Organization, OrgRole } from '@/types'
 import { PLAN_LIMITS } from '@/lib/plans'
 
 const ROLE_CONFIG: Record<OrgRole, { label: string; cls: string; desc: string }> = {
-  owner:   { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700',  desc: 'Accès complet, facturation, équipe'              },
+  owner:   { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700',  desc: 'Accès complet, facturation, équipe'                },
   manager: { label: 'Manager',      cls: 'bg-blue-100   text-blue-700',   desc: 'Clients, projets, calendrier, assigner des tâches' },
-  partner: { label: 'Partenaire',   cls: 'bg-orange-100 text-orange-700', desc: 'Ses clients assignés, contenu, calendrier'         },
-  editor:  { label: 'Éditeur',      cls: 'bg-green-100  text-green-700',  desc: 'Créer et éditer du contenu'                       },
-  viewer:  { label: 'Observateur',  cls: 'bg-gray-100   text-gray-600',   desc: 'Lecture seule sur les projets'                    },
+  partner: { label: 'Partenaire',   cls: 'bg-orange-100 text-orange-700', desc: 'Ses clients assignés, contenu, calendrier'          },
+  editor:  { label: 'Éditeur',      cls: 'bg-green-100  text-green-700',  desc: 'Créer et éditer du contenu'                        },
+  viewer:  { label: 'Observateur',  cls: 'bg-gray-100   text-gray-600',   desc: 'Lecture seule sur les projets'                     },
 }
 
 const APP_URL = typeof window !== 'undefined' ? window.location.origin : ''
+
+interface InviteForm {
+  first_name: string
+  last_name:  string
+  email:      string
+  role:       Exclude<OrgRole, 'owner'>
+}
 
 interface Props {
   org:           Organization
@@ -31,9 +38,16 @@ export default function EquipeClient({ org, members: initial, invitations: initi
   const [members,     setMembers]     = useState(initial)
   const [invitations, setInvitations] = useState(initialInv)
   const [showInvite,  setShowInvite]  = useState(false)
-  const [newRole,     setNewRole]     = useState<Exclude<OrgRole, 'owner'>>('partner')
   const [loading,     setLoading]     = useState<string | null>(null)
   const [copied,      setCopied]      = useState<string | null>(null)
+  const [emailSent,   setEmailSent]   = useState<string | null>(null)
+
+  const [inviteForm, setInviteForm] = useState<InviteForm>({
+    first_name: '', last_name: '', email: '', role: 'partner',
+  })
+  const setField = (k: keyof InviteForm) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setInviteForm(f => ({ ...f, [k]: e.target.value }))
 
   const plan        = PLAN_LIMITS[org.plan as keyof typeof PLAN_LIMITS] ?? PLAN_LIMITS.free
   const activeCount = members.filter(m => m.status === 'actif').length
@@ -50,13 +64,20 @@ export default function EquipeClient({ org, members: initial, invitations: initi
     const res = await fetch('/api/equipe', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ role: newRole }),
+      body:    JSON.stringify({
+        role:       inviteForm.role,
+        first_name: inviteForm.first_name.trim(),
+        last_name:  inviteForm.last_name.trim(),
+        email:      inviteForm.email.trim(),
+      }),
     })
     const json = await res.json()
     setLoading(null)
     if (res.ok) {
       setInvitations(prev => [json.data, ...prev])
       setShowInvite(false)
+      setInviteForm({ first_name: '', last_name: '', email: '', role: 'partner' })
+      if (json.email_sent) setEmailSent(json.data.id)
     } else {
       alert(json.error)
     }
@@ -157,7 +178,6 @@ export default function EquipeClient({ org, members: initial, invitations: initi
                 key={member.id}
                 className={cn('flex items-center gap-4 px-5 py-3.5 transition-colors', isInactive && 'bg-gray-50/60 opacity-60')}
               >
-                {/* Avatar */}
                 <div className={cn(
                   'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0',
                   isInactive ? 'bg-gray-200 text-gray-400' : 'bg-auchu-100 text-auchu-700'
@@ -168,7 +188,6 @@ export default function EquipeClient({ org, members: initial, invitations: initi
                   }
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <p className="font-medium text-gray-900 text-sm truncate">{name}</p>
@@ -177,16 +196,12 @@ export default function EquipeClient({ org, members: initial, invitations: initi
                   <p className="text-xs text-gray-400 truncate">{email}</p>
                 </div>
 
-                {/* Charge de travail */}
                 {tasks > 0 && (
-                  <div className="text-xs flex items-center gap-1 flex-shrink-0">
-                    <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center font-semibold text-[10px]">
-                      {tasks}
-                    </span>
-                  </div>
+                  <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center font-semibold text-[10px] flex-shrink-0">
+                    {tasks}
+                  </span>
                 )}
 
-                {/* Rôle */}
                 {!isMe && member.role !== 'owner' ? (
                   <div className="relative flex-shrink-0">
                     <select
@@ -215,7 +230,6 @@ export default function EquipeClient({ org, members: initial, invitations: initi
                   </span>
                 )}
 
-                {/* Actions */}
                 {!isMe && member.role !== 'owner' && (
                   <div className="flex items-center gap-0.5 flex-shrink-0">
                     {isLoading
@@ -244,9 +258,7 @@ export default function EquipeClient({ org, members: initial, invitations: initi
           })}
 
           {members.length === 0 && (
-            <div className="px-5 py-8 text-center text-sm text-gray-400">
-              Aucun membre pour l'instant
-            </div>
+            <div className="px-5 py-8 text-center text-sm text-gray-400">Aucun membre pour l'instant</div>
           )}
         </div>
       </div>
@@ -254,63 +266,85 @@ export default function EquipeClient({ org, members: initial, invitations: initi
       {/* ── Invitations en attente ───────────────────────────────────────────── */}
       {invitations.length > 0 && (
         <div className="card p-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900">
               Invitations en attente
-              <span className="ml-2 text-xs font-normal text-gray-400 bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">{invitations.length}</span>
+              <span className="ml-2 text-xs font-normal bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">{invitations.length}</span>
             </h2>
           </div>
           <div className="divide-y divide-gray-50">
             {invitations.map(inv => {
-              const link    = `${APP_URL}/invite/${inv.code}`
-              const expired = new Date(inv.expires_at) < new Date()
-              const roleCfg = ROLE_CONFIG[inv.role] ?? ROLE_CONFIG.viewer
+              const link       = `${APP_URL}/invite/${inv.code}`
+              const expired    = new Date(inv.expires_at) < new Date()
+              const roleCfg    = ROLE_CONFIG[inv.role] ?? ROLE_CONFIG.viewer
               const isRevoking = loading === `inv-${inv.id}`
+              const wasJustSent = emailSent === inv.id
 
               return (
-                <div key={inv.id} className="flex items-center gap-4 px-5 py-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', roleCfg.cls)}>
-                        {roleCfg.label}
-                      </span>
-                      <span className="font-mono text-xs text-gray-500 bg-gray-50 px-2 py-0.5 rounded tracking-widest">
-                        {inv.code}
-                      </span>
+                <div key={inv.id} className="px-5 py-4">
+                  <div className="flex items-start gap-3">
+                    {/* Avatar placeholder */}
+                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Mail className="w-4 h-4 text-gray-400" />
                     </div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Clock className="w-3 h-3 text-gray-300" />
-                      <span className={cn('text-xs', expired ? 'text-red-500' : 'text-gray-400')}>
-                        {expired ? 'Expiré' : `Expire le ${formatDate(inv.expires_at)}`}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => copyText(inv.code, `code-${inv.id}`)}
-                      title="Copier le code"
-                      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors"
-                    >
-                      {copied === `code-${inv.id}` ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                      Code
-                    </button>
-                    <button
-                      onClick={() => copyText(link, `link-${inv.id}`)}
-                      title="Copier le lien d'invitation"
-                      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors"
-                    >
-                      {copied === `link-${inv.id}` ? <Check className="w-3 h-3 text-green-500" /> : <Link2 className="w-3 h-3" />}
-                      Lien
-                    </button>
-                    <button
-                      onClick={() => revokeInvitation(inv.id)}
-                      disabled={isRevoking}
-                      title="Révoquer cette invitation"
-                      className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-300 hover:text-red-400 disabled:opacity-50"
-                    >
-                      {isRevoking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                    </button>
+                    <div className="flex-1 min-w-0">
+                      {/* Name + role */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-gray-900">
+                          {inv.invited_name || 'Invitation'}
+                        </p>
+                        <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', roleCfg.cls)}>
+                          {roleCfg.label}
+                        </span>
+                        {wasJustSent && (
+                          <span className="flex items-center gap-1 text-xs text-green-600">
+                            <CheckCircle2 className="w-3 h-3" /> Email envoyé
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Email + expiry */}
+                      <div className="flex items-center gap-3 mt-0.5">
+                        {inv.invited_email && (
+                          <p className="text-xs text-gray-400 truncate">{inv.invited_email}</p>
+                        )}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Clock className="w-3 h-3 text-gray-300" />
+                          <span className={cn('text-xs', expired ? 'text-red-500' : 'text-gray-400')}>
+                            {expired ? 'Expiré' : `Expire le ${formatDate(inv.expires_at)}`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={() => copyText(inv.code, `code-${inv.id}`)}
+                        title="Copier le code"
+                        className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors"
+                      >
+                        {copied === `code-${inv.id}` ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                        Code
+                      </button>
+                      <button
+                        onClick={() => copyText(link, `link-${inv.id}`)}
+                        title="Copier le lien d'invitation"
+                        className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors"
+                      >
+                        {copied === `link-${inv.id}` ? <Check className="w-3 h-3 text-green-500" /> : <Link2 className="w-3 h-3" />}
+                        Lien
+                      </button>
+                      <button
+                        onClick={() => revokeInvitation(inv.id)}
+                        disabled={isRevoking}
+                        title="Révoquer cette invitation"
+                        className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-300 hover:text-red-400 disabled:opacity-50"
+                      >
+                        {isRevoking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
@@ -344,7 +378,7 @@ export default function EquipeClient({ org, members: initial, invitations: initi
       {showInvite && (
         <>
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50" onClick={() => setShowInvite(false)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-white rounded-2xl shadow-2xl z-50 p-6 space-y-5">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 p-6 space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Inviter un membre</h3>
               <button onClick={() => setShowInvite(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
@@ -352,53 +386,79 @@ export default function EquipeClient({ org, members: initial, invitations: initi
               </button>
             </div>
 
-            <div>
-              <label className="label">Rôle du nouveau membre</label>
-              <div className="space-y-2 mt-1">
-                {(['manager', 'partner', 'editor', 'viewer'] as const).map(r => {
-                  const cfg = ROLE_CONFIG[r]
-                  return (
-                    <button
-                      key={r}
-                      onClick={() => setNewRole(r)}
-                      className={cn(
-                        'w-full flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all',
-                        newRole === r ? 'border-auchu-400 bg-auchu-50' : 'border-gray-100 hover:border-gray-200'
-                      )}
-                    >
-                      <div className={cn(
-                        'w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-all',
-                        newRole === r ? 'border-auchu-500 bg-auchu-500' : 'border-gray-300'
-                      )}>
-                        {newRole === r && <Check className="w-3 h-3 text-white" />}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-gray-900">{cfg.label}</p>
-                          <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', cfg.cls)}>
-                            {r}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5">{cfg.desc}</p>
-                      </div>
-                    </button>
-                  )
-                })}
+            <div className="space-y-4">
+              {/* Prénom + Nom */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Prénom</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Samuel"
+                    value={inviteForm.first_name}
+                    onChange={setField('first_name')}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="label">Nom</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Martin"
+                    value={inviteForm.last_name}
+                    onChange={setField('last_name')}
+                  />
+                </div>
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="label">Email</label>
+                <input
+                  type="email"
+                  className="input"
+                  placeholder="samuel@exemple.com"
+                  value={inviteForm.email}
+                  onChange={setField('email')}
+                />
+              </div>
+
+              {/* Rôle */}
+              <div>
+                <label className="label">Rôle</label>
+                <div className="relative">
+                  <select
+                    value={inviteForm.role}
+                    onChange={setField('role')}
+                    className="input appearance-none pr-8 cursor-pointer"
+                  >
+                    <option value="manager">Manager — Clients, projets, calendrier</option>
+                    <option value="partner">Partenaire — Ses clients assignés, contenu</option>
+                    <option value="editor">Éditeur — Créer et éditer du contenu</option>
+                    <option value="viewer">Observateur — Lecture seule</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                </div>
               </div>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-800">
-              Le lien d'invitation sera valide 7 jours. Partagez-le directement avec votre collaborateur.
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 text-xs text-blue-700">
+              <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+              Un email d'invitation sera envoyé avec un lien valide 7 jours
             </div>
 
             <div className="flex gap-3">
               <button onClick={() => setShowInvite(false)} className="btn-secondary flex-1">Annuler</button>
               <button
                 onClick={createInvite}
-                disabled={loading === 'invite'}
+                disabled={loading === 'invite' || !inviteForm.first_name || !inviteForm.last_name || !inviteForm.email}
                 className="btn-primary flex-1 justify-center disabled:opacity-50"
               >
-                {loading === 'invite' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Générer le lien'}
+                {loading === 'invite'
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <><Mail className="w-3.5 h-3.5" /> Envoyer l'invitation</>
+                }
               </button>
             </div>
           </div>

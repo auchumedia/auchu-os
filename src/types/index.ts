@@ -34,15 +34,17 @@ export interface OrgMember {
 }
 
 export interface Invitation {
-  id: string
-  org_id: string
-  code: string
-  role: Exclude<OrgRole, 'owner'>
-  invited_by: string | null
-  expires_at: string
-  used_at: string | null
-  used_by: string | null
-  created_at: string
+  id:             string
+  org_id:         string
+  code:           string
+  role:           Exclude<OrgRole, 'owner'>
+  invited_by:     string | null
+  invited_name:   string | null
+  invited_email:  string | null
+  expires_at:     string
+  used_at:        string | null
+  used_by:        string | null
+  created_at:     string
 }
 
 

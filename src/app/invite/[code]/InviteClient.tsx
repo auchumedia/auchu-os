@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Building2, Loader2, CheckCircle2, Users } from 'lucide-react'
+import { Building2, Loader2, CheckCircle2, Users, AlertTriangle, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ROLE_CONFIG: Record<string, { label: string; desc: string; cls: string }> = {
@@ -31,28 +31,41 @@ const ROLE_CONFIG: Record<string, { label: string; desc: string; cls: string }> 
 }
 
 interface InviteInfo {
-  id:       string
-  code:     string
-  role:     string
-  org_name: string
+  id:            string
+  code:          string
+  role:          string
+  org_name:      string
+  invited_name:  string | null
+  invited_email: string | null
 }
 
 interface Props {
-  invite:     InviteInfo
-  isLoggedIn: boolean
-  userEmail:  string | null
+  invite:        InviteInfo
+  isLoggedIn:    boolean
+  userEmail:     string | null
+  emailMismatch: boolean
 }
 
-export default function InviteClient({ invite, isLoggedIn, userEmail }: Props) {
-  const router  = useRouter()
-  const [mode,    setMode]    = useState<'signup' | 'done'>(isLoggedIn ? 'done' : 'signup')
+export default function InviteClient({ invite, isLoggedIn, userEmail, emailMismatch }: Props) {
+  const router    = useRouter()
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
-  const [form, setForm]       = useState({ full_name: '', email: '', password: '' })
+  const [form,    setForm]    = useState({
+    full_name: invite.invited_name ?? '',
+    email:     invite.invited_email ?? '',
+    password:  '',
+  })
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
 
-  const roleCfg = ROLE_CONFIG[invite.role] ?? { label: invite.role, desc: '', cls: 'bg-gray-100 text-gray-600' }
+  const roleCfg    = ROLE_CONFIG[invite.role] ?? { label: invite.role, desc: '', cls: 'bg-gray-100 text-gray-600' }
+  const firstName  = invite.invited_name?.split(' ')[0] ?? null
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.reload()
+  }
 
   async function joinWithExistingAccount() {
     setLoading(true)
@@ -93,39 +106,70 @@ export default function InviteClient({ invite, isLoggedIn, userEmail }: Props) {
     router.refresh()
   }
 
+  const roleBgCls = roleCfg.cls.includes('blue')   ? 'bg-blue-50'
+                  : roleCfg.cls.includes('orange')  ? 'bg-orange-50'
+                  : roleCfg.cls.includes('green')   ? 'bg-green-50'
+                  : 'bg-gray-50'
+
   return (
     <div className="w-full max-w-sm space-y-4">
 
-      {/* Invite header card */}
+      {/* ── Header invitation ─────────────────────────────────────────────── */}
       <div className="card space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 bg-auchu-100 rounded-xl flex items-center justify-center flex-shrink-0">
             <Building2 className="w-5 h-5 text-auchu-600" />
           </div>
           <div>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Invitation</p>
-            <h1 className="text-base font-semibold text-gray-900 leading-tight">
-              {invite.org_name} vous invite
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Invitation</p>
+            <h1 className="text-base font-semibold text-gray-900 leading-snug">
+              {firstName
+                ? <>Bonjour {firstName}, <span className="text-gray-500 font-normal">{invite.org_name} vous invite</span></>
+                : <>{invite.org_name} vous invite à rejoindre l'équipe</>
+              }
             </h1>
           </div>
         </div>
 
-        <div className={cn('flex items-start gap-3 rounded-xl px-4 py-3', roleCfg.cls.includes('blue') ? 'bg-blue-50' : roleCfg.cls.includes('orange') ? 'bg-orange-50' : roleCfg.cls.includes('green') ? 'bg-green-50' : 'bg-gray-50')}>
-          <Users className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-70" />
+        {/* Rôle proposé */}
+        <div className={cn('flex items-start gap-3 rounded-xl px-4 py-3', roleBgCls)}>
+          <Users className="w-4 h-4 mt-0.5 flex-shrink-0 opacity-60" />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900">Votre rôle</span>
-              <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', roleCfg.cls)}>
+              <span className="text-sm font-medium text-gray-800">Vous serez</span>
+              <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', roleCfg.cls)}>
                 {roleCfg.label}
               </span>
             </div>
-            <p className="text-xs text-gray-600 mt-0.5">{roleCfg.desc}</p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{roleCfg.desc}</p>
           </div>
         </div>
       </div>
 
-      {/* Action card */}
-      {isLoggedIn ? (
+      {/* ── Avertissement email différent ─────────────────────────────────── */}
+      {emailMismatch && (
+        <div className="card border-amber-200 bg-amber-50 space-y-3 p-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">Mauvais compte</p>
+              <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                Cette invitation est destinée à <strong>{invite.invited_email}</strong>, mais vous êtes connecté en tant que <strong>{userEmail}</strong>.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-900 transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Se déconnecter et utiliser le bon compte
+          </button>
+        </div>
+      )}
+
+      {/* ── Carte d'action ───────────────────────────────────────────────── */}
+      {isLoggedIn && !emailMismatch ? (
         <div className="card space-y-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Rejoindre l'équipe</h2>
@@ -146,17 +190,14 @@ export default function InviteClient({ invite, isLoggedIn, userEmail }: Props) {
               : <><CheckCircle2 className="w-4 h-4" /> Rejoindre {invite.org_name}</>
             }
           </button>
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-xs text-gray-400 text-center">
             Ce n'est pas votre compte ?{' '}
-            <Link
-              href={`/auth/login?next=/invite/${invite.code}`}
-              className="text-auchu-600 hover:underline font-medium"
-            >
-              Se connecter avec un autre compte
-            </Link>
+            <button onClick={handleLogout} className="text-auchu-600 hover:underline font-medium">
+              Se déconnecter
+            </button>
           </p>
         </div>
-      ) : (
+      ) : !isLoggedIn ? (
         <div className="card space-y-5">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Créer mon compte</h2>
@@ -171,11 +212,11 @@ export default function InviteClient({ invite, isLoggedIn, userEmail }: Props) {
               <input
                 type="text"
                 className="input"
-                placeholder="Alex Tremblay"
+                placeholder="Samuel Martin"
                 value={form.full_name}
                 onChange={set('full_name')}
                 required
-                autoFocus
+                autoFocus={!form.full_name}
               />
             </div>
             <div>
@@ -213,12 +254,12 @@ export default function InviteClient({ invite, isLoggedIn, userEmail }: Props) {
             >
               {loading
                 ? <Loader2 className="w-4 h-4 animate-spin" />
-                : `Créer mon compte et rejoindre`
+                : 'Créer mon compte et rejoindre'
               }
             </button>
           </form>
 
-          <p className="text-xs text-gray-500 text-center border-t border-gray-100 pt-4">
+          <p className="text-xs text-gray-400 text-center border-t border-gray-100 pt-4">
             Déjà un compte ?{' '}
             <Link
               href={`/auth/login?next=/invite/${invite.code}`}
@@ -228,7 +269,7 @@ export default function InviteClient({ invite, isLoggedIn, userEmail }: Props) {
             </Link>
           </p>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

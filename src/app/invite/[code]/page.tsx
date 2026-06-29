@@ -7,19 +7,21 @@ import Link                 from 'next/link'
 export const dynamic = 'force-dynamic'
 
 interface InviteInfo {
-  id:         string
-  code:       string
-  role:       string
-  expires_at: string
-  org_id:     string
-  org_name:   string
+  id:             string
+  code:           string
+  role:           string
+  expires_at:     string
+  org_id:         string
+  org_name:       string
+  invited_name:   string | null
+  invited_email:  string | null
 }
 
 async function getInvite(code: string): Promise<InviteInfo | null> {
   const anon = createAnonClient()
   const { data } = await anon
     .from('invitations')
-    .select('id, code, role, expires_at, org_id, org:organizations(name)')
+    .select('id, code, role, expires_at, org_id, invited_name, invited_email, org:organizations(name)')
     .eq('code', code.toUpperCase().trim())
     .is('used_at', null)
     .gt('expires_at', new Date().toISOString())
@@ -28,12 +30,14 @@ async function getInvite(code: string): Promise<InviteInfo | null> {
   if (!data) return null
   const org = data.org as unknown as { name: string } | null
   return {
-    id:         data.id,
-    code:       data.code,
-    role:       data.role,
-    expires_at: data.expires_at,
-    org_id:     data.org_id,
-    org_name:   org?.name ?? 'Cette agence',
+    id:            data.id,
+    code:          data.code,
+    role:          data.role,
+    expires_at:    data.expires_at,
+    org_id:        data.org_id,
+    org_name:      org?.name ?? 'Cette agence',
+    invited_name:  (data as any).invited_name  ?? null,
+    invited_email: (data as any).invited_email ?? null,
   }
 }
 
@@ -59,15 +63,21 @@ export default async function InvitePage({ params }: { params: { code: string } 
     )
   }
 
-  // Detect if user already has a session
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Détecter un email différent entre l'invité et l'utilisateur connecté
+  const emailMismatch =
+    !!user &&
+    !!invite.invited_email &&
+    user.email?.toLowerCase() !== invite.invited_email.toLowerCase()
 
   return (
     <InviteClient
       invite={invite}
       isLoggedIn={!!user}
       userEmail={user?.email ?? null}
+      emailMismatch={emailMismatch}
     />
   )
 }
