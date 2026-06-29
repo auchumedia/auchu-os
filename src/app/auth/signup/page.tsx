@@ -57,7 +57,10 @@ function SignupForm() {
     const { error: signupErr } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      options: { data: { full_name: form.full_name } },
+      options: {
+        data:            { full_name: form.full_name },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+      },
     })
 
     if (signupErr) { setError(signupErr.message); setLoading(false); return }
