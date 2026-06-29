@@ -23,18 +23,18 @@ async function getInvite(code: string): Promise<InviteInfo | null> {
 
   console.log('[invite] lookup code:', normalizedCode)
 
-  // Requête complète (colonnes migration 013 incluses)
+  // Requête principale — .maybeSingle() retourne data:null sans erreur si 0 lignes
   const { data, error } = await anon
     .from('invitations')
     .select('id, code, role, expires_at, org_id, invited_name, invited_email, org:organizations(name)')
     .eq('code', normalizedCode)
     .is('used_at', null)
     .gt('expires_at', new Date().toISOString())
-    .single()
+    .maybeSingle()
 
-  console.log('[invite] full query → data:', JSON.stringify(data), '| error:', JSON.stringify(error))
+  console.log('[invite] data:', JSON.stringify(data), '| error:', JSON.stringify(error))
 
-  if (!error && data) {
+  if (data) {
     const org = data.org as unknown as { name: string } | null
     return {
       id:            data.id,
@@ -48,30 +48,36 @@ async function getInvite(code: string): Promise<InviteInfo | null> {
     }
   }
 
-  // Fallback : colonnes optionnelles absentes (migration 013 non appliquée)
-  console.log('[invite] fallback query sans invited_name / invited_email…')
-  const { data: d2, error: e2 } = await anon
-    .from('invitations')
-    .select('id, code, role, expires_at, org_id, org:organizations(name)')
-    .eq('code', normalizedCode)
-    .is('used_at', null)
-    .gt('expires_at', new Date().toISOString())
-    .single()
+  // Si erreur de colonne inconnue (migration 013 non appliquée), on réessaie sans ces colonnes
+  if (error && error.code !== 'PGRST116') {
+    console.log('[invite] fallback sans invited_name/invited_email — erreur:', error.code, error.message)
+    const { data: d2, error: e2 } = await anon
+      .from('invitations')
+      .select('id, code, role, expires_at, org_id, org:organizations(name)')
+      .eq('code', normalizedCode)
+      .is('used_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle()
 
-  console.log('[invite] fallback → data:', JSON.stringify(d2), '| error:', JSON.stringify(e2))
+    console.log('[invite] fallback data:', JSON.stringify(d2), '| error:', JSON.stringify(e2))
 
-  if (e2 || !d2) return null
-  const org2 = d2.org as unknown as { name: string } | null
-  return {
-    id:            d2.id,
-    code:          d2.code,
-    role:          d2.role,
-    expires_at:    d2.expires_at,
-    org_id:        d2.org_id,
-    org_name:      org2?.name ?? 'Cette agence',
-    invited_name:  null,
-    invited_email: null,
+    if (d2) {
+      const org2 = d2.org as unknown as { name: string } | null
+      return {
+        id:            d2.id,
+        code:          d2.code,
+        role:          d2.role,
+        expires_at:    d2.expires_at,
+        org_id:        d2.org_id,
+        org_name:      org2?.name ?? 'Cette agence',
+        invited_name:  null,
+        invited_email: null,
+      }
+    }
   }
+
+  console.log('[invite] aucune invitation trouvée pour ce code')
+  return null
 }
 
 export default async function InvitePage({ params }: { params: { code: string } }) {
