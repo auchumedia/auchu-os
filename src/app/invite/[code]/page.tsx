@@ -18,26 +18,59 @@ interface InviteInfo {
 }
 
 async function getInvite(code: string): Promise<InviteInfo | null> {
-  const anon = createAnonClient()
-  const { data } = await anon
+  const anon           = createAnonClient()
+  const normalizedCode = code.toUpperCase().trim()
+
+  console.log('[invite] lookup code:', normalizedCode)
+
+  // Requête complète (colonnes migration 013 incluses)
+  const { data, error } = await anon
     .from('invitations')
     .select('id, code, role, expires_at, org_id, invited_name, invited_email, org:organizations(name)')
-    .eq('code', code.toUpperCase().trim())
+    .eq('code', normalizedCode)
     .is('used_at', null)
     .gt('expires_at', new Date().toISOString())
     .single()
 
-  if (!data) return null
-  const org = data.org as unknown as { name: string } | null
+  console.log('[invite] full query → data:', JSON.stringify(data), '| error:', JSON.stringify(error))
+
+  if (!error && data) {
+    const org = data.org as unknown as { name: string } | null
+    return {
+      id:            data.id,
+      code:          data.code,
+      role:          data.role,
+      expires_at:    data.expires_at,
+      org_id:        data.org_id,
+      org_name:      org?.name ?? 'Cette agence',
+      invited_name:  (data as any).invited_name  ?? null,
+      invited_email: (data as any).invited_email ?? null,
+    }
+  }
+
+  // Fallback : colonnes optionnelles absentes (migration 013 non appliquée)
+  console.log('[invite] fallback query sans invited_name / invited_email…')
+  const { data: d2, error: e2 } = await anon
+    .from('invitations')
+    .select('id, code, role, expires_at, org_id, org:organizations(name)')
+    .eq('code', normalizedCode)
+    .is('used_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .single()
+
+  console.log('[invite] fallback → data:', JSON.stringify(d2), '| error:', JSON.stringify(e2))
+
+  if (e2 || !d2) return null
+  const org2 = d2.org as unknown as { name: string } | null
   return {
-    id:            data.id,
-    code:          data.code,
-    role:          data.role,
-    expires_at:    data.expires_at,
-    org_id:        data.org_id,
-    org_name:      org?.name ?? 'Cette agence',
-    invited_name:  (data as any).invited_name  ?? null,
-    invited_email: (data as any).invited_email ?? null,
+    id:            d2.id,
+    code:          d2.code,
+    role:          d2.role,
+    expires_at:    d2.expires_at,
+    org_id:        d2.org_id,
+    org_name:      org2?.name ?? 'Cette agence',
+    invited_name:  null,
+    invited_email: null,
   }
 }
 
