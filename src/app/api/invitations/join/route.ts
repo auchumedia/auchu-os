@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+const OWNER_EMAIL = 'raphael@auchumedia.com'
+
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,14 +33,15 @@ export async function POST(req: Request) {
 
   if (alreadyMember) return NextResponse.json({ success: true, org_name: org.name })
 
-  // Vérifier la limite de membres
+  // Vérifier la limite de membres (bypass pour le compte owner)
+  const effectiveMax = user.email === OWNER_EMAIL ? 999 : org.max_members
   const { count } = await supabase
     .from('org_members')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', inv.org_id)
     .eq('status', 'actif')
 
-  if ((count ?? 0) >= org.max_members) {
+  if ((count ?? 0) >= effectiveMax) {
     return NextResponse.json(
       { error: `Cette équipe a atteint sa limite de membres (plan ${org.plan})` },
       { status: 403 }

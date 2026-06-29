@@ -41,6 +41,8 @@ export async function GET() {
   })
 }
 
+const OWNER_EMAIL = 'raphael@auchumedia.com'
+
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -59,14 +61,16 @@ export async function POST(req: Request) {
 
   if (!org) return NextResponse.json({ error: 'Aucune organisation' }, { status: 404 })
 
-  // Vérifier la limite du plan
+  // Compte owner : pas de limite de membres
+  const effectiveMax = user.email === OWNER_EMAIL ? 999 : org.max_members
+
   const { count } = await supabase
     .from('org_members')
     .select('*', { count: 'exact', head: true })
     .eq('org_id', org.id)
     .eq('status', 'actif')
 
-  if ((count ?? 0) >= org.max_members) {
+  if ((count ?? 0) >= effectiveMax) {
     return NextResponse.json(
       { error: `Limite atteinte pour le plan ${org.plan} (${org.max_members} membres max)` },
       { status: 403 }
