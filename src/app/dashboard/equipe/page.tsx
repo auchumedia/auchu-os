@@ -39,7 +39,7 @@ export default async function EquipePage() {
 
     supabase
       .from('invitations')
-      .select('id, code, role, expires_at, created_at')
+      .select('id, code, role, expires_at, created_at, invited_name, invited_email')
       .eq('org_id', ctx.org.id)
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())

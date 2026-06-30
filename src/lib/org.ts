@@ -60,17 +60,24 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   }
 
   // 2 — Membre ?
+  // .limit(1).maybeSingle() au lieu de .single() : évite PGRST116 si 0 lignes
+  // (utilisateur pas encore dans org_members) ou si doublons (race condition
+  // entre callback email et joinWithExistingAccount).
   const { data: membership } = await supabase
     .from('org_members')
     .select('role, status, org:organizations(id, name, plan, max_members, owner_id)')
     .eq('user_id', user.id)
     .eq('status', 'actif')
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   if (membership) {
     const role    = membership.role as OrgRole
     const orgData = membership.org as unknown as OrgContext['org']
     const isPartner = role === 'partner'
+
+    console.log('[getOrgContext] membre — role:', role, '| orgData.owner_id:', orgData?.owner_id ?? 'NULL')
+
     return {
       userId: user.id, userName, userEmail,
       org: orgData,
@@ -78,6 +85,8 @@ export async function getOrgContext(): Promise<OrgContext | null> {
       canManageTeam:    role === 'manager',
       canAccessFinance: role === 'manager',
       canWrite:         role === 'manager' || role === 'partner' || role === 'editor',
+      // dataOwnerId : toujours l'owner de l'org pour que les queries de données
+      // (clients, projets...) ciblent les bonnes lignes
       dataOwnerId: orgData?.owner_id ?? user.id,
       memberCount: 0,
     }
