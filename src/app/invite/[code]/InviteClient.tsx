@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Building2, Loader2, CheckCircle2, Users, AlertTriangle, LogOut } from 'lucide-react'
+import { Building2, Loader2, CheckCircle2, Users, AlertTriangle, LogOut, Mail } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ROLE_CONFIG: Record<string, { label: string; desc: string; cls: string }> = {
@@ -48,8 +48,9 @@ interface Props {
 
 export default function InviteClient({ invite, isLoggedIn, userEmail, emailMismatch }: Props) {
   const router    = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState<string | null>(null)
+  const [loading,      setLoading]      = useState(false)
+  const [error,        setError]        = useState<string | null>(null)
+  const [emailSent,    setEmailSent]    = useState(false)
   const [form,    setForm]    = useState({
     full_name: invite.invited_name ?? '',
     email:     invite.invited_email ?? '',
@@ -99,14 +100,17 @@ export default function InviteClient({ invite, isLoggedIn, userEmail, emailMisma
         password: form.password,
         options:  {
           data:            { full_name: form.full_name },
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          // Le code d'invitation est passé dans l'URL pour que /auth/callback
+          // puisse auto-joindre l'org après confirmation email
+          emailRedirectTo: `${window.location.origin}/auth/callback?invite=${invite.code}&next=/dashboard`,
         },
       })
       if (signupErr) { setError(signupErr.message); return }
 
-      // Si email confirmation activée : pas de session immédiate
+      // Email confirmation activée : pas de session immédiate.
+      // Le join se fera automatiquement dans /auth/callback après confirmation.
       if (!signupData.session) {
-        setError('Vérifie ta boîte email et clique sur le lien de confirmation pour finaliser ton inscription.')
+        setEmailSent(true)
         return
       }
 
@@ -220,6 +224,20 @@ export default function InviteClient({ invite, isLoggedIn, userEmail, emailMisma
           </p>
         </div>
       ) : !isLoggedIn ? (
+        emailSent ? (
+          <div className="card space-y-4 text-center py-8">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+              <Mail className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Vérifie ta boîte email</h2>
+              <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                Un lien de confirmation a été envoyé à <strong className="text-gray-700">{form.email}</strong>.
+                Clique dessus pour activer ton compte et rejoindre <strong className="text-gray-700">{invite.org_name}</strong> automatiquement.
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="card space-y-5">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Créer mon compte</h2>
@@ -291,6 +309,7 @@ export default function InviteClient({ invite, isLoggedIn, userEmail, emailMisma
             </Link>
           </p>
         </div>
+        )
       ) : null}
     </div>
   )
