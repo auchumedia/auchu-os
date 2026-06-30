@@ -70,43 +70,62 @@ export default function InviteClient({ invite, isLoggedIn, userEmail, emailMisma
   async function joinWithExistingAccount() {
     setLoading(true)
     setError(null)
-    const res = await fetch('/api/invitations/join', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ code: invite.code }),
-    })
-    const json = await res.json()
-    if (!res.ok) { setError(json.error); setLoading(false); return }
-    router.push('/dashboard')
-    router.refresh()
+    try {
+      const res  = await fetch('/api/invitations/join', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ code: invite.code }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setError(json.error ?? 'Erreur inconnue'); return }
+      router.push('/dashboard')
+      router.refresh()
+    } catch (err) {
+      console.error('[join] erreur inattendue:', err)
+      setError('Erreur réseau — réessaie dans un instant')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    try {
+      const supabase = createClient()
+      const { data: signupData, error: signupErr } = await supabase.auth.signUp({
+        email:    form.email,
+        password: form.password,
+        options:  {
+          data:            { full_name: form.full_name },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+        },
+      })
+      if (signupErr) { setError(signupErr.message); return }
 
-    const supabase = createClient()
-    const { error: signupErr } = await supabase.auth.signUp({
-      email:    form.email,
-      password: form.password,
-      options:  {
-        data:             { full_name: form.full_name },
-        emailRedirectTo:  `${window.location.origin}/auth/callback?next=/dashboard`,
-      },
-    })
-    if (signupErr) { setError(signupErr.message); setLoading(false); return }
+      // Si email confirmation activée : pas de session immédiate
+      if (!signupData.session) {
+        setError('Vérifie ta boîte email et clique sur le lien de confirmation pour finaliser ton inscription.')
+        return
+      }
 
-    const res = await fetch('/api/invitations/join', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ code: invite.code }),
-    })
-    const json = await res.json()
-    if (!res.ok) { setError(json.error); setLoading(false); return }
+      const res  = await fetch('/api/invitations/join', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ code: invite.code }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setError(json.error ?? 'Erreur inconnue'); return }
 
-    router.push('/dashboard')
-    router.refresh()
+      router.push('/dashboard')
+      router.refresh()
+    } catch (err) {
+      console.error('[signup] erreur inattendue:', err)
+      setError('Erreur réseau — réessaie dans un instant')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const roleBgCls = roleCfg.cls.includes('blue')   ? 'bg-blue-50'
