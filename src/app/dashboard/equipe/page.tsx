@@ -30,10 +30,11 @@ export default async function EquipePage() {
 
   const supabase = await createClient()
 
-  const [membersRes, invitesRes, contentRes] = await Promise.all([
+  const [orgMembersRes, invitesRes, contentRes] = await Promise.all([
+    // org_members sans embed profiles — pas de FK direct org_members.user_id→profiles.id
     supabase
       .from('org_members')
-      .select('id, user_id, role, status, joined_at, profile:profiles(full_name, email, avatar_url)')
+      .select('id, user_id, role, status, joined_at')
       .eq('org_id', ctx.org.id)
       .order('joined_at', { ascending: true }),
 
@@ -54,6 +55,20 @@ export default async function EquipePage() {
       .not('status', 'in', '(approuve,publie,refuse)'),
   ])
 
+  // Récupérer les profiles séparément (profiles.id = auth.users.id)
+  const userIds = (orgMembersRes.data ?? []).map(m => m.user_id)
+  const { data: profilesData } = userIds.length > 0
+    ? await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', userIds)
+    : { data: [] as { id: string; full_name: string | null; email: string | null; avatar_url: string | null }[] }
+
+  const profileMap = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
+
+  // Fusionner org_members + profiles
+  const membersWithProfiles = (orgMembersRes.data ?? []).map(m => ({
+    ...m,
+    profile: profileMap[m.user_id] ?? null,
+  }))
+
   // Compter les contenus par membre
   const workload: Record<string, number> = {}
   for (const c of contentRes.data ?? []) {
@@ -70,7 +85,7 @@ export default async function EquipePage() {
       </div>
       <EquipeClient
         org={ctx.org as any}
-        members={(membersRes.data ?? []) as any}
+        members={membersWithProfiles as any}
         invitations={(invitesRes.data ?? []) as any}
         workload={workload}
         currentUserId={ctx.userId}

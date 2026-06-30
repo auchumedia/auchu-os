@@ -1,12 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
+import { getOrgContext } from '@/lib/org'
 import { notFound } from 'next/navigation'
 import ClientDetail from './ClientDetail'
 
+export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Fiche client' }
 
 export default async function ClientPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const ctx = await getOrgContext()
+
+  const ownerId = ctx?.dataOwnerId
+  if (!ownerId) notFound()
 
   const [
     { data: client, error },
@@ -18,28 +23,28 @@ export default async function ClientPage({ params }: { params: { id: string } })
       .from('clients')
       .select('*')
       .eq('id', params.id)
-      .eq('user_id', user!.id)
+      .eq('user_id', ownerId)
       .single(),
 
     supabase
       .from('invoices')
       .select('*')
       .eq('client_id', params.id)
-      .eq('user_id', user!.id)
+      .eq('user_id', ownerId)
       .order('created_at', { ascending: false }),
 
     supabase
       .from('content_pieces')
       .select('*')
       .eq('client_id', params.id)
-      .eq('user_id', user!.id)
+      .eq('user_id', ownerId)
       .order('created_at', { ascending: false }),
 
     supabase
       .from('calendar_events')
       .select('*')
       .eq('client_id', params.id)
-      .eq('user_id', user!.id)
+      .eq('user_id', ownerId)
       .order('date', { ascending: true }),
   ])
 

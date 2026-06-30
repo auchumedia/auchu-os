@@ -1,20 +1,25 @@
 import { createClient } from '@/lib/supabase/server'
+import { getOrgContext } from '@/lib/org'
 import { formatCurrency } from '@/lib/utils'
 import { Users, FileText, Receipt, Brain, ArrowRight, CalendarDays } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Tableau de bord' }
 
 export default async function DashboardPage() {
+  const ctx = await getOrgContext()
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'là'
+  const firstName  = ctx?.userName?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'là'
+  const ownerId    = ctx?.dataOwnerId ?? user?.id ?? ''
 
   const [clientsRes, contenuRes, invoicesRes] = await Promise.all([
-    supabase.from('clients').select('id, status', { count: 'exact' }).eq('user_id', user!.id),
-    supabase.from('content_pieces').select('id', { count: 'exact' }).eq('user_id', user!.id),
-    supabase.from('invoices').select('id, status').eq('user_id', user!.id),
+    supabase.from('clients').select('id, status', { count: 'exact' }).eq('user_id', ownerId),
+    supabase.from('content_pieces').select('id', { count: 'exact' }).eq('user_id', ownerId),
+    supabase.from('invoices').select('id, status').eq('user_id', ownerId),
   ])
 
   const stats = [
@@ -44,7 +49,7 @@ export default async function DashboardPage() {
   const { data: recentContent } = await supabase
     .from('content_pieces')
     .select('id, title, status, platform, clients(name)')
-    .eq('user_id', user!.id)
+    .eq('user_id', ownerId)
     .order('updated_at', { ascending: false })
     .limit(5)
 
