@@ -38,7 +38,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && isAuthRoute) {
+  // Ne pas rediriger les routes /auth/callback — elles doivent s'exécuter même
+  // si l'utilisateur a déjà une session (ex: clic sur lien de confirmation email)
+  const isCallbackRoute = request.nextUrl.pathname.startsWith('/auth/callback')
+
+  if (user && isAuthRoute && !isCallbackRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)

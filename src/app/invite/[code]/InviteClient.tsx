@@ -102,7 +102,9 @@ export default function InviteClient({ invite, isLoggedIn, userEmail, emailMisma
           data:            { full_name: form.full_name },
           // Le code d'invitation est passé dans l'URL pour que /auth/callback
           // puisse auto-joindre l'org après confirmation email
-          emailRedirectTo: `${window.location.origin}/auth/callback?invite=${invite.code}&next=/dashboard`,
+          // Code dans le PATH (pas query param) — Supabase ajoute ?code=xxx
+          // à ce qui devient /auth/callback/U6VP3B?code=xxx
+          emailRedirectTo: `${window.location.origin}/auth/callback/${invite.code}`,
         },
       })
       if (signupErr) { setError(signupErr.message); return }
