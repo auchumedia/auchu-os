@@ -13,10 +13,10 @@ export interface OrgContext {
   role:        OrgRole
   isOwner:     boolean
   isPartner:   boolean
-  canManageTeam:    boolean  // owner or manager
-  canAccessFinance: boolean  // owner or manager
-  canWrite:         boolean  // owner, manager, partner, or editor
-  dataOwnerId: string        // user_id to use for all data queries
+  canManageTeam:    boolean
+  canAccessFinance: boolean
+  canWrite:         boolean
+  dataOwnerId: string
   memberCount: number
 }
 
@@ -30,46 +30,23 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   const userName  = user.user_metadata?.full_name  || user.email?.split('@')[0] || ''
   const userEmail = user.email || ''
 
-  // 1 — Propriétaire ?
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('id, name, plan, max_members, owner_id')
-    .eq('owner_id', user.id)
-    .single()
-
-  if (org) {
-    const { count } = await supabase
-      .from('org_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('org_id', org.id)
-      .eq('status', 'actif')
-
-    // Compte owner gratuit : toujours plan Pro sans restriction
-    const effectiveOrg = userEmail === OWNER_EMAIL
-      ? { ...org, plan: 'pro' as OrgPlan, max_members: 999 }
-      : org as OrgContext['org']
-
-    return {
-      userId: user.id, userName, userEmail,
-      org: effectiveOrg,
-      role: 'owner', isOwner: true, isPartner: false,
-      canManageTeam: true, canAccessFinance: true, canWrite: true,
-      dataOwnerId: user.id,
-      memberCount: count ?? 1,
-    }
-  }
-
-  // 2 — Membre ?
-  // .limit(1).maybeSingle() au lieu de .single() : évite PGRST116 si 0 lignes
-  // (utilisateur pas encore dans org_members) ou si doublons (race condition
-  // entre callback email et joinWithExistingAccount).
-  const { data: membership } = await supabase
+  // ── 1. Membre non-owner (priorité sur la propriété) ────────────────────────
+  // Si l'utilisateur a été invité dans une org tierce (role != 'owner'),
+  // on utilise ce contexte même s'il possède aussi sa propre org.
+  // Cela évite qu'un manager voie la section "Facturation" de sa propre org
+  // vide alors qu'il opère dans l'org de l'agence qui l'a invité.
+  const { data: membership, error: memberErr } = await supabase
     .from('org_members')
     .select('role, status, org:organizations(id, name, plan, max_members, owner_id)')
     .eq('user_id', user.id)
     .eq('status', 'actif')
+    .neq('role', 'owner')   // exclut les lignes owner (migration 007 backfill)
     .limit(1)
     .maybeSingle()
+
+  if (memberErr) {
+    console.error('[getOrgContext] erreur membership:', memberErr.code, memberErr.message)
+  }
 
   if (membership) {
     const role    = membership.role as OrgRole
@@ -85,14 +62,45 @@ export async function getOrgContext(): Promise<OrgContext | null> {
       canManageTeam:    role === 'manager',
       canAccessFinance: role === 'manager',
       canWrite:         role === 'manager' || role === 'partner' || role === 'editor',
-      // dataOwnerId : toujours l'owner de l'org pour que les queries de données
-      // (clients, projets...) ciblent les bonnes lignes
       dataOwnerId: orgData?.owner_id ?? user.id,
       memberCount: 0,
     }
   }
 
-  // 3 — Utilisateur solo (pas encore d'org)
+  // ── 2. Propriétaire ────────────────────────────────────────────────────────
+  // Seulement si pas de membership non-owner trouvé.
+  const { data: ownedOrg, error: orgErr } = await supabase
+    .from('organizations')
+    .select('id, name, plan, max_members, owner_id')
+    .eq('owner_id', user.id)
+    .maybeSingle()   // était .single() — PGRST116 si 0 ou 2+ orgs
+
+  if (orgErr) {
+    console.error('[getOrgContext] erreur org owner:', orgErr.code, orgErr.message)
+  }
+
+  if (ownedOrg) {
+    const { count } = await supabase
+      .from('org_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('org_id', ownedOrg.id)
+      .eq('status', 'actif')
+
+    const effectiveOrg = userEmail === OWNER_EMAIL
+      ? { ...ownedOrg, plan: 'pro' as OrgPlan, max_members: 999 }
+      : ownedOrg as OrgContext['org']
+
+    return {
+      userId: user.id, userName, userEmail,
+      org: effectiveOrg,
+      role: 'owner', isOwner: true, isPartner: false,
+      canManageTeam: true, canAccessFinance: true, canWrite: true,
+      dataOwnerId: user.id,
+      memberCount: count ?? 1,
+    }
+  }
+
+  // ── 3. Utilisateur solo (pas encore d'org, pas de membership) ─────────────
   return {
     userId: user.id, userName, userEmail,
     org: null, role: 'owner', isOwner: true, isPartner: false,

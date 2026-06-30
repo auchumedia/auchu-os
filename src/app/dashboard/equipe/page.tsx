@@ -31,12 +31,13 @@ export default async function EquipePage() {
   const supabase = await createClient()
 
   const [orgMembersRes, invitesRes, contentRes] = await Promise.all([
-    // org_members sans embed profiles — pas de FK direct org_members.user_id→profiles.id
+    // joined_at omis du SELECT : la colonne peut être absente si la table
+    // existait avant migration 006 (CREATE TABLE IF NOT EXISTS skippé)
     supabase
       .from('org_members')
-      .select('id, user_id, role, status, joined_at')
+      .select('id, user_id, role, status')
       .eq('org_id', ctx.org.id)
-      .order('joined_at', { ascending: true }),
+      .order('id', { ascending: true }),
 
     supabase
       .from('invitations')
@@ -54,6 +55,11 @@ export default async function EquipePage() {
       .not('assigned_user_id', 'is', null)
       .not('status', 'in', '(approuve,publie,refuse)'),
   ])
+
+  if (orgMembersRes.error) {
+    console.error('[equipe] org_members query error:', orgMembersRes.error.code, orgMembersRes.error.message)
+  }
+  console.log('[equipe] org_members rows:', orgMembersRes.data?.length ?? 0, '| org_id:', ctx.org.id)
 
   // Récupérer les profiles séparément (profiles.id = auth.users.id)
   const userIds = (orgMembersRes.data ?? []).map(m => m.user_id)
