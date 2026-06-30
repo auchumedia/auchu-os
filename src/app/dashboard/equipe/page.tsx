@@ -89,6 +89,7 @@ export default async function EquipePage() {
         invitations={(invitesRes.data ?? []) as any}
         workload={workload}
         currentUserId={ctx.userId}
+        isOwner={ctx.isOwner}
       />
     </div>
   )

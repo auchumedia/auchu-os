@@ -85,8 +85,8 @@ export default async function SettingsPage() {
         }}
       />
 
-      {/* ── Facturation & plan ───────────────────────────────────────────────── */}
-      {ctx.isOwner && ctx.org && (
+      {/* ── Facturation & plan — owner uniquement ────────────────────────────── */}
+      {ctx.role === 'owner' && ctx.isOwner && ctx.org && (
         <section className="space-y-4">
           <div>
             <h2 className="font-semibold text-gray-900">Facturation & plan</h2>

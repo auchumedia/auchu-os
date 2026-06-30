@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { cn, getInitials, formatDate } from '@/lib/utils'
 import {
   Plus, Copy, Check, X, ChevronDown, UserMinus, UserCheck,
-  Loader2, Clock, Link2, Trash2, ShieldCheck, Mail, CheckCircle2,
+  Loader2, Clock, Link2, Trash2, ShieldCheck, Mail, CheckCircle2, RefreshCw,
 } from 'lucide-react'
 import type { OrgMember, Invitation, Organization, OrgRole } from '@/types'
 import { PLAN_LIMITS } from '@/lib/plans'
@@ -32,9 +33,11 @@ interface Props {
   invitations:   Invitation[]
   workload:      Record<string, number>
   currentUserId: string
+  isOwner:       boolean
 }
 
-export default function EquipeClient({ org, members: initial, invitations: initialInv, workload, currentUserId }: Props) {
+export default function EquipeClient({ org, members: initial, invitations: initialInv, workload, currentUserId, isOwner }: Props) {
+  const router = useRouter()
   const [members,     setMembers]     = useState(initial)
   const [invitations, setInvitations] = useState(initialInv)
   const [showInvite,  setShowInvite]  = useState(false)
@@ -140,9 +143,11 @@ export default function EquipeClient({ org, members: initial, invitations: initi
             />
           </div>
         </div>
-        <a href="/settings" className="text-xs text-auchu-600 hover:text-auchu-700 font-medium hover:underline">
-          Gérer le plan →
-        </a>
+        {isOwner && (
+          <a href="/settings" className="text-xs text-auchu-600 hover:text-auchu-700 font-medium hover:underline">
+            Gérer le plan →
+          </a>
+        )}
       </div>
 
       {/* ── Membres actifs ───────────────────────────────────────────────────── */}
@@ -266,11 +271,18 @@ export default function EquipeClient({ org, members: initial, invitations: initi
       {/* ── Invitations en attente ───────────────────────────────────────────── */}
       {invitations.length > 0 && (
         <div className="card p-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900">
               Invitations en attente
               <span className="ml-2 text-xs font-normal bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">{invitations.length}</span>
             </h2>
+            <button
+              onClick={() => router.refresh()}
+              title="Rafraîchir la liste"
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
           </div>
           <div className="divide-y divide-gray-50">
             {invitations.map(inv => {
