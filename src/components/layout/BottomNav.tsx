@@ -42,12 +42,12 @@ export default function BottomNav({ role = 'owner' }: Props) {
             key={href}
             href={href}
             className={cn(
-              'flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors',
+              'flex-1 flex flex-col items-center justify-center gap-1 py-2 min-h-[56px] text-[10px] font-medium transition-colors',
               isActive(href) ? 'text-auchu-600' : 'text-gray-400'
             )}
           >
             <Icon className={cn('w-5 h-5', isActive(href) ? 'text-auchu-600' : 'text-gray-400')} />
-            {label}
+            <span className="text-center leading-tight px-0.5">{label}</span>
           </Link>
         ))}
 
@@ -56,12 +56,12 @@ export default function BottomNav({ role = 'owner' }: Props) {
           <button
             onClick={() => setOpen(true)}
             className={cn(
-              'flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors',
+              'flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors min-h-[56px]',
               open ? 'text-auchu-600' : 'text-gray-400'
             )}
           >
             <MoreHorizontal className="w-5 h-5" />
-            Plus
+            <span className="text-center leading-tight px-0.5">Plus</span>
           </button>
         )}
       </nav>

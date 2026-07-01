@@ -279,7 +279,7 @@ export default function PortalContent({ content: initial, events, token, primary
             )}
             <button
               onClick={fetchContent}
-              className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors"
+              className="text-xs px-2.5 py-1 min-h-[40px] rounded-lg border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors"
             >
               ↻ Rafraîchir
             </button>
@@ -375,17 +375,17 @@ export default function PortalContent({ content: initial, events, token, primary
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 text-xs">
               <button
                 onClick={() => setCalType('tournage')}
-                className={cn('px-2.5 py-1.5 rounded-md font-medium transition-all', calType === 'tournage' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500')}
+                className={cn('px-2.5 py-1.5 min-h-[40px] rounded-md font-medium transition-all', calType === 'tournage' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500')}
               >Tournage</button>
               <button
                 onClick={() => setCalType('publication')}
-                className={cn('px-2.5 py-1.5 rounded-md font-medium transition-all', calType === 'publication' ? 'bg-white shadow-sm' : 'text-gray-500')}
+                className={cn('px-2.5 py-1.5 min-h-[40px] rounded-md font-medium transition-all', calType === 'publication' ? 'bg-white shadow-sm' : 'text-gray-500')}
                 style={calType === 'publication' ? { color: '#f95640' } : undefined}
               >Publication</button>
             </div>
-            <button onClick={() => setCalDate(new Date(year, month - 1, 1))} className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white">←</button>
+            <button onClick={() => setCalDate(new Date(year, month - 1, 1))} className="px-2 py-1.5 min-h-[40px] min-w-[40px] border border-gray-200 rounded-lg text-xs bg-white">←</button>
             <span className="text-sm font-medium text-gray-700">{MONTHS_FR[month]} {year}</span>
-            <button onClick={() => setCalDate(new Date(year, month + 1, 1))} className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white">→</button>
+            <button onClick={() => setCalDate(new Date(year, month + 1, 1))} className="px-2 py-1.5 min-h-[40px] min-w-[40px] border border-gray-200 rounded-lg text-xs bg-white">→</button>
           </div>
         </div>
 
@@ -444,7 +444,7 @@ export default function PortalContent({ content: initial, events, token, primary
           <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40" onClick={() => setSelected(null)} />
           <aside className="fixed top-0 right-0 h-full w-full md:max-w-xl bg-white shadow-2xl z-50 flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-start justify-between p-6 border-b border-gray-100 flex-shrink-0" style={{ background: `linear-gradient(135deg, ${primary}10, ${secondary}10)` }}>
+            <div className="flex items-start justify-between p-4 sm:p-6 border-b border-gray-100 flex-shrink-0" style={{ background: `linear-gradient(135deg, ${primary}10, ${secondary}10)` }}>
               <div className="flex-1 min-w-0 pr-4">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', PLATFORM_COLORS[selected.platform] ?? 'bg-gray-100 text-gray-600')}>
@@ -457,13 +457,13 @@ export default function PortalContent({ content: initial, events, token, primary
                   <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1', sc.cls)}>{sc.label}</span>
                 ) : null })()}
               </div>
-              <button onClick={() => setSelected(null)} className="p-2 rounded-lg hover:bg-white/80 transition-colors flex-shrink-0">
+              <button onClick={() => setSelected(null)} className="p-2 min-h-[44px] min-w-[44px] rounded-lg hover:bg-white/80 transition-colors flex-shrink-0">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
               {selected.description && (
                 <section>
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Description</h3>
@@ -513,7 +513,7 @@ export default function PortalContent({ content: initial, events, token, primary
                   <button
                     onClick={saveNotes}
                     disabled={saving === selected.id}
-                    className="mt-2 text-sm font-medium px-4 py-2 rounded-lg text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    className="mt-2 text-sm font-medium px-4 py-2 min-h-[44px] rounded-lg text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                     style={{ background: primary }}
                   >
                     {saving === selected.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Enregistrer mes notes'}
@@ -527,7 +527,7 @@ export default function PortalContent({ content: initial, events, token, primary
                   onClick={() => portalPatch(selected.id, { status: 'approuve' })}
                   disabled={!!saving || selected.status === 'approuve'}
                   className={cn(
-                    'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-50',
+                    'flex-1 flex items-center justify-center gap-2 py-3 min-h-[44px] rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-50',
                     selected.status === 'approuve'
                       ? 'border-green-400 bg-green-50 text-green-700'
                       : 'border-gray-200 text-gray-600 hover:border-green-300 hover:bg-green-50 hover:text-green-700'
@@ -540,7 +540,7 @@ export default function PortalContent({ content: initial, events, token, primary
                   onClick={() => portalPatch(selected.id, { status: 'refuse' })}
                   disabled={!!saving || selected.status === 'refuse'}
                   className={cn(
-                    'flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-50',
+                    'flex-1 flex items-center justify-center gap-2 py-3 min-h-[44px] rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-50',
                     selected.status === 'refuse'
                       ? 'border-red-400 bg-red-50 text-red-700'
                       : 'border-gray-200 text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700'

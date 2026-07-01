@@ -331,10 +331,12 @@ function AddEventModal({
   const accentColor = isTournage ? '#3b82f6' : '#f95640'
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50" onClick={onClose} />
-      <div className="fixed inset-x-0 top-1/2 -translate-y-1/2 mx-auto max-w-md w-full bg-white rounded-2xl shadow-2xl z-50 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             {isTournage
               ? <Video className="w-4 h-4 text-blue-500" />
@@ -344,12 +346,12 @@ function AddEventModal({
               {isTournage ? 'Ajouter un tournage' : 'Ajouter une publication'}
             </h3>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+          <button onClick={onClose} className="p-2 -m-2 rounded-lg hover:bg-gray-100 transition-colors">
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           <div>
             <label className="label">Titre *</label>
             <input
@@ -440,7 +442,7 @@ function AddEventModal({
             <button type="button" onClick={onClose} className="btn-secondary flex-1">Annuler</button>
             <button
               type="submit" disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               style={{ background: accentColor }}
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ajouter'}
@@ -448,6 +450,6 @@ function AddEventModal({
           </div>
         </form>
       </div>
-    </>
+    </div>
   )
 }

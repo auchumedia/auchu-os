@@ -154,62 +154,64 @@ export default function ContentTable({ initialContent, clientId }: Props) {
         </div>
       ) : (
         <div className="card p-0 overflow-hidden">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Titre</th>
-                <th>Type</th>
-                <th>Plateforme</th>
-                <th>Statut</th>
-                <th>Assigné à</th>
-                <th>Planifié</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(item => {
-                const sc = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.idee
-                return (
-                  <tr
-                    key={item.id}
-                    className="cursor-pointer hover:bg-gray-50/80 transition-colors"
-                    onClick={() => openItem(item)}
-                  >
-                    <td className="font-medium text-gray-900 max-w-[200px]">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate">{item.title}</span>
-                        {item.reference_links?.length > 0 && (
-                          <span title={`${item.reference_links.length} référence(s)`}>
-                            <Link2 className="w-3 h-3 text-gray-300 flex-shrink-0" />
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="text-xs text-gray-500">{TYPE_LABELS[item.type] ?? item.type}</td>
-                    <td>
-                      <span className={cn('badge text-xs', PLATFORM_COLORS[item.platform] ?? 'badge-gray')}>
-                        {PLATFORM_LABELS[item.platform] ?? item.platform}
-                      </span>
-                    </td>
-                    <td><span className={cn('badge text-xs', sc.cls)}>{sc.label}</span></td>
-                    <td className="text-xs text-gray-500">{item.assigned_to ?? '—'}</td>
-                    <td className="text-xs text-gray-400">{item.scheduled_at ? formatDate(item.scheduled_at) : '—'}</td>
-                    <td onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => deleteItem(item.id)}
-                          className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Titre</th>
+                  <th>Type</th>
+                  <th>Plateforme</th>
+                  <th>Statut</th>
+                  <th>Assigné à</th>
+                  <th>Planifié</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(item => {
+                  const sc = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.idee
+                  return (
+                    <tr
+                      key={item.id}
+                      className="cursor-pointer hover:bg-gray-50/80 transition-colors"
+                      onClick={() => openItem(item)}
+                    >
+                      <td className="font-medium text-gray-900 max-w-[200px]">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate">{item.title}</span>
+                          {item.reference_links?.length > 0 && (
+                            <span title={`${item.reference_links.length} référence(s)`}>
+                              <Link2 className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="text-xs text-gray-500">{TYPE_LABELS[item.type] ?? item.type}</td>
+                      <td>
+                        <span className={cn('badge text-xs', PLATFORM_COLORS[item.platform] ?? 'badge-gray')}>
+                          {PLATFORM_LABELS[item.platform] ?? item.platform}
+                        </span>
+                      </td>
+                      <td><span className={cn('badge text-xs', sc.cls)}>{sc.label}</span></td>
+                      <td className="text-xs text-gray-500">{item.assigned_to ?? '—'}</td>
+                      <td className="text-xs text-gray-400">{item.scheduled_at ? formatDate(item.scheduled_at) : '—'}</td>
+                      <td onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => deleteItem(item.id)}
+                            className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -629,21 +631,23 @@ function AddContentModal({
   }
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50" onClick={onClose} />
-      <div className="fixed inset-x-0 top-1/2 -translate-y-1/2 mx-auto max-w-xl w-full bg-white rounded-2xl shadow-2xl z-50 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <h3 className="font-semibold text-gray-900">Nouveau contenu</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+          <button onClick={onClose} className="p-2 -m-2 rounded-lg hover:bg-gray-100 transition-colors">
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
           <div>
             <label className="label">Titre *</label>
             <input type="text" required autoFocus value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="input text-sm" placeholder="Titre du contenu" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Type</label>
               <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="select text-sm">
@@ -688,6 +692,6 @@ function AddContentModal({
           </div>
         </form>
       </div>
-    </>
+    </div>
   )
 }

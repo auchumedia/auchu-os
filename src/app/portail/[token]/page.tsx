@@ -104,7 +104,7 @@ export default async function PortailPage({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mt-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
             <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4">
               <p className="text-white/70 text-xs font-medium uppercase tracking-wide">Projets actifs</p>
               <p className="text-2xl font-bold text-white mt-1">{activeProjects.length}</p>
@@ -178,7 +178,32 @@ export default async function PortailPage({
               <h2 className="font-semibold text-gray-900">Factures</h2>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-sm">
+              {/* Mobile : cartes empilées */}
+              <div className="sm:hidden divide-y divide-gray-50">
+                {(invoices ?? []).map(inv => {
+                  const cfg = INVOICE_STATUS_CONFIG[inv.status as keyof typeof INVOICE_STATUS_CONFIG]
+                  return (
+                    <div key={inv.id} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 text-sm">{inv.invoice_number}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {formatDate(inv.created_at)}
+                            {inv.due_date && ` · échéance ${formatDate(inv.due_date)}`}
+                          </p>
+                        </div>
+                        <p className="font-semibold text-gray-900 tabular-nums flex-shrink-0">{formatCurrency(inv.total)}</p>
+                      </div>
+                      <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-2', cfg?.cls)}>
+                        {cfg?.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop : tableau */}
+              <table className="w-full text-sm hidden sm:table">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-4 py-3">N°</th>

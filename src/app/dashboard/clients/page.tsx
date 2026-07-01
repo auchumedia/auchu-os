@@ -73,58 +73,96 @@ export default async function ClientsPage() {
           )}
         </div>
       ) : (
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Client</th>
-                <th>Statut</th>
-                <th>Plateformes</th>
-                <th>Budget mensuel</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {(clients ?? []).map((client: any) => (
-                <tr key={client.id}>
-                  <td>
-                    <div>
-                      <p className="font-medium text-gray-900">{client.name}</p>
-                      <p className="text-xs text-gray-400">{client.email}</p>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`badge ${
-                      client.status === 'actif' ? 'badge-green' :
-                      client.status === 'prospect' ? 'badge-blue' : 'badge-gray'
-                    }`}>
-                      {client.status === 'actif' ? 'Actif' :
-                       client.status === 'prospect' ? 'Prospect' : 'Inactif'}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="flex gap-1 flex-wrap">
-                      {(client.platforms || []).map((p: string) => (
-                        <span key={p} className="badge badge-gray text-xs capitalize">{p}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="text-gray-700">
-                    {client.monthly_budget ? formatCurrency(client.monthly_budget) : '—'}
-                  </td>
-                  <td>
-                    <Link
-                      href={`/dashboard/clients/${client.id}`}
-                      className="text-xs text-auchu-600 hover:underline"
-                    >
-                      Voir →
-                    </Link>
-                  </td>
+        <>
+          {/* Mobile : cartes empilées, chaque carte entièrement cliquable */}
+          <div className="md:hidden space-y-2">
+            {(clients ?? []).map((client: any) => (
+              <Link
+                key={client.id}
+                href={`/dashboard/clients/${client.id}`}
+                className="card block p-4 active:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-900 truncate">{client.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{client.email}</p>
+                  </div>
+                  <span className={`badge flex-shrink-0 ${
+                    client.status === 'actif' ? 'badge-green' :
+                    client.status === 'prospect' ? 'badge-blue' : 'badge-gray'
+                  }`}>
+                    {client.status === 'actif' ? 'Actif' :
+                     client.status === 'prospect' ? 'Prospect' : 'Inactif'}
+                  </span>
+                </div>
+                {(client.platforms ?? []).length > 0 && (
+                  <div className="flex gap-1 flex-wrap mt-2">
+                    {client.platforms.map((p: string) => (
+                      <span key={p} className="badge badge-gray text-xs capitalize">{p}</span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-sm text-gray-700 mt-2">
+                  {client.monthly_budget ? formatCurrency(client.monthly_budget) : 'Aucun budget mensuel'}
+                </p>
+              </Link>
+            ))}
+          </div>
+
+          {/* Desktop : tableau */}
+          <div className="table-wrapper hidden md:block">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Statut</th>
+                  <th>Plateformes</th>
+                  <th>Budget mensuel</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {(clients ?? []).map((client: any) => (
+                  <tr key={client.id}>
+                    <td>
+                      <div>
+                        <p className="font-medium text-gray-900">{client.name}</p>
+                        <p className="text-xs text-gray-400">{client.email}</p>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`badge ${
+                        client.status === 'actif' ? 'badge-green' :
+                        client.status === 'prospect' ? 'badge-blue' : 'badge-gray'
+                      }`}>
+                        {client.status === 'actif' ? 'Actif' :
+                         client.status === 'prospect' ? 'Prospect' : 'Inactif'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex gap-1 flex-wrap">
+                        {(client.platforms || []).map((p: string) => (
+                          <span key={p} className="badge badge-gray text-xs capitalize">{p}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="text-gray-700">
+                      {client.monthly_budget ? formatCurrency(client.monthly_budget) : '—'}
+                    </td>
+                    <td>
+                      <Link
+                        href={`/dashboard/clients/${client.id}`}
+                        className="text-xs text-auchu-600 hover:underline"
+                      >
+                        Voir →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )

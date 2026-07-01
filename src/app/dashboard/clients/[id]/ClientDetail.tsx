@@ -575,37 +575,39 @@ export default function ClientDetail({ client: initial, invoices, content, event
             </div>
           ) : (
             <div className="card p-0 overflow-hidden">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>N°</th>
-                    <th>Date</th>
-                    <th className="text-right">HT</th>
-                    <th className="text-right">TTC</th>
-                    <th>Statut</th>
-                    <th>Échéance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map(inv => {
-                    const cfg = INVOICE_STATUS_CONFIG[inv.status as keyof typeof INVOICE_STATUS_CONFIG]
-                    return (
-                      <tr key={inv.id}>
-                        <td>
-                          <Link href={`/dashboard/finance/factures/${inv.id}`} className="text-sm font-medium text-auchu-600 hover:underline">
-                            {inv.invoice_number}
-                          </Link>
-                        </td>
-                        <td className="text-xs text-gray-400">{formatDate(inv.created_at)}</td>
-                        <td className="text-right tabular-nums text-sm text-gray-600">{formatCurrency(inv.subtotal)}</td>
-                        <td className="text-right tabular-nums text-sm font-medium text-gray-900">{formatCurrency(inv.total)}</td>
-                        <td><span className={cn('badge', cfg?.cls)}>{cfg?.label}</span></td>
-                        <td className="text-xs text-gray-400">{inv.due_date ? formatDate(inv.due_date) : '—'}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>N°</th>
+                      <th>Date</th>
+                      <th className="text-right">HT</th>
+                      <th className="text-right">TTC</th>
+                      <th>Statut</th>
+                      <th>Échéance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map(inv => {
+                      const cfg = INVOICE_STATUS_CONFIG[inv.status as keyof typeof INVOICE_STATUS_CONFIG]
+                      return (
+                        <tr key={inv.id}>
+                          <td>
+                            <Link href={`/dashboard/finance/factures/${inv.id}`} className="text-sm font-medium text-auchu-600 hover:underline">
+                              {inv.invoice_number}
+                            </Link>
+                          </td>
+                          <td className="text-xs text-gray-400">{formatDate(inv.created_at)}</td>
+                          <td className="text-right tabular-nums text-sm text-gray-600">{formatCurrency(inv.subtotal)}</td>
+                          <td className="text-right tabular-nums text-sm font-medium text-gray-900">{formatCurrency(inv.total)}</td>
+                          <td><span className={cn('badge', cfg?.cls)}>{cfg?.label}</span></td>
+                          <td className="text-xs text-gray-400">{inv.due_date ? formatDate(inv.due_date) : '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

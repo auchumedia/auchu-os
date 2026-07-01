@@ -8,6 +8,10 @@
     @apply bg-white border border-gray-200 rounded-xl p-6;
   }
 
+  .card-sm {
+    @apply bg-white border border-gray-200 rounded-xl p-3;
+  }
+
   /* ─── Buttons ────────────────────────────────────────────────────────────── */
   .btn-primary {
     @apply inline-flex items-center gap-2 bg-auchu-500 hover:bg-auchu-600 active:bg-auchu-700
@@ -21,6 +25,12 @@
            transition-colors cursor-pointer min-h-[44px];
   }
 
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 text-gray-500 hover:text-gray-700
+           hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors
+           cursor-pointer min-h-[44px];
+  }
+
   /* ─── Badges ─────────────────────────────────────────────────────────────── */
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
@@ -31,6 +41,7 @@
   .badge-amber  { @apply bg-amber-50  text-amber-700; }
   .badge-gray   { @apply bg-gray-100  text-gray-600;  }
   .badge-red    { @apply bg-red-50    text-red-700;   }
+  .badge-purple { @apply bg-purple-50 text-purple-700; }
 
   /* ─── Labels (form) ──────────────────────────────────────────────────────── */
   .label {
@@ -39,7 +50,7 @@
 
   /* ─── Table ──────────────────────────────────────────────────────────────── */
   .table-wrapper {
-    @apply border border-gray-200 rounded-xl overflow-hidden;
+    @apply border border-gray-200 rounded-xl overflow-x-auto;
   }
 
   .table {
@@ -88,6 +99,12 @@
            focus:outline-none focus:ring-2 focus:ring-auchu-500 focus:border-transparent
            min-h-[44px];
   }
+
+  .textarea {
+    @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-auchu-500 focus:border-transparent
+           placeholder:text-gray-400 resize-none;
+  }
 }
 
 @layer utilities {
@@ -97,5 +114,14 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Espace pour la home indicator sur iPhone X+ (nécessite viewport-fit=cover,
+     voir layout.tsx). Sans ça env() renvoie 0 et ces classes ne font rien. */
+  .safe-area-inset-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }

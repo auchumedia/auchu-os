@@ -769,20 +769,9 @@ function InvoiceTable({
   compact?: boolean
 }) {
   return (
-    <table className="table">
-      <thead>
-        <tr>
-          <th>N° Facture</th>
-          <th>Client</th>
-          {!compact && <th>Date</th>}
-          <th className="text-right">HT</th>
-          <th className="text-right">TTC</th>
-          <th>Statut</th>
-          {!compact && <th>Échéance</th>}
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
+    <>
+      {/* Mobile : cartes empilées */}
+      <div className="md:hidden divide-y divide-gray-100">
         {invoices.map(inv => {
           const cfg = INVOICE_STATUS_CONFIG[inv.status as InvoiceStatus]
           const isUpdating = updatingId === inv.id
@@ -790,96 +779,173 @@ function InvoiceTable({
           const isOverdue = inv.status === 'envoye' && inv.due_date && new Date(inv.due_date) < new Date()
 
           return (
-            <tr key={inv.id} className={cn(isDeleting && 'opacity-40')}>
-              <td>
-                <Link
-                  href={`/dashboard/finance/factures/${inv.id}`}
-                  className="text-sm font-medium text-auchu-600 hover:underline"
-                >
-                  {inv.invoice_number}
-                </Link>
-              </td>
-              <td className="text-sm text-gray-700">{inv.client?.name ?? '—'}</td>
-              {!compact && (
-                <td className="text-xs text-gray-400">{formatDate(inv.created_at)}</td>
-              )}
-              <td className="text-right text-sm text-gray-600 tabular-nums">
-                {formatCurrency(inv.subtotal)}
-              </td>
-              <td className="text-right text-sm font-medium text-gray-900 tabular-nums">
-                {formatCurrency(inv.total)}
-              </td>
-              <td>
-                <span className={cn('badge', cfg?.class)}>
-                  {cfg?.label}
-                </span>
-                {isOverdue && (
-                  <span className="badge badge-red ml-1">En retard</span>
-                )}
-              </td>
-              {!compact && (
-                <td className="text-xs text-gray-400">
-                  {inv.due_date ? formatDate(inv.due_date) : '—'}
-                </td>
-              )}
-              <td>
+            <div key={inv.id} className={cn('px-4 py-3', isDeleting && 'opacity-40')}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/dashboard/finance/factures/${inv.id}`}
+                    className="text-sm font-medium text-auchu-600 hover:underline"
+                  >
+                    {inv.invoice_number}
+                  </Link>
+                  <p className="text-xs text-gray-500 mt-0.5">{inv.client?.name ?? '—'}</p>
+                  {!compact && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {formatDate(inv.created_at)}
+                      {inv.due_date && ` · échéance ${formatDate(inv.due_date)}`}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-sm font-medium text-gray-900 tabular-nums">{formatCurrency(inv.total)}</p>
+                  <p className="text-xs text-gray-400 tabular-nums">HT {formatCurrency(inv.subtotal)}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 mt-2">
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className={cn('badge', cfg?.class)}>{cfg?.label}</span>
+                  {isOverdue && <span className="badge badge-red">En retard</span>}
+                </div>
                 {isUpdating ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+                  <Loader2 className="w-4 h-4 animate-spin text-gray-400 flex-shrink-0" />
                 ) : (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
                     {inv.status === 'draft' && (
-                      <ActionBtn
-                        onClick={() => onSendEmail(inv)}
-                        title="Envoyer par email"
-                        icon={Send}
-                        colorClass="hover:text-blue-500"
-                      />
+                      <ActionBtn onClick={() => onSendEmail(inv)} title="Envoyer par email" icon={Send} colorClass="hover:text-blue-500" size="md" />
                     )}
                     {(inv.status === 'envoye' || inv.status === 'en_retard') && (
-                      <ActionBtn
-                        onClick={() => onUpdateStatus(inv.id, 'paye')}
-                        title="Marquer payé"
-                        icon={CheckCircle}
-                        colorClass="hover:text-green-500"
-                      />
+                      <ActionBtn onClick={() => onUpdateStatus(inv.id, 'paye')} title="Marquer payé" icon={CheckCircle} colorClass="hover:text-green-500" size="md" />
                     )}
                     {inv.status === 'envoye' && (
-                      <ActionBtn
-                        onClick={() => onUpdateStatus(inv.id, 'en_retard')}
-                        title="Marquer en retard"
-                        icon={AlertCircle}
-                        colorClass="hover:text-amber-500"
-                      />
+                      <ActionBtn onClick={() => onUpdateStatus(inv.id, 'en_retard')} title="Marquer en retard" icon={AlertCircle} colorClass="hover:text-amber-500" size="md" />
                     )}
-                    <ActionBtn
-                      onClick={() => onDelete(inv.id)}
-                      title="Supprimer"
-                      icon={Trash2}
-                      colorClass="hover:text-red-400"
-                    />
+                    <ActionBtn onClick={() => onDelete(inv.id)} title="Supprimer" icon={Trash2} colorClass="hover:text-red-400" size="md" />
                   </div>
                 )}
-              </td>
-            </tr>
+              </div>
+            </div>
           )
         })}
-      </tbody>
-    </table>
+      </div>
+
+      {/* Desktop : tableau */}
+      <table className="table hidden md:table">
+        <thead>
+          <tr>
+            <th>N° Facture</th>
+            <th>Client</th>
+            {!compact && <th>Date</th>}
+            <th className="text-right">HT</th>
+            <th className="text-right">TTC</th>
+            <th>Statut</th>
+            {!compact && <th>Échéance</th>}
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoices.map(inv => {
+            const cfg = INVOICE_STATUS_CONFIG[inv.status as InvoiceStatus]
+            const isUpdating = updatingId === inv.id
+            const isDeleting = deletingId === inv.id
+            const isOverdue = inv.status === 'envoye' && inv.due_date && new Date(inv.due_date) < new Date()
+
+            return (
+              <tr key={inv.id} className={cn(isDeleting && 'opacity-40')}>
+                <td>
+                  <Link
+                    href={`/dashboard/finance/factures/${inv.id}`}
+                    className="text-sm font-medium text-auchu-600 hover:underline"
+                  >
+                    {inv.invoice_number}
+                  </Link>
+                </td>
+                <td className="text-sm text-gray-700">{inv.client?.name ?? '—'}</td>
+                {!compact && (
+                  <td className="text-xs text-gray-400">{formatDate(inv.created_at)}</td>
+                )}
+                <td className="text-right text-sm text-gray-600 tabular-nums">
+                  {formatCurrency(inv.subtotal)}
+                </td>
+                <td className="text-right text-sm font-medium text-gray-900 tabular-nums">
+                  {formatCurrency(inv.total)}
+                </td>
+                <td>
+                  <span className={cn('badge', cfg?.class)}>
+                    {cfg?.label}
+                  </span>
+                  {isOverdue && (
+                    <span className="badge badge-red ml-1">En retard</span>
+                  )}
+                </td>
+                {!compact && (
+                  <td className="text-xs text-gray-400">
+                    {inv.due_date ? formatDate(inv.due_date) : '—'}
+                  </td>
+                )}
+                <td>
+                  {isUpdating ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      {inv.status === 'draft' && (
+                        <ActionBtn
+                          onClick={() => onSendEmail(inv)}
+                          title="Envoyer par email"
+                          icon={Send}
+                          colorClass="hover:text-blue-500"
+                        />
+                      )}
+                      {(inv.status === 'envoye' || inv.status === 'en_retard') && (
+                        <ActionBtn
+                          onClick={() => onUpdateStatus(inv.id, 'paye')}
+                          title="Marquer payé"
+                          icon={CheckCircle}
+                          colorClass="hover:text-green-500"
+                        />
+                      )}
+                      {inv.status === 'envoye' && (
+                        <ActionBtn
+                          onClick={() => onUpdateStatus(inv.id, 'en_retard')}
+                          title="Marquer en retard"
+                          icon={AlertCircle}
+                          colorClass="hover:text-amber-500"
+                        />
+                      )}
+                      <ActionBtn
+                        onClick={() => onDelete(inv.id)}
+                        title="Supprimer"
+                        icon={Trash2}
+                        colorClass="hover:text-red-400"
+                      />
+                    </div>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </>
   )
 }
 
 function ActionBtn({
-  onClick, title, icon: Icon, colorClass,
+  onClick, title, icon: Icon, colorClass, size = 'sm',
 }: {
-  onClick: () => void; title: string; icon: React.ElementType; colorClass: string
+  onClick: () => void; title: string; icon: React.ElementType; colorClass: string; size?: 'sm' | 'md'
 }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      className={cn('p-1 rounded text-gray-300 transition-colors', colorClass)}
+      className={cn(
+        'rounded-lg text-gray-300 transition-colors',
+        size === 'md' ? 'p-2.5 min-h-[40px] min-w-[40px]' : 'p-1',
+        colorClass,
+      )}
     >
-      <Icon className="w-3.5 h-3.5" />
+      <Icon className={size === 'md' ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
     </button>
   )
 }

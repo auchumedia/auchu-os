@@ -299,7 +299,7 @@ ${invoice.notes ? `<div class="notes"><strong>Notes :</strong> ${invoice.notes}<
         </div>
 
         {/* Items */}
-        <div>
+        <div className="overflow-x-auto">
           <table className="table">
             <thead>
               <tr>

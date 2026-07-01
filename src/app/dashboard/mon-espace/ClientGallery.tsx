@@ -43,7 +43,7 @@ export default function ClientGallery({ title, clients }: { title: string; clien
           <p className="text-sm text-gray-400">Aucun client assigné pour l'instant</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {clients.map(c => {
             const badge = STATUS_BADGE[c.status] ?? STATUS_BADGE.inactif
             return (

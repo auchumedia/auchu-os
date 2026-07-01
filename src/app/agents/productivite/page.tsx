@@ -93,44 +93,44 @@ export default function AgentProductivitePage() {
         <p className="text-sm text-gray-500 capitalize">{today}</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-4">
           {/* Clients + livrables */}
           <div className="card space-y-3">
             <label className="label">Clients et livrables en attente</label>
 
             {clients.map((client) => (
-              <div key={client.id} className="flex gap-2 items-start">
+              <div key={client.id} className="flex flex-col sm:flex-row gap-2 pb-3 sm:pb-0 border-b border-gray-100 sm:border-0 last:border-0 last:pb-0">
                 <input
-                  className="input text-sm"
-                  style={{ flex: '0 0 130px' }}
+                  className="input text-sm w-full sm:w-[130px] sm:flex-none"
                   placeholder="Client"
                   value={client.name}
                   onChange={(e) => updateClient(client.id, 'name', e.target.value)}
                 />
                 <input
-                  className="input text-sm flex-1"
+                  className="input text-sm w-full sm:flex-1"
                   placeholder="Livrable(s) attendu(s)"
                   value={client.deliverable}
                   onChange={(e) => updateClient(client.id, 'deliverable', e.target.value)}
                 />
-                <select
-                  className="select text-xs"
-                  style={{ flex: '0 0 110px' }}
-                  value={client.priority}
-                  onChange={(e) => updateClient(client.id, 'priority', e.target.value as any)}
-                >
-                  <option value="urgent">Urgent</option>
-                  <option value="semaine">Cette semaine</option>
-                  <option value="mois">Ce mois</option>
-                </select>
-                <button
-                  onClick={() => removeClient(client.id)}
-                  className="p-2 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 flex-shrink-0"
-                  aria-label="Retirer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="flex gap-2">
+                  <select
+                    className="select text-xs flex-1 sm:flex-none sm:w-[110px]"
+                    value={client.priority}
+                    onChange={(e) => updateClient(client.id, 'priority', e.target.value as any)}
+                  >
+                    <option value="urgent">Urgent</option>
+                    <option value="semaine">Cette semaine</option>
+                    <option value="mois">Ce mois</option>
+                  </select>
+                  <button
+                    onClick={() => removeClient(client.id)}
+                    className="p-2 min-h-[44px] min-w-[44px] text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50 flex-shrink-0"
+                    aria-label="Retirer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
 
@@ -183,7 +183,7 @@ export default function AgentProductivitePage() {
                 <button
                   key={s}
                   onClick={() => setWorkStyle(s)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
+                  className={`w-full text-left px-3 py-2 min-h-[44px] rounded-lg text-xs transition-colors ${
                     workStyle === s
                       ? 'bg-amber-50 text-amber-800 font-medium border border-amber-200'
                       : 'text-gray-600 hover:bg-gray-50'
@@ -201,7 +201,7 @@ export default function AgentProductivitePage() {
       {plan && (
         <div className="space-y-4">
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { val: plan.stats?.clients, label: 'Clients' },
               { val: plan.stats?.blocs, label: 'Blocs' },

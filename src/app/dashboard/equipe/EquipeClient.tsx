@@ -236,14 +236,14 @@ export default function EquipeClient({
       )}
 
       {/* ── En-tête d'actions ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
         {canManageOrgStructure && chefCandidates.length > 0 && (
-          <button onClick={() => setShowCreate(true)} className="btn-secondary text-sm gap-1.5">
+          <button onClick={() => setShowCreate(true)} className="btn-secondary text-sm gap-1.5 w-full sm:w-auto justify-center">
             <UsersRound className="w-3.5 h-3.5" /> Créer une équipe
           </button>
         )}
         {canInvite && (
-          <button onClick={() => setShowInvite(true)} className="btn-primary text-sm gap-1.5">
+          <button onClick={() => setShowInvite(true)} className="btn-primary text-sm gap-1.5 w-full sm:w-auto justify-center">
             <Plus className="w-3.5 h-3.5" /> Inviter
           </button>
         )}
@@ -268,63 +268,68 @@ export default function EquipeClient({
               const canManageThis = !isMe && member.role !== 'owner' && canManageRole(role, member.role)
 
               return (
-                <div key={member.id} className={cn('flex items-center gap-4 px-5 py-3.5 transition-colors', isInactive && 'bg-gray-50/60 opacity-60')}>
-                  <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0', isInactive ? 'bg-gray-200 text-gray-400' : 'bg-auchu-100 text-auchu-700')}>
-                    {member.profile?.avatar_url
-                      ? <img src={member.profile.avatar_url} alt={name} className="w-9 h-9 rounded-full object-cover" />
-                      : getInitials(name)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="font-medium text-gray-900 text-sm truncate">{name}</p>
-                      {isMe && <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0">vous</span>}
+                <div key={member.id} className={cn('flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 px-4 sm:px-5 py-3.5 transition-colors', isInactive && 'bg-gray-50/60 opacity-60')}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0', isInactive ? 'bg-gray-200 text-gray-400' : 'bg-auchu-100 text-auchu-700')}>
+                      {member.profile?.avatar_url
+                        ? <img src={member.profile.avatar_url} alt={name} className="w-9 h-9 rounded-full object-cover" />
+                        : getInitials(name)}
                     </div>
-                    <p className="text-xs text-gray-400 truncate">{member.profile?.email}</p>
-                  </div>
-                  {workload[member.user_id] > 0 && (
-                    <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center font-semibold text-[10px] flex-shrink-0">{workload[member.user_id]}</span>
-                  )}
-
-                  {canManageThis && !isLoading ? (
-                    <div className="relative flex-shrink-0">
-                      <select
-                        value={member.role}
-                        onChange={e => patchMember(member.id, { role: e.target.value as OrgRole })}
-                        className="text-xs font-medium rounded-full pl-2.5 pr-6 py-1 border border-transparent appearance-none cursor-pointer transition-colors bg-transparent hover:border-gray-200"
-                      >
-                        {getManageableRoles(role).map(r => <option key={r} value={r}>{roleLabel(r).label}</option>)}
-                      </select>
-                      <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-gray-900 text-sm truncate">{name}</p>
+                        {isMe && <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0">vous</span>}
+                      </div>
+                      <p className="text-xs text-gray-400 truncate">{member.profile?.email}</p>
                     </div>
-                  ) : (
-                    <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0', roleCfg.cls)}>{roleCfg.label}</span>
-                  )}
+                  </div>
 
-                  {canManageThis && (
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      {isLoading
-                        ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                        : <>
-                            <button
-                              onClick={() => patchMember(member.id, { status: isInactive ? 'actif' : 'inactif' })}
-                              title={isInactive ? 'Réactiver' : 'Désactiver'}
-                              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
-                            >
-                              {isInactive ? <UserCheck className="w-3.5 h-3.5" /> : <UserMinus className="w-3.5 h-3.5" />}
-                            </button>
-                            {role === 'owner' && (
+                  <div className="flex items-center gap-2 flex-wrap pl-12 sm:pl-0 sm:flex-shrink-0">
+                    {workload[member.user_id] > 0 && (
+                      <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center font-semibold text-[10px] flex-shrink-0">{workload[member.user_id]}</span>
+                    )}
+
+                    {canManageThis && !isLoading ? (
+                      <div className="relative flex-shrink-0">
+                        <select
+                          value={member.role}
+                          onChange={e => patchMember(member.id, { role: e.target.value as OrgRole })}
+                          className="text-xs font-medium rounded-full pl-2.5 pr-6 py-1 min-h-[36px] border border-transparent appearance-none cursor-pointer transition-colors bg-transparent hover:border-gray-200"
+                        >
+                          {getManageableRoles(role).map(r => <option key={r} value={r}>{roleLabel(r).label}</option>)}
+                        </select>
+                        <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                      </div>
+                    ) : (
+                      <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0', roleCfg.cls)}>{roleCfg.label}</span>
+                    )}
+
+                    {canManageThis && (
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        {isLoading
+                          ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                          : <>
                               <button
-                                onClick={() => removeMemberFromOrg(member.id)}
-                                title="Supprimer le compte"
-                                className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-300 hover:text-red-400"
+                                onClick={() => patchMember(member.id, { status: isInactive ? 'actif' : 'inactif' })}
+                                title={isInactive ? 'Réactiver' : 'Désactiver'}
+                                className="p-2.5 min-h-[40px] min-w-[40px] rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
                               >
-                                <X className="w-3.5 h-3.5" />
+                                {isInactive ? <UserCheck className="w-3.5 h-3.5" /> : <UserMinus className="w-3.5 h-3.5" />}
                               </button>
-                            )}
-                          </>
-                      }
-                    </div>
-                  )}
+                              {role === 'owner' && (
+                                <button
+                                  onClick={() => removeMemberFromOrg(member.id)}
+                                  title="Supprimer le compte"
+                                  className="p-2.5 min-h-[40px] min-w-[40px] rounded-lg hover:bg-red-50 transition-colors text-gray-300 hover:text-red-400"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </>
+                        }
+                      </div>
+                    )}
+                  </div>
                 </div>
               )
             })}
@@ -374,70 +379,75 @@ export default function EquipeClient({
                 const canManageThis = canEditThisTeam && !isChef && !isMe
 
                 return (
-                  <div key={member.id} className={cn('flex items-center gap-4 px-5 py-3.5 transition-colors', isInactive && 'bg-gray-50/60 opacity-60')}>
-                    <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0', isInactive ? 'bg-gray-200 text-gray-400' : 'bg-auchu-100 text-auchu-700')}>
-                      {member.profile?.avatar_url
-                        ? <img src={member.profile.avatar_url} alt={name} className="w-9 h-9 rounded-full object-cover" />
-                        : getInitials(name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="font-medium text-gray-900 text-sm truncate">{name}</p>
-                        {isMe && <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0">vous</span>}
+                  <div key={member.id} className={cn('flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 px-4 sm:px-5 py-3.5 transition-colors', isInactive && 'bg-gray-50/60 opacity-60')}>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0', isInactive ? 'bg-gray-200 text-gray-400' : 'bg-auchu-100 text-auchu-700')}>
+                        {member.profile?.avatar_url
+                          ? <img src={member.profile.avatar_url} alt={name} className="w-9 h-9 rounded-full object-cover" />
+                          : getInitials(name)}
                       </div>
-                      <p className="text-xs text-gray-400 truncate">{member.profile?.email}</p>
-                    </div>
-                    {tasks > 0 && (
-                      <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center font-semibold text-[10px] flex-shrink-0">{tasks}</span>
-                    )}
-
-                    {canManageThis && !isLoading ? (
-                      <div className="relative flex-shrink-0">
-                        <select
-                          value={member.role}
-                          onChange={e => patchMember(member.id, { role: e.target.value as OrgRole })}
-                          className="text-xs font-medium rounded-full pl-2.5 pr-6 py-1 border border-transparent appearance-none cursor-pointer transition-colors bg-transparent hover:border-gray-200"
-                        >
-                          {getManageableRoles(role).map(r => <option key={r} value={r}>{roleLabel(r).label}</option>)}
-                        </select>
-                        <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-gray-900 text-sm truncate">{name}</p>
+                          {isMe && <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0">vous</span>}
+                        </div>
+                        <p className="text-xs text-gray-400 truncate">{member.profile?.email}</p>
                       </div>
-                    ) : (
-                      <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0', roleCfg.cls)}>{roleCfg.label}</span>
-                    )}
+                    </div>
 
-                    {canManageThis && (
-                      <div className="flex items-center gap-0.5 flex-shrink-0">
-                        {isLoading
-                          ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                          : <>
-                              <button
-                                onClick={() => patchMember(member.id, { status: isInactive ? 'actif' : 'inactif' })}
-                                title={isInactive ? 'Réactiver' : 'Désactiver'}
-                                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
-                              >
-                                {isInactive ? <UserCheck className="w-3.5 h-3.5" /> : <UserMinus className="w-3.5 h-3.5" />}
-                              </button>
-                              <button
-                                onClick={() => removeMemberFromTeam(team.id, member.user_id)}
-                                title="Retirer de l'équipe"
-                                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
-                              >
-                                <UserX className="w-3.5 h-3.5" />
-                              </button>
-                              {role === 'owner' && (
+                    <div className="flex items-center gap-2 flex-wrap pl-12 sm:pl-0 sm:flex-shrink-0">
+                      {tasks > 0 && (
+                        <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center font-semibold text-[10px] flex-shrink-0">{tasks}</span>
+                      )}
+
+                      {canManageThis && !isLoading ? (
+                        <div className="relative flex-shrink-0">
+                          <select
+                            value={member.role}
+                            onChange={e => patchMember(member.id, { role: e.target.value as OrgRole })}
+                            className="text-xs font-medium rounded-full pl-2.5 pr-6 py-1 min-h-[36px] border border-transparent appearance-none cursor-pointer transition-colors bg-transparent hover:border-gray-200"
+                          >
+                            {getManageableRoles(role).map(r => <option key={r} value={r}>{roleLabel(r).label}</option>)}
+                          </select>
+                          <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                        </div>
+                      ) : (
+                        <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0', roleCfg.cls)}>{roleCfg.label}</span>
+                      )}
+
+                      {canManageThis && (
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          {isLoading
+                            ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                            : <>
                                 <button
-                                  onClick={() => removeMemberFromOrg(member.id)}
-                                  title="Supprimer le compte"
-                                  className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-300 hover:text-red-400"
+                                  onClick={() => patchMember(member.id, { status: isInactive ? 'actif' : 'inactif' })}
+                                  title={isInactive ? 'Réactiver' : 'Désactiver'}
+                                  className="p-2.5 min-h-[40px] min-w-[40px] rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
                                 >
-                                  <X className="w-3.5 h-3.5" />
+                                  {isInactive ? <UserCheck className="w-3.5 h-3.5" /> : <UserMinus className="w-3.5 h-3.5" />}
                                 </button>
-                              )}
-                            </>
-                        }
-                      </div>
-                    )}
+                                <button
+                                  onClick={() => removeMemberFromTeam(team.id, member.user_id)}
+                                  title="Retirer de l'équipe"
+                                  className="p-2.5 min-h-[40px] min-w-[40px] rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+                                >
+                                  <UserX className="w-3.5 h-3.5" />
+                                </button>
+                                {role === 'owner' && (
+                                  <button
+                                    onClick={() => removeMemberFromOrg(member.id)}
+                                    title="Supprimer le compte"
+                                    className="p-2.5 min-h-[40px] min-w-[40px] rounded-lg hover:bg-red-50 transition-colors text-gray-300 hover:text-red-400"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </>
+                          }
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )
               })}
@@ -539,36 +549,38 @@ export default function EquipeClient({
               const wasJustSent = emailSent === inv.id
 
               return (
-                <div key={inv.id} className="px-5 py-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-gray-900">{inv.invited_name || 'Invitation'}</p>
-                        <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', roleCfg.cls)}>{roleCfg.label}</span>
-                        {wasJustSent && (
-                          <span className="flex items-center gap-1 text-xs text-green-600">
-                            <CheckCircle2 className="w-3 h-3" /> Email envoyé
-                          </span>
-                        )}
+                <div key={inv.id} className="px-4 sm:px-5 py-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Mail className="w-4 h-4 text-gray-400" />
                       </div>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        {inv.invited_email && <p className="text-xs text-gray-400 truncate">{inv.invited_email}</p>}
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Clock className="w-3 h-3 text-gray-300" />
-                          <span className={cn('text-xs', expired ? 'text-red-500' : 'text-gray-400')}>
-                            {expired ? 'Expiré' : `Expire le ${formatDate(inv.expires_at)}`}
-                          </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium text-gray-900">{inv.invited_name || 'Invitation'}</p>
+                          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', roleCfg.cls)}>{roleCfg.label}</span>
+                          {wasJustSent && (
+                            <span className="flex items-center gap-1 text-xs text-green-600">
+                              <CheckCircle2 className="w-3 h-3" /> Email envoyé
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          {inv.invited_email && <p className="text-xs text-gray-400 truncate">{inv.invited_email}</p>}
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <Clock className="w-3 h-3 text-gray-300" />
+                            <span className={cn('text-xs', expired ? 'text-red-500' : 'text-gray-400')}>
+                              {expired ? 'Expiré' : `Expire le ${formatDate(inv.expires_at)}`}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 pl-12 sm:pl-0 sm:flex-shrink-0">
                       <button
                         onClick={() => copyText(inv.code, `code-${inv.id}`)}
                         title="Copier le code"
-                        className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors"
+                        className="flex items-center gap-1 text-xs px-2 py-1.5 min-h-[40px] rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors"
                       >
                         {copied === `code-${inv.id}` ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                         Code
@@ -576,7 +588,7 @@ export default function EquipeClient({
                       <button
                         onClick={() => copyText(link, `link-${inv.id}`)}
                         title="Copier le lien d'invitation"
-                        className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors"
+                        className="flex items-center gap-1 text-xs px-2 py-1.5 min-h-[40px] rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-colors"
                       >
                         {copied === `link-${inv.id}` ? <Check className="w-3 h-3 text-green-500" /> : <Link2 className="w-3 h-3" />}
                         Lien
@@ -585,7 +597,7 @@ export default function EquipeClient({
                         onClick={() => revokeInvitation(inv.id)}
                         disabled={isRevoking}
                         title="Révoquer cette invitation"
-                        className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-300 hover:text-red-400 disabled:opacity-50"
+                        className="p-2.5 min-h-[40px] min-w-[40px] rounded-lg hover:bg-red-50 transition-colors text-gray-300 hover:text-red-400 disabled:opacity-50"
                       >
                         {isRevoking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                       </button>
@@ -619,12 +631,14 @@ export default function EquipeClient({
 
       {/* ── Modal création d'équipe ───────────────────────────────────────────── */}
       {showCreate && (
-        <>
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50" onClick={() => setShowCreate(false)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 p-6 space-y-5">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
+          <div
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Créer une équipe</h3>
-              <button onClick={() => setShowCreate(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+              <button onClick={() => setShowCreate(false)} className="p-2 -m-2 rounded-lg hover:bg-gray-100 transition-colors">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
@@ -657,23 +671,25 @@ export default function EquipeClient({
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* ── Modal invitation ─────────────────────────────────────────────────── */}
       {showInvite && (
-        <>
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50" onClick={() => setShowInvite(false)} />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-2xl shadow-2xl z-50 p-6 space-y-5">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowInvite(false)}>
+          <div
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 space-y-5"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Inviter un membre</h3>
-              <button onClick={() => setShowInvite(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+              <button onClick={() => setShowInvite(false)} className="p-2 -m-2 rounded-lg hover:bg-gray-100 transition-colors">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="label">Prénom</label>
                   <input type="text" className="input" placeholder="Samuel" value={inviteForm.first_name} onChange={setField('first_name')} autoFocus />
@@ -718,7 +734,7 @@ export default function EquipeClient({
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
