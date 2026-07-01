@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { LogOut, Zap } from 'lucide-react'
 import { buildNavSections } from '@/lib/nav'
+import { ROLE_LABELS } from '@/lib/roles'
 import type { OrgRole } from '@/types'
 
 export default function Sidebar({
@@ -25,15 +26,7 @@ export default function Sidebar({
   }
 
   const navSections = buildNavSections(role).filter(s => s.items.length > 0)
-
-  const ROLE_BADGES: Record<OrgRole, { label: string; cls: string }> = {
-    owner:   { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700'  },
-    manager: { label: 'Manager',      cls: 'bg-blue-100   text-blue-700'   },
-    partner: { label: 'Partenaire',   cls: 'bg-orange-100 text-orange-700' },
-    editor:  { label: 'Éditeur',      cls: 'bg-green-100  text-green-700'  },
-    viewer:  { label: 'Observateur',  cls: 'bg-gray-100   text-gray-600'   },
-  }
-  const badge = ROLE_BADGES[role]
+  const badge = ROLE_LABELS[role]
 
   return (
     <aside

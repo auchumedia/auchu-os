@@ -18,33 +18,32 @@ const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const ROLE_LABELS: Record<string, string> = {
-  manager: 'Manager',
-  partner: 'Partenaire',
-  editor:  'Éditeur',
-  viewer:  'Observateur',
+  director:    'Directeur',
+  chef_equipe: 'Chef d\'équipe',
+  stratege:    'Stratège',
+  monteur:     'Monteur',
 }
 
-
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  manager: [
-    'Accès complet aux clients et projets',
-    'Gestion du calendrier et des contenus',
-    'Inviter et gérer les membres de l\'équipe',
+  director: [
+    'Vue globale de toute l\'agence',
+    'Gère les rôles chef d\'équipe, stratège et monteur',
+    'Aucun accès à la facturation',
   ],
-  partner: [
-    'Accès aux clients qui vous seront assignés',
-    'Créer et éditer du contenu',
-    'Consulter le calendrier de l\'équipe',
+  chef_equipe: [
+    'Gère son équipe et ses clients assignés',
+    'Assigne les rôles stratège et monteur',
+    'Consulte le calendrier de son équipe',
   ],
-  editor: [
-    'Créer et éditer des contenus',
-    'Accès aux projets et aux clients',
-    'Gestion du calendrier éditorial',
+  stratege: [
+    'Accès aux clients assignés à son équipe',
+    'Gère le calendrier de contenu',
+    'Consulte les membres de son équipe',
   ],
-  viewer: [
-    'Lecture seule sur tous les projets',
-    'Accès au calendrier de l\'équipe',
-    'Aucune modification possible',
+  monteur: [
+    'Accès aux projets vidéo assignés',
+    'Gère les fichiers à monter',
+    'Consulte les membres de son équipe',
   ],
 }
 

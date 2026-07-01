@@ -6,12 +6,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Building2, Users, ChevronLeft, Loader2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ROLE_LABELS } from '@/lib/roles'
+import type { OrgRole } from '@/types'
 
 type Step = 'choose' | 'join_code' | 'create_form' | 'join_form'
-
-const ROLE_LABELS: Record<string, string> = {
-  manager: 'Manager', editor: 'Éditeur', viewer: 'Observateur',
-}
 
 function SignupForm() {
   const router = useRouter()
@@ -221,7 +219,7 @@ function SignupForm() {
             <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-green-900">{inviteInfo.org_name}</p>
-              <p className="text-xs text-green-700">Rôle : {ROLE_LABELS[inviteInfo.role] ?? inviteInfo.role}</p>
+              <p className="text-xs text-green-700">Rôle : {ROLE_LABELS[inviteInfo.role as OrgRole]?.label ?? inviteInfo.role}</p>
             </div>
           </div>
           <h1 className="text-xl font-semibold text-gray-900 mb-1">Créer mon compte</h1>

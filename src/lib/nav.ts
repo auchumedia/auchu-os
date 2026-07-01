@@ -8,41 +8,38 @@ export type NavSection = { key: 'principal' | 'equipe' | 'agents' | 'compte'; la
 
 // Structure exacte requise partout (sidebar desktop + bottom nav mobile) :
 //   Principal : Tableau de bord, Mon espace, Clients, Finance
-//   Équipe    : Équipe (owner/manager)
-//   Agents IA : Agent productivité
+//   Équipe    : Équipe (les 5 rôles — owner/director en gestion complète,
+//               chef_equipe sur sa propre équipe, stratege/monteur en lecture seule)
+//   Agents IA : Agent productivité (rôles côté production de contenu)
 //   Compte    : Paramètres
 export function buildNavSections(role: OrgRole): NavSection[] {
-  const isOwnerOrManager = role === 'owner' || role === 'manager'
-  const isEditor         = role === 'editor'
-  const isPartner        = role === 'partner'
+  const isOwner    = role === 'owner'
+  const isDirector = role === 'director'
 
   const principal: NavItem[] = [
     { href: '/dashboard',            icon: LayoutDashboard, label: 'Tableau de bord' },
     { href: '/dashboard/mon-espace', icon: UserCircle,      label: 'Mon espace'      },
+    { href: '/dashboard/clients',    icon: Users,            label: 'Clients'         },
   ]
 
-  if (isOwnerOrManager || isEditor) {
-    principal.push({ href: '/dashboard/clients', icon: Users, label: 'Clients' })
-  } else if (isPartner) {
-    principal.push({ href: '/dashboard/clients', icon: Users, label: 'Mes clients' })
-  }
-  // viewer : pas d'accès direct à la liste clients (voir "Mon espace" pour ses clients assignés)
-
-  if (isOwnerOrManager) {
+  // Finance : owner uniquement pour l'instant.
+  if (isOwner) {
     principal.push({ href: '/dashboard/finance', icon: Receipt, label: 'Finance' })
   }
 
-  const equipe: NavItem[] = isOwnerOrManager
-    ? [{ href: '/dashboard/equipe', icon: UsersRound, label: 'Équipe' }]
-    : []
+  const equipe: NavItem[] = [
+    { href: '/dashboard/equipe', icon: UsersRound, label: 'Équipe' },
+  ]
 
-  const agents: NavItem[] = (isOwnerOrManager || isPartner)
+  // Agents IA : rôles côté production de contenu (le monteur travaille sur
+  // des fichiers vidéo livrés, pas sur la génération de contenu écrit).
+  const agents: NavItem[] = (isOwner || isDirector || role === 'chef_equipe' || role === 'stratege')
     ? [{ href: '/agents/productivite', icon: Brain, label: 'Agent productivité' }]
     : []
 
-  const compte: NavItem[] = role !== 'partner'
-    ? [{ href: '/settings', icon: Settings, label: 'Paramètres' }]
-    : []
+  const compte: NavItem[] = [
+    { href: '/settings', icon: Settings, label: 'Paramètres' },
+  ]
 
   return [
     { key: 'principal', label: 'Principal', items: principal },
@@ -51,4 +48,3 @@ export function buildNavSections(role: OrgRole): NavSection[] {
     { key: 'compte',    label: 'Compte',    items: compte    },
   ]
 }
-

@@ -57,14 +57,16 @@ function getMonthCells(year: number, month: number): (string | null)[] {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
+type CalendarScope = 'personal' | 'org' | 'own-team'
+
 interface Props {
-  teamMode: boolean
+  scope: CalendarScope
   initialClients: { id: string; name: string }[]
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function CalendarPanel({ teamMode, initialClients }: Props) {
+export default function CalendarPanel({ scope, initialClients }: Props) {
   const [view, setView] = useState<ViewMode>('month')
 
   useEffect(() => {
@@ -96,12 +98,13 @@ export default function CalendarPanel({ teamMode, initialClients }: Props) {
     setLoading(true)
     const [start, end] = getRangeForView()
     const params = new URLSearchParams({ start, end })
-    if (teamMode) params.set('team', '1')
+    if (scope === 'org') params.set('team', '1')
+    if (scope === 'own-team') params.set('scope', 'own-team')
     const res  = await fetch(`/api/calendrier?${params}`)
     const json = await res.json()
     setEvents(json.events ?? [])
     setLoading(false)
-  }, [getRangeForView, teamMode])
+  }, [getRangeForView, scope])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
 

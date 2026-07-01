@@ -11,7 +11,7 @@ export interface User {
 
 // ─── Organisation & équipe ────────────────────────────────────────────────────
 export type OrgPlan = 'free' | 'starter' | 'agence' | 'pro'
-export type OrgRole = 'owner' | 'manager' | 'partner' | 'editor' | 'viewer'
+export type OrgRole = 'owner' | 'director' | 'chef_equipe' | 'stratege' | 'monteur'
 
 export interface Organization {
   id: string
@@ -38,6 +38,7 @@ export interface Invitation {
   org_id:         string
   code:           string
   role:           Exclude<OrgRole, 'owner'>
+  team_id:        string | null
   invited_by:     string | null
   invited_name:   string | null
   invited_email:  string | null
@@ -45,6 +46,31 @@ export interface Invitation {
   used_at:        string | null
   used_by:        string | null
   created_at:     string
+}
+
+// ─── Équipes ──────────────────────────────────────────────────────────────────
+export interface Team {
+  id:         string
+  org_id:     string
+  name:       string
+  chef_id:    string
+  created_at: string
+  updated_at: string
+}
+
+export interface TeamMembership {
+  id:        string
+  team_id:   string
+  user_id:   string
+  role:      Extract<OrgRole, 'chef_equipe' | 'stratege' | 'monteur'>
+  joined_at: string
+}
+
+export interface TeamClient {
+  id:          string
+  team_id:     string
+  client_id:   string
+  assigned_at: string
 }
 
 

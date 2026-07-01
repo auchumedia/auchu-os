@@ -1,9 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
+import { getOrgContext } from '@/lib/org'
+import { redirect }      from 'next/navigation'
 import FinanceModule from './FinanceModule'
 
 export const metadata = { title: 'Finance' }
 
 export default async function FinancePage() {
+  const ctx = await getOrgContext()
+  if (!ctx) redirect('/auth/login')
+  if (!ctx.canAccessFinance) redirect('/dashboard') // FINANCE-GATE: owner-only pour l'instant
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

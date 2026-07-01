@@ -1,84 +1,47 @@
-import { createClient }         from '@/lib/supabase/server'
-import { sendInvitationEmail }   from '@/lib/email'
-import { NextResponse }          from 'next/server'
-
-const OWNER_EMAIL = 'raphael@auchumedia.com'
+import { createClient }        from '@/lib/supabase/server'
+import { getOrgContext }       from '@/lib/org'
+import { canManageRole }       from '@/lib/roles'
+import { sendInvitationEmail } from '@/lib/email'
+import { NextResponse }        from 'next/server'
 
 function generateCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
-export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('id, name, plan, max_members')
-    .eq('owner_id', user.id)
-    .single()
-
-  if (!org) return NextResponse.json({ error: 'Aucune organisation' }, { status: 404 })
-
-  const [membersRes, invitesRes] = await Promise.all([
-    supabase
-      .from('org_members')
-      .select('id, user_id, role, status, joined_at, profile:profiles(full_name, email, avatar_url)')
-      .eq('org_id', org.id)
-      .order('joined_at', { ascending: true }),
-    supabase
-      .from('invitations')
-      .select('id, code, role, expires_at, created_at, invited_name, invited_email')
-      .eq('org_id', org.id)
-      .is('used_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false }),
-  ])
-
-  return NextResponse.json({
-    org,
-    members:     membersRes.data ?? [],
-    invitations: invitesRes.data ?? [],
-  })
-}
-
 export async function POST(req: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const ctx = await getOrgContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!ctx.org) return NextResponse.json({ error: 'Aucune organisation' }, { status: 404 })
 
   const body = await req.json()
   const { role, first_name, last_name, email } = body
 
-  if (!['manager', 'partner', 'editor', 'viewer'].includes(role)) {
-    return NextResponse.json({ error: 'Rôle invalide' }, { status: 400 })
+  if (!canManageRole(ctx.role, role)) {
+    return NextResponse.json({ error: 'Rôle invalide pour votre niveau d\'accès' }, { status: 400 })
   }
   if (!first_name?.trim() || !last_name?.trim() || !email?.trim()) {
     return NextResponse.json({ error: 'Prénom, nom et email sont requis' }, { status: 400 })
   }
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('id, name, plan, max_members, logo_url, primary_color')
-    .eq('owner_id', user.id)
-    .single()
+  // Un chef_equipe invite forcément dans sa propre équipe.
+  let teamId: string | null = null
+  if (ctx.isTeamChef) {
+    if (!ctx.teamId) return NextResponse.json({ error: 'Vous ne dirigez aucune équipe' }, { status: 403 })
+    teamId = ctx.teamId
+  }
 
-  if (!org) return NextResponse.json({ error: 'Aucune organisation' }, { status: 404 })
-
-  // Compte owner : pas de limite de membres
-  const effectiveMax = user.email === OWNER_EMAIL ? 999 : org.max_members
+  const supabase = await createClient()
 
   const { count } = await supabase
     .from('org_members')
     .select('*', { count: 'exact', head: true })
-    .eq('org_id', org.id)
+    .eq('org_id', ctx.org.id)
     .eq('status', 'actif')
 
-  if ((count ?? 0) >= effectiveMax) {
+  if ((count ?? 0) >= ctx.org.max_members) {
     return NextResponse.json(
-      { error: `Limite atteinte pour le plan ${org.plan} (${org.max_members} membres max)` },
+      { error: `Limite atteinte pour le plan ${ctx.org.plan} (${ctx.org.max_members} membres max)` },
       { status: 403 }
     )
   }
@@ -98,10 +61,11 @@ export async function POST(req: Request) {
   const { data: invitation, error } = await supabase
     .from('invitations')
     .insert({
-      org_id:        org.id,
+      org_id:        ctx.org.id,
       code,
       role,
-      invited_by:    user.id,
+      team_id:       teamId,
+      invited_by:    ctx.userId,
       expires_at:    expiresAt,
       invited_name,
       invited_email,
@@ -112,19 +76,21 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Envoyer l'email d'invitation (non-bloquant — l'invitation est créée même si l'email échoue)
+  const { data: orgBranding } = await supabase
+    .from('organizations')
+    .select('logo_url, primary_color')
+    .eq('id', ctx.org.id)
+    .single()
+
   const appUrl    = process.env.NEXT_PUBLIC_APP_URL ?? 'https://auchu-os.vercel.app'
   const inviteUrl = `${appUrl}/invite/${code}`
-
-  const orgLogoUrl      = (org as any).logo_url      ?? null
-  const orgPrimaryColor = (org as any).primary_color ?? '#4f46e5'
-  console.log('[equipe] org.logo_url:', orgLogoUrl, '| org.primary_color:', orgPrimaryColor)
 
   const emailSent = await sendInvitationEmail({
     to:   invited_email,
     toName:           invited_name,
-    orgName:          org.name,
-    orgLogoUrl,
-    orgPrimaryColor,
+    orgName:          ctx.org.name,
+    orgLogoUrl:       orgBranding?.logo_url ?? null,
+    orgPrimaryColor:  orgBranding?.primary_color ?? '#4f46e5',
     role,
     inviteUrl,
   })

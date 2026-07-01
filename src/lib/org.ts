@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { PLAN_LIMITS } from '@/lib/plans'
+import type { OrgRole, OrgPlan } from '@/types'
 
-export type OrgRole = 'owner' | 'manager' | 'partner' | 'editor' | 'viewer'
-export type OrgPlan = 'free' | 'starter' | 'agence' | 'pro'
+export type { OrgRole, OrgPlan }
 export { PLAN_LIMITS }
 
 export interface OrgContext {
@@ -12,11 +12,13 @@ export interface OrgContext {
   org:         { id: string; name: string; plan: OrgPlan; max_members: number; owner_id: string; created_at?: string; updated_at?: string } | null
   role:        OrgRole
   isOwner:     boolean
-  isPartner:   boolean
-  canManageTeam:    boolean
-  canAccessFinance: boolean
-  canWrite:         boolean
+  isDirector:  boolean
+  isTeamChef:  boolean
+  canManageTeamRoles:    boolean
+  canManageOrgStructure: boolean
+  canAccessFinance:      boolean
   dataOwnerId: string
+  teamId:      string | null
   memberCount: number
 }
 
@@ -33,14 +35,12 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   // ── 1. Membre non-owner (priorité sur la propriété) ────────────────────────
   // Si l'utilisateur a été invité dans une org tierce (role != 'owner'),
   // on utilise ce contexte même s'il possède aussi sa propre org.
-  // Cela évite qu'un manager voie la section "Facturation" de sa propre org
-  // vide alors qu'il opère dans l'org de l'agence qui l'a invité.
   const { data: membership, error: memberErr } = await supabase
     .from('org_members')
     .select('role, status, org:organizations(id, name, plan, max_members, owner_id)')
     .eq('user_id', user.id)
     .eq('status', 'actif')
-    .neq('role', 'owner')   // exclut les lignes owner (migration 007 backfill)
+    .neq('role', 'owner')
     .limit(1)
     .maybeSingle()
 
@@ -51,18 +51,31 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   if (membership) {
     const role    = membership.role as OrgRole
     const orgData = membership.org as unknown as OrgContext['org']
-    const isPartner = role === 'partner'
+    const isDirector = role === 'director'
+    const isTeamChef = role === 'chef_equipe'
 
-    console.log('[getOrgContext] membre — role:', role, '| orgData.owner_id:', orgData?.owner_id ?? 'NULL')
+    // team_memberships n'a pas de FK directe vers org_members (les deux ne
+    // référencent que auth.users) — PostgREST ne peut pas l'embarquer dans
+    // la requête ci-dessus, d'où ce second aller-retour ciblé.
+    let teamId: string | null = null
+    if (role === 'chef_equipe' || role === 'stratege' || role === 'monteur') {
+      const { data: teamMembership } = await supabase
+        .from('team_memberships')
+        .select('team_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      teamId = teamMembership?.team_id ?? null
+    }
 
     return {
       userId: user.id, userName, userEmail,
       org: orgData,
-      role, isOwner: false, isPartner,
-      canManageTeam:    role === 'manager',
-      canAccessFinance: role === 'manager',
-      canWrite:         role === 'manager' || role === 'partner' || role === 'editor',
+      role, isOwner: false, isDirector, isTeamChef,
+      canManageTeamRoles:    isDirector || isTeamChef,
+      canManageOrgStructure: isDirector,
+      canAccessFinance:      false,
       dataOwnerId: orgData?.owner_id ?? user.id,
+      teamId,
       memberCount: 0,
     }
   }
@@ -93,9 +106,10 @@ export async function getOrgContext(): Promise<OrgContext | null> {
     return {
       userId: user.id, userName, userEmail,
       org: effectiveOrg,
-      role: 'owner', isOwner: true, isPartner: false,
-      canManageTeam: true, canAccessFinance: true, canWrite: true,
+      role: 'owner', isOwner: true, isDirector: false, isTeamChef: false,
+      canManageTeamRoles: true, canManageOrgStructure: true, canAccessFinance: true,
       dataOwnerId: user.id,
+      teamId: null,
       memberCount: count ?? 1,
     }
   }
@@ -103,8 +117,8 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   // ── 3. Utilisateur solo (pas encore d'org, pas de membership) ─────────────
   return {
     userId: user.id, userName, userEmail,
-    org: null, role: 'owner', isOwner: true, isPartner: false,
-    canManageTeam: true, canAccessFinance: true, canWrite: true,
-    dataOwnerId: user.id, memberCount: 1,
+    org: null, role: 'owner', isOwner: true, isDirector: false, isTeamChef: false,
+    canManageTeamRoles: true, canManageOrgStructure: true, canAccessFinance: true,
+    dataOwnerId: user.id, teamId: null, memberCount: 1,
   }
 }

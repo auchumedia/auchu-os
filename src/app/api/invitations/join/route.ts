@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   // ── 1. Lire l'invitation seule (pas de join org — le invitee n'est pas encore membre) ──
   const { data: inv, error: invErr } = await supabase
     .from('invitations')
-    .select('id, org_id, role, expires_at')
+    .select('id, org_id, role, team_id, expires_at')
     .eq('code', normalizedCode)
     .is('used_at', null)
     .gt('expires_at', new Date().toISOString())
@@ -84,6 +84,16 @@ export async function POST(req: Request) {
   console.log('[join] insert org_members:', joinErr ? joinErr.message : 'OK')
 
   if (joinErr) return NextResponse.json({ error: joinErr.message }, { status: 500 })
+
+  // ── 5b. Rejoindre l'équipe si l'invitation en ciblait une (chef_equipe qui
+  //         invite un stratege/monteur — le nouveau membre rejoint son équipe
+  //         automatiquement, sans étape manuelle) ──────────────────────────────
+  if (inv.team_id) {
+    const { error: teamJoinErr } = await supabase.from('team_memberships').insert({
+      team_id: inv.team_id, user_id: user.id, role: inv.role,
+    })
+    console.log('[join] insert team_memberships:', teamJoinErr ? teamJoinErr.message : 'OK')
+  }
 
   // ── 6. Marquer l'invitation utilisée ──────────────────────────────────────────────────
   await supabase.from('invitations')

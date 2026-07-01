@@ -6,29 +6,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Building2, Loader2, CheckCircle2, Users, AlertTriangle, LogOut, Mail } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-const ROLE_CONFIG: Record<string, { label: string; desc: string; cls: string }> = {
-  manager: {
-    label: 'Manager',
-    desc:  'Gère les clients, projets, calendrier et l\'équipe',
-    cls:   'bg-blue-100 text-blue-700',
-  },
-  partner: {
-    label: 'Partenaire',
-    desc:  'Accès aux clients assignés, contenu et calendrier',
-    cls:   'bg-orange-100 text-orange-700',
-  },
-  editor: {
-    label: 'Éditeur',
-    desc:  'Crée et édite du contenu pour les clients',
-    cls:   'bg-green-100 text-green-700',
-  },
-  viewer: {
-    label: 'Observateur',
-    desc:  'Lecture seule sur les projets et le calendrier',
-    cls:   'bg-gray-100 text-gray-600',
-  },
-}
+import { ROLE_LABELS } from '@/lib/roles'
+import type { OrgRole } from '@/types'
 
 interface InviteInfo {
   id:            string
@@ -59,7 +38,7 @@ export default function InviteClient({ invite, isLoggedIn, userEmail, emailMisma
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
 
-  const roleCfg    = ROLE_CONFIG[invite.role] ?? { label: invite.role, desc: '', cls: 'bg-gray-100 text-gray-600' }
+  const roleCfg    = ROLE_LABELS[invite.role as OrgRole] ?? { label: invite.role, desc: '', cls: 'bg-gray-100 text-gray-600' }
   const firstName  = invite.invited_name?.split(' ')[0] ?? null
 
   async function handleLogout() {

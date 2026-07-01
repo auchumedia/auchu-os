@@ -11,37 +11,33 @@ export default async function ClientsPage() {
   const supabase = await createClient()
   const ctx = await getOrgContext()
 
-  let query = supabase
+  // Le scoping par équipe est entièrement géré par les RLS ("clients: director
+  // read" / "clients: team read" / "clients: owner all") — cette requête est
+  // volontairement identique pour les 5 rôles, la DB filtre automatiquement.
+  const { data: clients, error } = await supabase
     .from('clients')
     .select('*')
     .eq('user_id', ctx?.dataOwnerId ?? '')
     .order('created_at', { ascending: false })
 
-  if (ctx?.isPartner) {
-    query = query.eq('assigned_partner', ctx.userId)
-  }
-
-  const { data: clients, error } = await query
-
   if (error) {
     console.error('[clients] Supabase error:', error.message, '| code:', error.code, '| user:', ctx?.userId)
   }
+
+  const isTeamScoped   = !!ctx && !ctx.isOwner && ctx.role !== 'director'
+  const notYetOnTeam   = isTeamScoped && !ctx?.teamId
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
-            {ctx?.isPartner ? 'Mes clients' : 'Clients'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{clients?.length ?? 0} clients{ctx?.isPartner ? ' assignés' : ' enregistrés'}</p>
+          <h1 className="text-2xl font-semibold text-gray-900">Clients</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{clients?.length ?? 0} clients enregistrés</p>
         </div>
-        {!ctx?.isPartner && (
-          <Link href="/dashboard/clients/nouveau" className="btn-primary">
-            <Plus className="w-4 h-4" />
-            Nouveau client
-          </Link>
-        )}
+        <Link href="/dashboard/clients/nouveau" className="btn-primary">
+          <Plus className="w-4 h-4" />
+          Nouveau client
+        </Link>
       </div>
 
       {error && (
@@ -56,14 +52,16 @@ export default async function ClientsPage() {
         <div className="card text-center py-16">
           <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <h3 className="text-sm font-medium text-gray-700 mb-1">
-            {ctx?.isPartner ? 'Aucun client assigné' : 'Aucun client encore'}
+            {notYetOnTeam ? 'Pas encore assigné à une équipe' : 'Aucun client'}
           </h3>
           <p className="text-xs text-gray-400 mb-4">
-            {ctx?.isPartner
-              ? 'Le propriétaire de l\'agence t\'assignera des clients'
-              : 'Ajoute ton premier client pour commencer'}
+            {notYetOnTeam
+              ? 'Un owner ou director doit vous placer dans une équipe pour voir des clients.'
+              : isTeamScoped
+                ? 'Aucun client n\'est encore assigné à votre équipe.'
+                : 'Ajoute ton premier client pour commencer'}
           </p>
-          {!ctx?.isPartner && (
+          {!isTeamScoped && (
             <Link href="/dashboard/clients/nouveau" className="btn-primary inline-flex">
               <Plus className="w-4 h-4" />
               Ajouter un client
