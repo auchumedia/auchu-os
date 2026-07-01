@@ -63,15 +63,25 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   if (!Object.keys(allowed).length) return NextResponse.json({ error: 'Aucune modification' }, { status: 400 })
 
+  // Pas d'embed profile:profiles(...) ici : dépend du cache de relations
+  // PostgREST, qui peut rester périmé après une migration DDL et faire
+  // échouer la requête (PGRST200 "Could not find a relationship..."), comme
+  // vu sur equipe/page.tsx. Profil récupéré séparément.
   const { data, error } = await supabase
     .from('org_members')
     .update(allowed)
     .eq('id', params.id)
     .eq('org_id', ctx.org.id)
-    .select('*, profile:profiles(full_name, email, avatar_url)')
+    .select('*')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, email, avatar_url')
+    .eq('id', data.user_id)
+    .maybeSingle()
 
   // team_memberships.role n'est pas mis à jour automatiquement par le trigger
   // (aucune FK entre org_members et team_memberships) — le synchroniser ici.
@@ -85,7 +95,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
   }
 
-  return NextResponse.json({ data })
+  return NextResponse.json({ data: { ...data, profile: profile ?? null } })
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {

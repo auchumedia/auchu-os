@@ -67,12 +67,15 @@ export default async function MonEspacePage() {
     teamClientIds = (clientsRes.data ?? []).map(c => c.client_id)
     const memberUserIds = (membershipsRes.data ?? []).map(m => m.user_id)
     if (memberUserIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from('org_members')
-        .select('user_id, role, profile:profiles(full_name, email, avatar_url)')
-        .eq('org_id', ctx.org?.id ?? '')
-        .in('user_id', memberUserIds)
-      teamMembers = profiles ?? []
+      // Pas d'embed profile:profiles(...) : dépend du cache de relations
+      // PostgREST, qui peut rester périmé après une migration DDL (PGRST200).
+      // Deux requêtes plates + fusion en JS, comme sur equipe/page.tsx.
+      const [{ data: members }, { data: profiles }] = await Promise.all([
+        supabase.from('org_members').select('user_id, role').eq('org_id', ctx.org?.id ?? '').in('user_id', memberUserIds),
+        supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', memberUserIds),
+      ])
+      const profileByUserId = new Map((profiles ?? []).map(p => [p.id, p]))
+      teamMembers = (members ?? []).map(m => ({ ...m, profile: profileByUserId.get(m.user_id) ?? null }))
     }
   }
 
