@@ -49,3 +49,11 @@ export function roleSortIndex(role: string): number {
   const i = ROLE_ORDER.indexOf(role as OrgRole)
   return i === -1 ? ROLE_ORDER.length : i
 }
+
+// Qui peut créer/modifier des clients — stratege/monteur restent en lecture
+// seule sur /dashboard/clients.
+const CLIENT_MANAGER_ROLES: OrgRole[] = ['owner', 'director', 'chef_equipe']
+
+export function canManageClients(role: string): boolean {
+  return CLIENT_MANAGER_ROLES.includes(role as OrgRole)
+}

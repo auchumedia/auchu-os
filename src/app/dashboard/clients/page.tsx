@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
+import { canManageClients } from '@/lib/roles'
 import { formatCurrency } from '@/lib/utils'
 import { Plus, Users } from 'lucide-react'
 import Link from 'next/link'
@@ -26,6 +27,7 @@ export default async function ClientsPage() {
 
   const isTeamScoped   = !!ctx && !ctx.isOwner && ctx.role !== 'director'
   const notYetOnTeam   = isTeamScoped && !ctx?.teamId
+  const canCreate      = canManageClients(ctx?.role ?? '')
 
   return (
     <div className="space-y-6">
@@ -34,10 +36,12 @@ export default async function ClientsPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Clients</h1>
           <p className="text-sm text-gray-500 mt-0.5">{clients?.length ?? 0} clients enregistrés</p>
         </div>
-        <Link href="/dashboard/clients/nouveau" className="btn-primary">
-          <Plus className="w-4 h-4" />
-          Nouveau client
-        </Link>
+        {canCreate && (
+          <Link href="/dashboard/clients/nouveau" className="btn-primary">
+            <Plus className="w-4 h-4" />
+            Nouveau client
+          </Link>
+        )}
       </div>
 
       {error && (
@@ -57,11 +61,11 @@ export default async function ClientsPage() {
           <p className="text-xs text-gray-400 mb-4">
             {notYetOnTeam
               ? 'Un owner ou director doit vous placer dans une équipe pour voir des clients.'
-              : isTeamScoped
+              : !canCreate
                 ? 'Aucun client n\'est encore assigné à votre équipe.'
                 : 'Ajoute ton premier client pour commencer'}
           </p>
-          {!isTeamScoped && (
+          {canCreate && (
             <Link href="/dashboard/clients/nouveau" className="btn-primary inline-flex">
               <Plus className="w-4 h-4" />
               Ajouter un client
