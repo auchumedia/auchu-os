@@ -78,6 +78,18 @@ export default async function EquipePage() {
     profile: profileMap[m.user_id] ?? null,
   }))
 
+  // Invitations dont l'email correspond déjà à un membre actif : l'invité a
+  // rejoint mais l'invitation n'a pas été marquée used_at (échec silencieux
+  // du join). On les exclut ici en plus du filtre used_at IS NULL.
+  const activeMemberEmails = new Set(
+    membersWithProfiles
+      .filter(m => m.status === 'actif' && m.profile?.email)
+      .map(m => m.profile!.email!.toLowerCase())
+  )
+  const pendingInvitations = (invitesRes.data ?? []).filter(
+    inv => !inv.invited_email || !activeMemberEmails.has(inv.invited_email.toLowerCase())
+  )
+
   // Compter les contenus par membre
   const workload: Record<string, number> = {}
   for (const c of contentRes.data ?? []) {
@@ -95,7 +107,7 @@ export default async function EquipePage() {
       <EquipeClient
         org={ctx.org as any}
         members={membersWithProfiles as any}
-        invitations={(invitesRes.data ?? []) as any}
+        invitations={pendingInvitations as any}
         workload={workload}
         currentUserId={ctx.userId}
         isOwner={ctx.isOwner}

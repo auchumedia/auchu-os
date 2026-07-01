@@ -133,36 +133,36 @@ export default function EquipeClient({ org, members: initial, invitations: initi
   return (
     <div className="space-y-6">
 
-      {/* ── Plan bar ────────────────────────────────────────────────────────── */}
-      <div className="card flex items-center justify-between gap-4 p-4">
-        <div className="flex items-center gap-3">
-          <span className={cn('px-2.5 py-1 rounded-lg text-sm font-semibold', {
-            'bg-gray-100   text-gray-600':   org.plan === 'free',
-            'bg-blue-100   text-blue-700':   org.plan === 'starter',
-            'bg-auchu-100  text-auchu-700':  org.plan === 'agence',
-            'bg-purple-100 text-purple-700': org.plan === 'pro',
-          })}>
-            {plan.label}
-          </span>
-          <div className="text-sm text-gray-600">
-            <span className="font-semibold">{activeCount}</span>
-            <span className="text-gray-400"> / </span>
-            <span>{org.max_members === 999 ? '∞' : org.max_members}</span>
-            <span className="text-gray-400 ml-1">membres</span>
+      {/* ── Plan bar — owner uniquement ───────────────────────────────────────── */}
+      {isOwner && (
+        <div className="card flex items-center justify-between gap-4 p-4">
+          <div className="flex items-center gap-3">
+            <span className={cn('px-2.5 py-1 rounded-lg text-sm font-semibold', {
+              'bg-gray-100   text-gray-600':   org.plan === 'free',
+              'bg-blue-100   text-blue-700':   org.plan === 'starter',
+              'bg-auchu-100  text-auchu-700':  org.plan === 'agence',
+              'bg-purple-100 text-purple-700': org.plan === 'pro',
+            })}>
+              {plan.label}
+            </span>
+            <div className="text-sm text-gray-600">
+              <span className="font-semibold">{activeCount}</span>
+              <span className="text-gray-400"> / </span>
+              <span>{org.max_members === 999 ? '∞' : org.max_members}</span>
+              <span className="text-gray-400 ml-1">membres</span>
+            </div>
+            <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-auchu-500 rounded-full transition-all"
+                style={{ width: `${Math.min(100, (activeCount / (org.max_members === 999 ? Math.max(activeCount, 1) : org.max_members)) * 100)}%` }}
+              />
+            </div>
           </div>
-          <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-auchu-500 rounded-full transition-all"
-              style={{ width: `${Math.min(100, (activeCount / (org.max_members === 999 ? Math.max(activeCount, 1) : org.max_members)) * 100)}%` }}
-            />
-          </div>
-        </div>
-        {isOwner && (
           <a href="/settings" className="text-xs text-auchu-600 hover:text-auchu-700 font-medium hover:underline">
             Gérer le plan →
           </a>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Membres actifs ───────────────────────────────────────────────────── */}
       <div className="card p-0 overflow-hidden">
