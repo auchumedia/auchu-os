@@ -52,15 +52,18 @@ function RefCard({ link }: { link: ReferenceLink }) {
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const TYPE_LABELS: Record<string, string> = {
+  video_organique: 'Vidéo organique',
   post: 'Post', reel: 'Reel', story: 'Story', script_video: 'Script vidéo', ad: 'Ad',
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
+  toutes: 'Toutes les plateformes',
   instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok',
   linkedin: 'LinkedIn', google: 'Google Ads', meta: 'Meta Ads',
 }
 
 const PLATFORM_COLORS: Record<string, string> = {
+  toutes:    'bg-auchu-100 text-auchu-700',
   instagram: 'bg-pink-100 text-pink-700',
   facebook:  'bg-blue-100 text-blue-700',
   tiktok:    'bg-slate-100 text-slate-700',

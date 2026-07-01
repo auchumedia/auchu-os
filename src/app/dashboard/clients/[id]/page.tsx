@@ -9,9 +9,9 @@ export const metadata = { title: 'Fiche client' }
 export default async function ClientPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
   const ctx = await getOrgContext()
+  if (!ctx) notFound()
 
-  const ownerId = ctx?.dataOwnerId
-  if (!ownerId) notFound()
+  const ownerId = ctx.dataOwnerId
 
   const [
     { data: client, error },
@@ -51,12 +51,35 @@ export default async function ClientPage({ params }: { params: { id: string } })
 
   if (error || !client) notFound()
 
+  // ── Membres de l'équipe (pour le champ "Assigné à" des concepts) ───────────
+  let teamMembers: { id: string; name: string }[]
+  if (ctx.org) {
+    const { data: orgMembersRaw } = await supabase
+      .from('org_members')
+      .select('user_id')
+      .eq('org_id', ctx.org.id)
+      .eq('status', 'actif')
+
+    const memberIds = Array.from(new Set([ctx.org.owner_id, ...(orgMembersRaw ?? []).map(m => m.user_id)]))
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', memberIds)
+
+    teamMembers = (profiles ?? [])
+      .map(p => ({ id: p.id, name: p.full_name || p.email || 'Membre' }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  } else {
+    teamMembers = [{ id: ctx.userId, name: ctx.userName || ctx.userEmail }]
+  }
+
   return (
     <ClientDetail
       client={client}
       invoices={invoices ?? []}
       content={content ?? []}
       events={events ?? []}
+      teamMembers={teamMembers}
     />
   )
 }

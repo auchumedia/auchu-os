@@ -47,11 +47,12 @@ interface Props {
   invoices: Invoice[]
   content:  ContentPiece[]
   events:   CalendarEvent[]
+  teamMembers: { id: string; name: string }[]
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ClientDetail({ client: initial, invoices, content, events }: Props) {
+export default function ClientDetail({ client: initial, invoices, content, events, teamMembers }: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
   const [saving, setSaving] = useState<string | null>(null)
@@ -540,7 +541,7 @@ export default function ClientDetail({ client: initial, invoices, content, event
 
       {/* ─── Tab: Contenu (table Notion) ─────────────────────────────────────── */}
       {tab === 'content' && (
-        <ContentTable initialContent={content} clientId={client.id} />
+        <ContentTable initialContent={content} clientId={client.id} teamMembers={teamMembers} />
       )}
 
       {/* ─── Tab: Calendrier ─────────────────────────────────────────────────── */}

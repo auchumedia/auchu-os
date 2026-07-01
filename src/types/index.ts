@@ -127,9 +127,9 @@ export interface Project {
 }
 
 // ─── Contenu ──────────────────────────────────────────────────────────────────
-export type ContentType = 'post' | 'reel' | 'story' | 'script_video' | 'ad' | 'caption' | 'script' | 'email'
+export type ContentType = 'post' | 'reel' | 'story' | 'script_video' | 'ad' | 'caption' | 'script' | 'email' | 'video_organique'
 export type ContentStatus = 'idee' | 'en_redaction' | 'pret' | 'approuve' | 'refuse' | 'draft' | 'review' | 'publie'
-export type Platform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin' | 'google' | 'meta'
+export type Platform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin' | 'google' | 'meta' | 'toutes'
 
 export interface ContentPiece {
   id: string

@@ -14,18 +14,24 @@ import RichTextEditor from '@/components/RichTextEditor'
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const TYPE_LABELS: Record<string, string> = {
+  video_organique: 'Vidéo organique',
   post: 'Post', reel: 'Reel', story: 'Story', script_video: 'Script vidéo', ad: 'Ad',
   caption: 'Caption', script: 'Script', email: 'Email',
 }
-const TYPES = ['post','reel','story','script_video','ad']
+// Options du formulaire de création — les autres valeurs restent affichables
+// (TYPE_LABELS) pour les contenus existants créés avant ce changement.
+const TYPES = ['video_organique','story','ad']
 
 const PLATFORM_LABELS: Record<string, string> = {
+  toutes: 'Toutes les plateformes',
   instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok',
   linkedin: 'LinkedIn', google: 'Google Ads', meta: 'Meta Ads',
 }
-const PLATFORMS = ['instagram','facebook','tiktok','linkedin','google','meta']
+// Options du formulaire de création (sans Google Ads, cf. maquette).
+const PLATFORMS = ['toutes','instagram','facebook','tiktok','linkedin','meta']
 
 const PLATFORM_COLORS: Record<string, string> = {
+  toutes:    'bg-auchu-100 text-auchu-700',
   instagram: 'bg-pink-100 text-pink-700',
   facebook:  'bg-blue-100 text-blue-700',
   tiktok:    'bg-slate-100 text-slate-700',
@@ -109,11 +115,12 @@ function useAutoSave(
 interface Props {
   initialContent: ContentPiece[]
   clientId: string
+  teamMembers: { id: string; name: string }[]
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ContentTable({ initialContent, clientId }: Props) {
+export default function ContentTable({ initialContent, clientId, teamMembers }: Props) {
   const [items, setItems]       = useState<ContentPiece[]>(initialContent)
   const [selected, setSelected] = useState<ContentPiece | null>(null)
   const [showAdd, setShowAdd]   = useState(false)
@@ -220,8 +227,13 @@ export default function ContentTable({ initialContent, clientId }: Props) {
       {showAdd && (
         <AddContentModal
           clientId={clientId}
+          teamMembers={teamMembers}
           onClose={() => setShowAdd(false)}
-          onCreated={item => { setItems(prev => [...prev, item]); setShowAdd(false) }}
+          onCreated={item => {
+            setItems(prev => [...prev, item])
+            setShowAdd(false)
+            setSelected(item) // ouvre directement la vue plein écran pour écrire description/script
+          }}
         />
       )}
     </div>
@@ -621,15 +633,16 @@ export { RefCard, ReferencesSection }
 // ─── Add content modal ────────────────────────────────────────────────────────
 
 function AddContentModal({
-  clientId, onClose, onCreated,
+  clientId, teamMembers, onClose, onCreated,
 }: {
   clientId: string
+  teamMembers: { id: string; name: string }[]
   onClose: () => void
   onCreated: (item: ContentPiece) => void
 }) {
   const [form, setForm] = useState({
-    title: '', type: 'post', platform: 'instagram',
-    status: 'idee', assigned_to: '', description: '', script: '',
+    title: '', type: 'video_organique', platform: 'toutes',
+    status: 'idee', assigned_to: '',
     scheduled_at: '',
   })
   const [saving, setSaving] = useState(false)
@@ -646,8 +659,6 @@ function AddContentModal({
         ...form,
         client_id:    clientId,
         assigned_to:  form.assigned_to  || null,
-        description:  form.description  || null,
-        script:       form.script       || null,
         scheduled_at: form.scheduled_at || null,
       }),
     })
@@ -694,20 +705,15 @@ function AddContentModal({
             </div>
             <div>
               <label className="label">Assigné à</label>
-              <input type="text" value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))} className="input text-sm" placeholder="Nom du responsable" />
+              <select value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))} className="select text-sm">
+                <option value="">Personne</option>
+                {teamMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+              </select>
             </div>
           </div>
           <div>
             <label className="label">Date de publication prévue</label>
             <input type="date" value={form.scheduled_at} onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value }))} className="input text-sm" />
-          </div>
-          <div>
-            <label className="label">Description</label>
-            <textarea rows={2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="input text-sm resize-none" placeholder="Contexte, objectifs…" />
-          </div>
-          <div>
-            <label className="label">Script / Texte</label>
-            <textarea rows={4} value={form.script} onChange={e => setForm(f => ({ ...f, script: e.target.value }))} className="input text-sm resize-none font-mono" placeholder="Texte du post ou script complet…" />
           </div>
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">
