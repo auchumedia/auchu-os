@@ -35,20 +35,34 @@ export default async function EquipePage() {
 
   const supabase = await createClient()
 
-  // ── Roster complet de l'org (id/role/status/profile) — "org_members: member
-  //    reads roster" autorise déjà tout membre actif à lire l'ensemble, la
-  //    RLS des tables enfants (teams/clients) fait le vrai filtrage par équipe.
-  //    Sert à enrichir team_memberships (qui n'a pas de FK vers org_members —
-  //    ce sont deux tables sœurs référençant seulement auth.users). ──────────
-  const { data: orgMembersAll, error: orgMembersErr } = await supabase
+  // ── Roster complet de l'org (id/role/status) — "org_members: member reads
+  //    roster" autorise déjà tout membre actif à lire l'ensemble, la RLS des
+  //    tables enfants (teams/clients) fait le vrai filtrage par équipe.
+  //    Profils récupérés séparément (pas d'embed profile:profiles(...) ici) :
+  //    l'embed PostgREST dépend du cache de relations du schéma, qui peut
+  //    rester périmé après une migration DDL (create table/policy/function)
+  //    et faire échouer silencieusement la requête (PGRST200) — vu en
+  //    production juste après les migrations 021/022/023. Deux requêtes
+  //    plates + fusion en JS n'ont pas cette dépendance. ─────────────────────
+  const { data: orgMembersRaw, error: orgMembersErr } = await supabase
     .from('org_members')
-    .select('id, user_id, role, status, profile:profiles(full_name, email, avatar_url)')
+    .select('id, user_id, role, status')
     .eq('org_id', ctx.org.id)
     .eq('status', 'actif')
 
-  if (orgMembersErr) console.error('[equipe] orgMembersAll query error:', orgMembersErr.code, orgMembersErr.message)
+  if (orgMembersErr) console.error('[equipe] orgMembersRaw query error:', orgMembersErr.code, orgMembersErr.message)
 
-  const orgMemberByUserId = new Map((orgMembersAll ?? []).map(m => [m.user_id, m]))
+  const memberUserIds = (orgMembersRaw ?? []).map(m => m.user_id)
+  const { data: memberProfiles, error: profilesErr } = memberUserIds.length > 0
+    ? await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', memberUserIds)
+    : { data: [] as { id: string; full_name: string | null; email: string | null; avatar_url: string | null }[], error: null }
+
+  if (profilesErr) console.error('[equipe] memberProfiles query error:', profilesErr.code, profilesErr.message)
+
+  const profileByUserId = new Map((memberProfiles ?? []).map(p => [p.id, p]))
+  const orgMembersAll = (orgMembersRaw ?? []).map(m => ({ ...m, profile: profileByUserId.get(m.user_id) ?? null }))
+
+  const orgMemberByUserId = new Map(orgMembersAll.map(m => [m.user_id, m]))
 
   // ── Équipes visibles selon le rôle ────────────────────────────────────────
   let teamsQuery = supabase.from('teams').select(TEAM_SELECT).order('created_at', { ascending: true })
