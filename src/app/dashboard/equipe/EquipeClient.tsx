@@ -52,6 +52,16 @@ export default function EquipeClient({
   const router = useRouter()
   const [teams,       setTeams]       = useState(initialTeams)
   const [invitations, setInvitations] = useState(initialInv)
+
+  // La plupart des actions (changer un rôle, assigner un client, etc.) ne
+  // font pas de mise à jour optimiste — elles appellent router.refresh() et
+  // comptent sur le Server Component pour renvoyer des props fraîches.
+  // useState(initialTeams) ne se resynchronise jamais tout seul quand une
+  // prop change après le montage initial, d'où ce useEffect explicite —
+  // sans lui, un changement de rôle est bien enregistré en base mais l'UI
+  // continue d'afficher l'ancien état local (symptôme : "ça ne fait rien").
+  useEffect(() => { setTeams(initialTeams) }, [initialTeams])
+  useEffect(() => { setInvitations(initialInv) }, [initialInv])
   const [showInvite,  setShowInvite]  = useState(false)
   const [showCreate,  setShowCreate]  = useState(false)
   const [loading,     setLoading]     = useState<string | null>(null)
