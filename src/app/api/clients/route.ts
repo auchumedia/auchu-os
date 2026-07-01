@@ -1,6 +1,6 @@
 import { createClient }     from '@/lib/supabase/server'
 import { getOrgContext }    from '@/lib/org'
-import { canManageClients } from '@/lib/roles'
+import { canCreateClients } from '@/lib/roles'
 import { NextResponse }     from 'next/server'
 
 export async function GET() {
@@ -21,8 +21,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const ctx = await getOrgContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!canManageClients(ctx.role)) {
-    return NextResponse.json({ error: 'Accès refusé — rôle stratège/monteur en lecture seule sur les clients' }, { status: 403 })
+  if (!canCreateClients(ctx.role)) {
+    return NextResponse.json({ error: 'Accès refusé — seuls owner et director peuvent créer un client' }, { status: 403 })
   }
 
   const body = await req.json()
@@ -55,13 +55,6 @@ export async function POST(req: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Un chef_equipe qui crée un client se l'assigne automatiquement à sa
-  // propre équipe — sinon "clients: team read" le rendrait invisible pour
-  // lui-même juste après l'avoir créé.
-  if (ctx.isTeamChef && ctx.teamId) {
-    await supabase.from('team_clients').insert({ team_id: ctx.teamId, client_id: data.id })
-  }
 
   return NextResponse.json({ data }, { status: 201 })
 }

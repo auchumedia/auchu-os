@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
-import { canManageClients } from '@/lib/roles'
+import { canCreateClients } from '@/lib/roles'
 import { formatCurrency } from '@/lib/utils'
 import { Plus, Users } from 'lucide-react'
 import Link from 'next/link'
@@ -27,7 +27,7 @@ export default async function ClientsPage() {
 
   const isTeamScoped   = !!ctx && !ctx.isOwner && ctx.role !== 'director'
   const notYetOnTeam   = isTeamScoped && !ctx?.teamId
-  const canCreate      = canManageClients(ctx?.role ?? '')
+  const canCreate      = canCreateClients(ctx?.role ?? '')
 
   return (
     <div className="space-y-6">
