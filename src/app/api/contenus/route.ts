@@ -13,6 +13,7 @@ export async function GET(req: Request) {
     .from('content_pieces')
     .select('*')
     .eq('user_id', user.id)
+    .order('position', { ascending: true })
     .order('created_at', { ascending: false })
 
   if (clientId) query = query.eq('client_id', clientId)
@@ -29,6 +30,15 @@ export async function POST(req: Request) {
 
   const body = await req.json()
 
+  const { data: last } = await supabase
+    .from('content_pieces')
+    .select('position')
+    .eq('client_id', body.client_id)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const nextPosition = (last?.position ?? -1) + 1
+
   const { data, error } = await supabase
     .from('content_pieces')
     .insert({
@@ -44,6 +54,7 @@ export async function POST(req: Request) {
       scheduled_at: body.scheduled_at ?? null,
       body:        body.script ?? body.body ?? '',
       variants:    [],
+      position:    nextPosition,
       ai_generated: false,
     })
     .select()

@@ -147,6 +147,7 @@ export interface ContentPiece {
   client_notes:    string | null
   reference_links: ReferenceLink[]
   variants:        ContentVariant[]
+  position: number
   scheduled_at: string | null
   published_at: string | null
   ai_generated: boolean

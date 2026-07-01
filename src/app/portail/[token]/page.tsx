@@ -56,6 +56,7 @@ export default async function PortailPage({
       .from('content_pieces')
       .select('*')
       .eq('client_id', client.id)
+      .order('position', { ascending: true })
       .order('created_at', { ascending: false }),
 
     supabase

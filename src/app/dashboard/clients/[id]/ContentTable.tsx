@@ -1,9 +1,15 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, X, ChevronRight, Loader2, ThumbsUp, ThumbsDown, Trash2, ExternalLink, Link2, Check } from 'lucide-react'
+import { Plus, X, ChevronRight, Loader2, ThumbsUp, ThumbsDown, Trash2, ExternalLink, Link2, Check, GripVertical } from 'lucide-react'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { ContentPiece, ReferenceLink } from '@/types'
 import { cn, formatDate } from '@/lib/utils'
+import RichTextEditor from '@/components/RichTextEditor'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -136,6 +142,23 @@ export default function ContentTable({ initialContent, clientId }: Props) {
     if (selected?.id === id) closePanel()
   }
 
+  // ── Drag & drop reorder ──────────────────────────────────────────────────
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setItems(prev => {
+      const oldIndex = prev.findIndex(i => i.id === active.id)
+      const newIndex = prev.findIndex(i => i.id === over.id)
+      const reordered = arrayMove(prev, oldIndex, newIndex)
+      reordered.forEach((item, idx) => {
+        if (item.position !== idx) patchItem(item.id, { position: idx })
+      })
+      return reordered
+    })
+  }
+
   return (
     <div className="relative">
       {/* Header */}
@@ -155,80 +178,42 @@ export default function ContentTable({ initialContent, clientId }: Props) {
       ) : (
         <div className="card p-0 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Titre</th>
-                  <th>Type</th>
-                  <th>Plateforme</th>
-                  <th>Statut</th>
-                  <th>Assigné à</th>
-                  <th>Planifié</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {items.map(item => {
-                  const sc = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.idee
-                  return (
-                    <tr
-                      key={item.id}
-                      className="cursor-pointer hover:bg-gray-50/80 transition-colors"
-                      onClick={() => openItem(item)}
-                    >
-                      <td className="font-medium text-gray-900 max-w-[200px]">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate">{item.title}</span>
-                          {item.reference_links?.length > 0 && (
-                            <span title={`${item.reference_links.length} référence(s)`}>
-                              <Link2 className="w-3 h-3 text-gray-300 flex-shrink-0" />
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-xs text-gray-500">{TYPE_LABELS[item.type] ?? item.type}</td>
-                      <td>
-                        <span className={cn('badge text-xs', PLATFORM_COLORS[item.platform] ?? 'badge-gray')}>
-                          {PLATFORM_LABELS[item.platform] ?? item.platform}
-                        </span>
-                      </td>
-                      <td><span className={cn('badge text-xs', sc.cls)}>{sc.label}</span></td>
-                      <td className="text-xs text-gray-500">{item.assigned_to ?? '—'}</td>
-                      <td className="text-xs text-gray-400">{item.scheduled_at ? formatDate(item.scheduled_at) : '—'}</td>
-                      <td onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => deleteItem(item.id)}
-                            className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                          <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th className="w-8" />
+                    <th>Titre</th>
+                    <th>Type</th>
+                    <th>Plateforme</th>
+                    <th>Statut</th>
+                    <th>Assigné à</th>
+                    <th>Planifié</th>
+                    <th />
+                  </tr>
+                </thead>
+                <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                  <tbody>
+                    {items.map(item => (
+                      <SortableRow key={item.id} item={item} onOpen={openItem} onDelete={deleteItem} />
+                    ))}
+                  </tbody>
+                </SortableContext>
+              </table>
+            </DndContext>
           </div>
         </div>
       )}
 
-      {/* Side panel */}
+      {/* Vue plein écran du concept */}
       {selected && (
-        <>
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40" onClick={closePanel} />
-          <aside className="fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-2xl z-50 flex flex-col overflow-hidden">
-            <ContentPanel
-              key={selected.id}
-              item={selected}
-              onPatch={(fields) => patchItem(selected.id, fields)}
-              onClose={closePanel}
-              onDelete={() => deleteItem(selected.id)}
-            />
-          </aside>
-        </>
+        <ContentPanel
+          key={selected.id}
+          item={selected}
+          onPatch={(fields) => patchItem(selected.id, fields)}
+          onClose={closePanel}
+          onDelete={() => deleteItem(selected.id)}
+        />
       )}
 
       {/* Add modal */}
@@ -236,14 +221,78 @@ export default function ContentTable({ initialContent, clientId }: Props) {
         <AddContentModal
           clientId={clientId}
           onClose={() => setShowAdd(false)}
-          onCreated={item => { setItems(prev => [item, ...prev]); setShowAdd(false) }}
+          onCreated={item => { setItems(prev => [...prev, item]); setShowAdd(false) }}
         />
       )}
     </div>
   )
 }
 
-// ─── Content panel ────────────────────────────────────────────────────────────
+// ─── Sortable row ───────────────────────────────────────────────────────────────
+
+function SortableRow({
+  item, onOpen, onDelete,
+}: {
+  item: ContentPiece
+  onOpen: (item: ContentPiece) => void
+  onDelete: (id: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+  const sc = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.idee
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className="cursor-pointer hover:bg-gray-50/80 transition-colors group"
+      onClick={() => onOpen(item)}
+    >
+      <td onClick={e => e.stopPropagation()} className="px-2">
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-500 touch-none"
+          title="Glisser pour réordonner"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+      </td>
+      <td className="font-medium text-gray-900 max-w-[200px]">
+        <div className="flex items-center gap-2">
+          <span className="truncate">{item.title}</span>
+          {item.reference_links?.length > 0 && (
+            <span title={`${item.reference_links.length} référence(s)`}>
+              <Link2 className="w-3 h-3 text-gray-300 flex-shrink-0" />
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="text-xs text-gray-500">{TYPE_LABELS[item.type] ?? item.type}</td>
+      <td>
+        <span className={cn('badge text-xs', PLATFORM_COLORS[item.platform] ?? 'badge-gray')}>
+          {PLATFORM_LABELS[item.platform] ?? item.platform}
+        </span>
+      </td>
+      <td><span className={cn('badge text-xs', sc.cls)}>{sc.label}</span></td>
+      <td className="text-xs text-gray-500">{item.assigned_to ?? '—'}</td>
+      <td className="text-xs text-gray-400">{item.scheduled_at ? formatDate(item.scheduled_at) : '—'}</td>
+      <td onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onDelete(item.id)}
+            className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+          <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+// ─── Content panel (vue plein écran) ─────────────────────────────────────────────
 
 function ContentPanel({
   item, onPatch, onClose, onDelete,
@@ -276,48 +325,36 @@ function ContentPanel({
     await onPatch({ reference_links: newRefs })
   }
 
-  const sc = STATUS_CONFIG[item.platform] // unused, just to keep ref
-
   return (
-    <>
-      {/* Panel header */}
-      <div className="flex items-start justify-between p-5 border-b border-gray-100 flex-shrink-0">
-        <div className="flex-1 min-w-0 pr-4">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className={cn('badge text-xs', PLATFORM_COLORS[item.platform] ?? 'badge-gray')}>
-              {PLATFORM_LABELS[item.platform] ?? item.platform}
-            </span>
-            <span className="text-xs text-gray-400">{TYPE_LABELS[item.type] ?? item.type}</span>
-            {item.assigned_to && <span className="text-xs text-gray-400">· {item.assigned_to}</span>}
-            {/* Global save indicator */}
-            <span className={cn(
-              'text-xs transition-all ml-auto',
-              anyStatus === 'saved'  ? 'text-green-500' :
-              anyStatus === 'saving' ? 'text-gray-400'  : 'text-transparent'
-            )}>
-              {anyStatus === 'saving' ? 'Sauvegarde…' : 'Sauvegardé ✓'}
-            </span>
-          </div>
-          {/* Editable title */}
-          <input
-            type="text"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            className="text-lg font-semibold text-gray-900 w-full bg-transparent border-b border-transparent hover:border-gray-200 focus:border-auchu-400 focus:outline-none py-0.5 transition-colors"
-          />
+    <div className="fixed inset-0 bg-white z-50 flex flex-col">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-4 sm:px-8 py-4 border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <span className={cn('badge text-xs', PLATFORM_COLORS[item.platform] ?? 'badge-gray')}>
+            {PLATFORM_LABELS[item.platform] ?? item.platform}
+          </span>
+          <span className="text-xs text-gray-400">{TYPE_LABELS[item.type] ?? item.type}</span>
+          {item.assigned_to && <span className="text-xs text-gray-400">· {item.assigned_to}</span>}
+          <span className={cn(
+            'text-xs transition-all',
+            anyStatus === 'saved'  ? 'text-green-500' :
+            anyStatus === 'saving' ? 'text-gray-400'  : 'text-transparent'
+          )}>
+            {anyStatus === 'saving' ? 'Sauvegarde…' : 'Sauvegardé ✓'}
+          </span>
         </div>
         <div className="flex gap-1 flex-shrink-0">
           <button onClick={onDelete} className="p-2 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors" title="Supprimer">
             <Trash2 className="w-4 h-4" />
           </button>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <X className="w-4 h-4 text-gray-500" />
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Fermer">
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center gap-2 px-5 py-3 bg-gray-50 border-b border-gray-100 flex-shrink-0 overflow-x-auto">
+      <div className="flex items-center gap-2 px-4 sm:px-8 py-3 bg-gray-50 border-b border-gray-100 flex-shrink-0 overflow-x-auto">
         <span className="text-xs text-gray-500 mr-1 flex-shrink-0">Statut :</span>
         {STATUSES.map(s => {
           const cfg = STATUS_CONFIG[s]
@@ -339,86 +376,95 @@ function ContentPanel({
         })}
       </div>
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-6">
+      {/* Body — colonne centrée, style Notion */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 sm:px-8 py-8 space-y-8">
 
-        {/* Description */}
-        <section>
-          <SaveLabel label="Description" status={descStatus} />
-          <AutoSaveTextarea
-            value={description}
-            onChange={setDescription}
-            placeholder="Contexte, objectifs, brief…"
-            rows={3}
+          {/* Titre éditable en grand */}
+          <input
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Titre du concept"
+            className="text-3xl sm:text-4xl font-bold text-gray-900 w-full bg-transparent border-b border-transparent hover:border-gray-200 focus:border-auchu-400 focus:outline-none py-1 transition-colors"
           />
-        </section>
 
-        {/* Script */}
-        <section>
-          <SaveLabel
-            label={item.type === 'script_video' ? 'Script vidéo' : 'Texte / Script'}
-            status={scriptStatus}
-          />
-          <AutoSaveTextarea
-            value={script}
-            onChange={setScript}
-            placeholder="Saisis le texte du post, le script de la vidéo…"
-            rows={10}
-            mono
-          />
-        </section>
-
-        {/* References */}
-        <ReferencesSection links={refs} onUpdate={updateRefs} />
-
-        {/* Client notes (readonly — filled by client via portal) */}
-        {item.client_notes && (
+          {/* Description */}
           <section>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-              Notes du client
-              <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] normal-case tracking-normal font-medium">Reçu</span>
-            </h3>
-            <div className="bg-amber-50 border border-amber-200/60 rounded-xl p-3 text-sm text-gray-700 whitespace-pre-line">
-              {item.client_notes}
-            </div>
+            <SaveLabel label="Description" status={descStatus} />
+            <RichTextEditor
+              content={description}
+              onChange={setDescription}
+              placeholder="Contexte, objectifs, brief…"
+            />
           </section>
-        )}
 
-        {/* Approve / Refuse */}
-        <section className="flex gap-3 pb-2">
-          <button
-            onClick={() => changeStatus('approuve')}
-            disabled={status === 'approuve'}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-60',
-              status === 'approuve'
-                ? 'border-green-400 bg-green-50 text-green-700'
-                : 'border-gray-200 text-gray-600 hover:border-green-300 hover:bg-green-50 hover:text-green-700'
-            )}
-          >
-            <ThumbsUp className="w-4 h-4" />
-            Approuver
-          </button>
-          <button
-            onClick={() => changeStatus('refuse')}
-            disabled={status === 'refuse'}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-60',
-              status === 'refuse'
-                ? 'border-red-400 bg-red-50 text-red-700'
-                : 'border-gray-200 text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700'
-            )}
-          >
-            <ThumbsDown className="w-4 h-4" />
-            Refuser
-          </button>
-        </section>
+          {/* Script */}
+          <section>
+            <SaveLabel
+              label={item.type === 'script_video' ? 'Script vidéo' : 'Texte / Script'}
+              status={scriptStatus}
+            />
+            <RichTextEditor
+              content={script}
+              onChange={setScript}
+              placeholder="Saisis le texte du post, le script de la vidéo…"
+              minHeight="320px"
+            />
+          </section>
+
+          {/* References */}
+          <ReferencesSection links={refs} onUpdate={updateRefs} />
+
+          {/* Client notes (readonly — filled by client via portal) */}
+          {item.client_notes && (
+            <section>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                Notes du client
+                <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] normal-case tracking-normal font-medium">Reçu</span>
+              </h3>
+              <div className="bg-amber-50 border border-amber-200/60 rounded-xl p-3 text-sm text-gray-700 whitespace-pre-line">
+                {item.client_notes}
+              </div>
+            </section>
+          )}
+
+          {/* Approve / Refuse */}
+          <section className="flex gap-3 pb-8">
+            <button
+              onClick={() => changeStatus('approuve')}
+              disabled={status === 'approuve'}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-60',
+                status === 'approuve'
+                  ? 'border-green-400 bg-green-50 text-green-700'
+                  : 'border-gray-200 text-gray-600 hover:border-green-300 hover:bg-green-50 hover:text-green-700'
+              )}
+            >
+              <ThumbsUp className="w-4 h-4" />
+              Approuver
+            </button>
+            <button
+              onClick={() => changeStatus('refuse')}
+              disabled={status === 'refuse'}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border-2 transition-all disabled:opacity-60',
+                status === 'refuse'
+                  ? 'border-red-400 bg-red-50 text-red-700'
+                  : 'border-gray-200 text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700'
+              )}
+            >
+              <ThumbsDown className="w-4 h-4" />
+              Refuser
+            </button>
+          </section>
+        </div>
       </div>
-    </>
+    </div>
   )
 }
 
-// ─── Auto-save textarea ───────────────────────────────────────────────────────
+// ─── Save label ───────────────────────────────────────────────────────────────
 
 function SaveLabel({ label, status }: { label: string; status: SaveStatus }) {
   return (
@@ -432,26 +478,6 @@ function SaveLabel({ label, status }: { label: string; status: SaveStatus }) {
         {status === 'saving' ? 'Sauvegarde…' : 'Sauvegardé ✓'}
       </span>
     </div>
-  )
-}
-
-function AutoSaveTextarea({
-  value, onChange, placeholder, rows, mono,
-}: {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  rows?: number
-  mono?: boolean
-}) {
-  return (
-    <textarea
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={rows ?? 4}
-      className={cn('input text-sm resize-none w-full', mono && 'font-mono text-gray-800 leading-relaxed')}
-    />
   )
 }
 

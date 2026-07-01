@@ -38,6 +38,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
       .select('*')
       .eq('client_id', params.id)
       .eq('user_id', ownerId)
+      .order('position', { ascending: true })
       .order('created_at', { ascending: false }),
 
     supabase
