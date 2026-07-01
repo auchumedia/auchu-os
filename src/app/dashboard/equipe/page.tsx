@@ -132,6 +132,7 @@ export default async function EquipePage() {
         currentUserId={ctx.userId}
         canManageOrgStructure={ctx.canManageOrgStructure}
         isTeamChef={ctx.isTeamChef}
+        allMembers={ctx.canManageOrgStructure ? ((orgMembersAll ?? []) as any) : []}
         teams={teams as any}
         invitations={(invitesData ?? []) as any}
         unassignedMembers={(unassignedMembers ?? []) as any}

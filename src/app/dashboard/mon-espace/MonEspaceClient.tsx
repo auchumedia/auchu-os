@@ -7,7 +7,7 @@ import {
   AlertTriangle, Users, Loader2, Check, UsersRound,
 } from 'lucide-react'
 import type { OrgRole } from '@/types'
-import { ROLE_LABELS } from '@/lib/roles'
+import { roleLabel } from '@/lib/roles'
 import CalendarPanel from './CalendarPanel'
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
@@ -154,7 +154,7 @@ function TeamRoster({ members }: { members: TeamMemberRow[] }) {
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
       {members.map(m => {
         const name = memberName(m.profile)
-        const roleCfg = ROLE_LABELS[m.role]
+        const roleCfg = roleLabel(m.role)
         return (
           <div key={m.user_id} className="card p-3 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-auchu-100 text-auchu-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">

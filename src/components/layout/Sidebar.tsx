@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { LogOut, Zap } from 'lucide-react'
 import { buildNavSections } from '@/lib/nav'
-import { ROLE_LABELS } from '@/lib/roles'
+import { roleLabel } from '@/lib/roles'
 import type { OrgRole } from '@/types'
 
 export default function Sidebar({
@@ -26,7 +26,7 @@ export default function Sidebar({
   }
 
   const navSections = buildNavSections(role).filter(s => s.items.length > 0)
-  const badge = ROLE_LABELS[role]
+  const badge = roleLabel(role)
 
   return (
     <aside

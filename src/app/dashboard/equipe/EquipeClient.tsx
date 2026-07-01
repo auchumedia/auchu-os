@@ -9,7 +9,7 @@ import {
   UsersRound, Settings2, PenSquare,
 } from 'lucide-react'
 import type { OrgRole } from '@/types'
-import { ROLE_LABELS, MANAGEABLE_ROLES } from '@/lib/roles'
+import { roleLabel, manageableRoles as getManageableRoles, canManageRole } from '@/lib/roles'
 
 const APP_URL = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -18,6 +18,7 @@ interface TeamMemberRow { id: string; user_id: string; role: OrgRole; status: 'a
 interface TeamClientRow { id: string; client_id: string; assigned_at: string; client: { id: string; name: string; company: string | null; status: string } | null }
 interface TeamData { id: string; org_id: string; name: string; chef_id: string; members: TeamMemberRow[]; clients: TeamClientRow[] }
 interface UnassignedMember { id: string; user_id: string; role: OrgRole; profile: Profile | null }
+interface AllMemberRow { id: string; user_id: string; role: OrgRole; status: 'actif' | 'inactif'; profile: Profile | null }
 interface InvitationRow { id: string; code: string; role: OrgRole; team_id: string | null; expires_at: string; created_at: string; invited_name: string | null; invited_email: string | null }
 
 interface InviteForm { first_name: string; last_name: string; email: string; role: OrgRole }
@@ -27,6 +28,7 @@ interface Props {
   currentUserId:          string
   canManageOrgStructure:  boolean
   isTeamChef:             boolean
+  allMembers:             AllMemberRow[]
   teams:                  TeamData[]
   invitations:            InvitationRow[]
   unassignedMembers:      UnassignedMember[]
@@ -40,7 +42,7 @@ function memberName(p: Profile | null) {
 }
 
 export default function EquipeClient({
-  role, currentUserId, canManageOrgStructure, isTeamChef,
+  role, currentUserId, canManageOrgStructure, isTeamChef, allMembers,
   teams: initialTeams, invitations: initialInv, unassignedMembers, unassignedClients,
   chefCandidates, workload,
 }: Props) {
@@ -53,11 +55,11 @@ export default function EquipeClient({
   const [copied,      setCopied]      = useState<string | null>(null)
   const [emailSent,   setEmailSent]   = useState<string | null>(null)
 
-  const manageableRoles = MANAGEABLE_ROLES[role]
-  const canInvite = manageableRoles.length > 0
+  const myManageableRoles = getManageableRoles(role)
+  const canInvite = myManageableRoles.length > 0
 
   const [inviteForm, setInviteForm] = useState<InviteForm>({
-    first_name: '', last_name: '', email: '', role: manageableRoles[manageableRoles.length - 1] ?? 'monteur',
+    first_name: '', last_name: '', email: '', role: myManageableRoles[myManageableRoles.length - 1] ?? 'monteur',
   })
   const setField = (k: keyof InviteForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -201,6 +203,92 @@ export default function EquipeClient({
         )}
       </div>
 
+      {/* ── Tous les membres (owner/director) ────────────────────────────────── */}
+      {canManageOrgStructure && (
+        <div className="card p-0 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-900">
+              Tous les membres
+              <span className="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{allMembers.length}</span>
+            </h2>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {allMembers.map(member => {
+              const name        = memberName(member.profile)
+              const roleCfg     = roleLabel(member.role)
+              const isMe        = member.user_id === currentUserId
+              const isInactive  = member.status === 'inactif'
+              const isLoading   = loading === member.id
+              const canManageThis = !isMe && member.role !== 'owner' && canManageRole(role, member.role)
+
+              return (
+                <div key={member.id} className={cn('flex items-center gap-4 px-5 py-3.5 transition-colors', isInactive && 'bg-gray-50/60 opacity-60')}>
+                  <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0', isInactive ? 'bg-gray-200 text-gray-400' : 'bg-auchu-100 text-auchu-700')}>
+                    {member.profile?.avatar_url
+                      ? <img src={member.profile.avatar_url} alt={name} className="w-9 h-9 rounded-full object-cover" />
+                      : getInitials(name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium text-gray-900 text-sm truncate">{name}</p>
+                      {isMe && <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0">vous</span>}
+                    </div>
+                    <p className="text-xs text-gray-400 truncate">{member.profile?.email}</p>
+                  </div>
+                  {workload[member.user_id] > 0 && (
+                    <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center font-semibold text-[10px] flex-shrink-0">{workload[member.user_id]}</span>
+                  )}
+
+                  {canManageThis && !isLoading ? (
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={member.role}
+                        onChange={e => patchMember(member.id, { role: e.target.value as OrgRole })}
+                        className="text-xs font-medium rounded-full pl-2.5 pr-6 py-1 border border-transparent appearance-none cursor-pointer transition-colors bg-transparent hover:border-gray-200"
+                      >
+                        {getManageableRoles(role).map(r => <option key={r} value={r}>{roleLabel(r).label}</option>)}
+                      </select>
+                      <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                    </div>
+                  ) : (
+                    <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0', roleCfg.cls)}>{roleCfg.label}</span>
+                  )}
+
+                  {canManageThis && (
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      {isLoading
+                        ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                        : <>
+                            <button
+                              onClick={() => patchMember(member.id, { status: isInactive ? 'actif' : 'inactif' })}
+                              title={isInactive ? 'Réactiver' : 'Désactiver'}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+                            >
+                              {isInactive ? <UserCheck className="w-3.5 h-3.5" /> : <UserMinus className="w-3.5 h-3.5" />}
+                            </button>
+                            {role === 'owner' && (
+                              <button
+                                onClick={() => removeMemberFromOrg(member.id)}
+                                title="Supprimer le compte"
+                                className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-gray-300 hover:text-red-400"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </>
+                      }
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {allMembers.length === 0 && (
+              <div className="px-5 py-8 text-center text-sm text-gray-400">Aucun membre pour l'instant</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Équipes ───────────────────────────────────────────────────────────── */}
       {teams.map(team => {
         const chef = team.members.find(m => m.user_id === team.chef_id)
@@ -231,7 +319,7 @@ export default function EquipeClient({
             <div className="divide-y divide-gray-50">
               {team.members.map(member => {
                 const name        = memberName(member.profile)
-                const roleCfg     = ROLE_LABELS[member.role]
+                const roleCfg     = roleLabel(member.role)
                 const isMe        = member.user_id === currentUserId
                 const isChef      = member.user_id === team.chef_id
                 const isInactive  = member.status === 'inactif'
@@ -264,7 +352,7 @@ export default function EquipeClient({
                           onChange={e => patchMember(member.id, { role: e.target.value as OrgRole })}
                           className="text-xs font-medium rounded-full pl-2.5 pr-6 py-1 border border-transparent appearance-none cursor-pointer transition-colors bg-transparent hover:border-gray-200"
                         >
-                          {MANAGEABLE_ROLES[role].map(r => <option key={r} value={r}>{ROLE_LABELS[r].label}</option>)}
+                          {getManageableRoles(role).map(r => <option key={r} value={r}>{roleLabel(r).label}</option>)}
                         </select>
                         <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
                       </div>
@@ -361,7 +449,7 @@ export default function EquipeClient({
           {unassignedMembers.length > 0 && (
             <div className="space-y-2 mb-4">
               {unassignedMembers.map(m => {
-                const roleCfg = ROLE_LABELS[m.role]
+                const roleCfg = roleLabel(m.role)
                 return (
                   <div key={m.id} className="flex items-center gap-3 text-sm">
                     <span className="font-medium text-gray-800">{memberName(m.profile)}</span>
@@ -400,7 +488,7 @@ export default function EquipeClient({
             {invitations.map(inv => {
               const link        = `${APP_URL}/invite/${inv.code}`
               const expired     = new Date(inv.expires_at) < new Date()
-              const roleCfg     = ROLE_LABELS[inv.role]
+              const roleCfg     = roleLabel(inv.role)
               const isRevoking  = loading === `inv-${inv.id}`
               const wasJustSent = emailSent === inv.id
 
@@ -472,7 +560,7 @@ export default function EquipeClient({
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {(['director', 'chef_equipe', 'stratege', 'monteur'] as const).map(r => {
-            const cfg = ROLE_LABELS[r]
+            const cfg = roleLabel(r)
             return (
               <div key={r} className="rounded-xl border border-gray-100 p-3 space-y-1.5">
                 <span className={cn('inline-flex text-xs font-medium px-2 py-0.5 rounded-full', cfg.cls)}>{cfg.label}</span>
@@ -558,8 +646,8 @@ export default function EquipeClient({
               <div>
                 <label className="label">Rôle</label>
                 <select value={inviteForm.role} onChange={setField('role')} className="input">
-                  {manageableRoles.map(r => (
-                    <option key={r} value={r}>{ROLE_LABELS[r].label} — {ROLE_LABELS[r].desc}</option>
+                  {myManageableRoles.map(r => (
+                    <option key={r} value={r}>{roleLabel(r).label} — {roleLabel(r).desc}</option>
                   ))}
                 </select>
                 {isTeamChef && (

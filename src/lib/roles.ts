@@ -12,8 +12,17 @@ export const MANAGEABLE_ROLES: Record<OrgRole, OrgRole[]> = {
   monteur:     [],
 }
 
-export function canManageRole(actor: OrgRole, target: OrgRole): boolean {
-  return MANAGEABLE_ROLES[actor].includes(target)
+// role vient de la DB (colonne text, pas un enum Postgres) — sa valeur
+// runtime peut ne pas correspondre au type OrgRole si une migration n'a pas
+// (encore) tourné. On indexe donc toujours via manageableRoles()/roleLabel()
+// plutôt que MANAGEABLE_ROLES[x]/ROLE_LABELS[x] directement, pour ne jamais
+// planter tout le dashboard sur un rôle legacy/inconnu.
+export function manageableRoles(actor: string): OrgRole[] {
+  return MANAGEABLE_ROLES[actor as OrgRole] ?? []
+}
+
+export function canManageRole(actor: string, target: string): boolean {
+  return manageableRoles(actor).includes(target as OrgRole)
 }
 
 export const ROLE_LABELS: Record<OrgRole, { label: string; cls: string; desc: string }> = {
@@ -22,4 +31,10 @@ export const ROLE_LABELS: Record<OrgRole, { label: string; cls: string; desc: st
   chef_equipe: { label: 'Chef d\'équipe', cls: 'bg-blue-100   text-blue-700',   desc: 'Gère son équipe et ses clients assignés' },
   stratege:    { label: 'Stratège',     cls: 'bg-orange-100 text-orange-700', desc: 'Clients assignés et membres de son équipe' },
   monteur:     { label: 'Monteur',      cls: 'bg-green-100  text-green-700',  desc: 'Projets vidéo assignés et membres de son équipe' },
+}
+
+const UNKNOWN_ROLE_LABEL = { label: 'Rôle inconnu', cls: 'bg-gray-100 text-gray-600', desc: '' }
+
+export function roleLabel(role: string) {
+  return ROLE_LABELS[role as OrgRole] ?? UNKNOWN_ROLE_LABEL
 }
