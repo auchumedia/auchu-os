@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn, getInitials, formatDate } from '@/lib/utils'
 import {
@@ -61,6 +61,20 @@ export default function EquipeClient({ org, members: initial, invitations: initi
     setCopied(key)
     setTimeout(() => setCopied(null), 2000)
   }, [])
+
+  // Rafraîchit automatiquement la page tant qu'il reste des invitations en
+  // attente : le Router Cache client de Next.js (staleTime 30s en dev) sert
+  // sinon une version périmée après qu'un invité a rejoint l'équipe.
+  useEffect(() => {
+    if (invitations.length === 0) return
+    const refresh = () => router.refresh()
+    const interval = setInterval(refresh, 15000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [invitations.length, router])
 
   const createInvite = async () => {
     setLoading('invite')

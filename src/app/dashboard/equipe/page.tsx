@@ -59,13 +59,16 @@ export default async function EquipePage() {
   if (orgMembersRes.error) {
     console.error('[equipe] org_members query error:', orgMembersRes.error.code, orgMembersRes.error.message)
   }
-  console.log('[equipe] org_members rows:', orgMembersRes.data?.length ?? 0, '| org_id:', ctx.org.id)
 
   // Récupérer les profiles séparément (profiles.id = auth.users.id)
   const userIds = (orgMembersRes.data ?? []).map(m => m.user_id)
-  const { data: profilesData } = userIds.length > 0
+  const { data: profilesData, error: profilesErr } = userIds.length > 0
     ? await supabase.from('profiles').select('id, full_name, email, avatar_url').in('id', userIds)
-    : { data: [] as { id: string; full_name: string | null; email: string | null; avatar_url: string | null }[] }
+    : { data: [] as { id: string; full_name: string | null; email: string | null; avatar_url: string | null }[], error: null }
+
+  if (profilesErr) {
+    console.error('[equipe] profiles query error:', profilesErr.code, profilesErr.message)
+  }
 
   const profileMap = Object.fromEntries((profilesData ?? []).map(p => [p.id, p]))
 
