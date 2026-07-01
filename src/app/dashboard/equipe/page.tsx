@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
 import { redirect }      from 'next/navigation'
+import { roleSortIndex } from '@/lib/roles'
 import EquipeClient      from './EquipeClient'
 
 export const dynamic = 'force-dynamic'
@@ -60,7 +61,9 @@ export default async function EquipePage() {
   if (profilesErr) console.error('[equipe] memberProfiles query error:', profilesErr.code, profilesErr.message)
 
   const profileByUserId = new Map((memberProfiles ?? []).map(p => [p.id, p]))
-  const orgMembersAll = (orgMembersRaw ?? []).map(m => ({ ...m, profile: profileByUserId.get(m.user_id) ?? null }))
+  const orgMembersAll = (orgMembersRaw ?? [])
+    .map(m => ({ ...m, profile: profileByUserId.get(m.user_id) ?? null }))
+    .sort((a, b) => roleSortIndex(a.role) - roleSortIndex(b.role))
 
   const orgMemberByUserId = new Map(orgMembersAll.map(m => [m.user_id, m]))
 

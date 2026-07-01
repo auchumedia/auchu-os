@@ -38,3 +38,14 @@ const UNKNOWN_ROLE_LABEL = { label: 'Rôle inconnu', cls: 'bg-gray-100 text-gray
 export function roleLabel(role: string) {
   return ROLE_LABELS[role as OrgRole] ?? UNKNOWN_ROLE_LABEL
 }
+
+// Ordre hiérarchique du plus élevé au plus bas — utilisé pour trier les
+// listes de membres (owner en premier, puis director, etc.). Un rôle
+// legacy/inconnu (migration pas encore appliquée) est relégué en dernier
+// plutôt que de planter le tri.
+const ROLE_ORDER: OrgRole[] = ['owner', 'director', 'chef_equipe', 'stratege', 'monteur']
+
+export function roleSortIndex(role: string): number {
+  const i = ROLE_ORDER.indexOf(role as OrgRole)
+  return i === -1 ? ROLE_ORDER.length : i
+}
