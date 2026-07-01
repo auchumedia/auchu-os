@@ -6,17 +6,15 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { MoreHorizontal, LogOut, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { buildNav } from '@/lib/nav'
+import { buildNavSections } from '@/lib/nav'
 import type { OrgRole } from '@/types'
 
 interface Props {
   role?: OrgRole
 }
 
-// Bar visible : les 4 premiers items de l'ordre partagé. Le reste (+ Déconnexion)
-// va dans le menu "Plus", en conservant le même ordre.
-const BAR_SLOTS = 4
-
+// Bar visible : section "Principal". Le reste (Équipe, Agents IA, Compte),
+// dans le même ordre, va dans le menu "Plus".
 export default function BottomNav({ role = 'owner' }: Props) {
   const pathname = usePathname()
   const router   = useRouter()
@@ -28,9 +26,9 @@ export default function BottomNav({ role = 'owner' }: Props) {
     router.push('/auth/login')
   }
 
-  const navItems  = buildNav(role)
-  const barItems  = navItems.slice(0, BAR_SLOTS)
-  const menuItems = navItems.slice(BAR_SLOTS)
+  const sections  = buildNavSections(role)
+  const barItems  = sections.find(s => s.key === 'principal')?.items ?? []
+  const menuItems = sections.filter(s => s.key !== 'principal').flatMap(s => s.items)
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
@@ -63,7 +61,7 @@ export default function BottomNav({ role = 'owner' }: Props) {
             )}
           >
             <MoreHorizontal className="w-5 h-5" />
-            Menu
+            Plus
           </button>
         )}
       </nav>
@@ -77,7 +75,7 @@ export default function BottomNav({ role = 'owner' }: Props) {
           />
           <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white rounded-t-2xl shadow-2xl pb-safe">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <p className="font-semibold text-gray-900 text-sm">Menu</p>
+              <p className="font-semibold text-gray-900 text-sm">Plus</p>
               <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100">
                 <X className="w-4 h-4 text-gray-500" />
               </button>

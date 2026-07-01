@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { LogOut, Zap } from 'lucide-react'
-import { buildNav } from '@/lib/nav'
+import { buildNavSections } from '@/lib/nav'
 import type { OrgRole } from '@/types'
 
 export default function Sidebar({
@@ -24,7 +24,7 @@ export default function Sidebar({
     router.push('/auth/login')
   }
 
-  const navItems = buildNav(role)
+  const navSections = buildNavSections(role).filter(s => s.items.length > 0)
 
   const ROLE_BADGES: Record<OrgRole, { label: string; cls: string }> = {
     owner:   { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700'  },
@@ -61,20 +61,31 @@ export default function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {navItems.map((item) => {
-          const Icon = item.icon
-          const isActive =
-            item.href === '/dashboard'
-              ? pathname === '/dashboard'
-              : pathname.startsWith(item.href)
-          return (
-            <Link key={item.href} href={item.href} className={cn('sidebar-link', isActive && 'active')}>
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              <span>{item.label}</span>
-            </Link>
-          )
-        })}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {navSections.map((section, i) => (
+          <div key={section.key} className={cn(i > 0 && 'mt-4 pt-4 border-t border-gray-100')}>
+            {section.key !== 'principal' && (
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-3 mb-1.5">
+                {section.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const Icon = item.icon
+                const isActive =
+                  item.href === '/dashboard'
+                    ? pathname === '/dashboard'
+                    : pathname.startsWith(item.href)
+                return (
+                  <Link key={item.href} href={item.href} className={cn('sidebar-link', isActive && 'active')}>
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Bottom */}
