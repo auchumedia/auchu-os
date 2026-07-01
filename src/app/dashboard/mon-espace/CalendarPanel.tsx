@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Plus, X, Loader2, Users, Calendar } from 'lucide-react'
-import type { OrgRole } from '@/types'
+import { ChevronLeft, ChevronRight, Plus, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -30,8 +29,6 @@ interface CalEvent {
   userName?: string | null
   source: 'calendar' | 'content'
 }
-
-interface Member { userId: string; name: string }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,37 +58,29 @@ function getMonthCells(year: number, month: number): (string | null)[] {
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  userId:        string
-  role:          OrgRole
-  dataOwnerId:   string
-  canManageTeam: boolean
+  teamMode: boolean
   initialClients: { id: string; name: string }[]
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function CalendrierClient({ userId, canManageTeam, initialClients }: Props) {
-  const [view,           setView]           = useState<ViewMode>('month')
+export default function CalendarPanel({ teamMode, initialClients }: Props) {
+  const [view, setView] = useState<ViewMode>('month')
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) setView('week')
   }, [])
-  const [curDate,        setCurDate]        = useState(new Date())
-  const [teamView,       setTeamView]       = useState(false)
-  const [selectedMember, setSelectedMember] = useState<string>('')
-  const [members,        setMembers]        = useState<Member[]>([])
-  const [events,         setEvents]         = useState<CalEvent[]>([])
-  const [loading,        setLoading]        = useState(true)
+  const [curDate, setCurDate] = useState(new Date())
+  const [events,  setEvents]  = useState<CalEvent[]>([])
+  const [loading, setLoading] = useState(true)
 
   // Modal
-  const [modal,        setModal]        = useState<string | null>(null) // date clicked
+  const [modal,        setModal]        = useState<string | null>(null)
   const [formTitle,    setFormTitle]    = useState('')
   const [formType,     setFormType]     = useState<CalEvtType>('tournage')
   const [formClientId, setFormClientId] = useState('')
   const [formNotes,    setFormNotes]    = useState('')
   const [saving,       setSaving]       = useState(false)
-
-  // ── Computed date range ──────────────────────────────────────────────────
 
   const getRangeForView = useCallback((): [string, string] => {
     if (view === 'month') {
@@ -103,38 +92,18 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
     return [toISO(mon), toISO(sun)]
   }, [view, curDate])
 
-  // ── Fetch events ─────────────────────────────────────────────────────────
-
   const fetchEvents = useCallback(async () => {
     setLoading(true)
     const [start, end] = getRangeForView()
     const params = new URLSearchParams({ start, end })
-    if (teamView) params.set('team', '1')
-    if (selectedMember) params.set('member', selectedMember)
+    if (teamMode) params.set('team', '1')
     const res  = await fetch(`/api/calendrier?${params}`)
     const json = await res.json()
     setEvents(json.events ?? [])
     setLoading(false)
-  }, [getRangeForView, teamView, selectedMember])
+  }, [getRangeForView, teamMode])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
-
-  // ── Fetch team members ───────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!canManageTeam) return
-    fetch('/api/equipe')
-      .then(r => r.json())
-      .then(json => {
-        setMembers((json.members ?? []).map((m: any) => ({
-          userId: m.user_id,
-          name:   m.profile?.full_name ?? m.profile?.email ?? 'Membre',
-        })))
-      })
-      .catch(() => {})
-  }, [canManageTeam])
-
-  // ── Navigation ───────────────────────────────────────────────────────────
 
   function navigate(dir: 1 | -1) {
     setCurDate(prev => {
@@ -145,14 +114,10 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
     })
   }
 
-  // ── Events map (date → events[]) ─────────────────────────────────────────
-
   const eventsMap = events.reduce<Record<string, CalEvent[]>>((acc, e) => {
     ;(acc[e.date] ??= []).push(e)
     return acc
   }, {})
-
-  // ── Event creation ───────────────────────────────────────────────────────
 
   function openModal(date: string) {
     setModal(date)
@@ -176,8 +141,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
     setEvents(prev => prev.filter(e => e.id !== id))
   }
 
-  // ── Period label ──────────────────────────────────────────────────────────
-
   const periodLabel = view === 'month'
     ? `${MONTHS_FR[curDate.getMonth()]} ${curDate.getFullYear()}`
     : (() => {
@@ -188,13 +151,9 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
 
   const todayISO = toISO(new Date())
 
-  // ── Month grid ────────────────────────────────────────────────────────────
-
   const monthCells = view === 'month'
     ? getMonthCells(curDate.getFullYear(), curDate.getMonth())
     : []
-
-  // ── Week days ─────────────────────────────────────────────────────────────
 
   const weekDays = view === 'week'
     ? Array.from({ length: 7 }, (_, i) => {
@@ -204,53 +163,20 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
       })
     : []
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Calendrier</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{events.length} événement{events.length !== 1 ? 's' : ''}</p>
+        <div className="flex items-center gap-3 flex-wrap">
+          {(Object.entries(TYPE_CFG) as [CalEvtType, typeof TYPE_CFG[CalEvtType]][]).map(([type, cfg]) => (
+            <div key={type} className="flex items-center gap-1.5">
+              <div className={cn('w-2.5 h-2.5 rounded-full', cfg.dot)} />
+              <span className="text-xs text-gray-500">{cfg.label}</span>
+            </div>
+          ))}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Vue équipe */}
-          {canManageTeam && (
-            <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden text-sm">
-              <button
-                onClick={() => setTeamView(false)}
-                className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors',
-                  !teamView ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50')}
-              >
-                <Calendar className="w-3.5 h-3.5" /> Personnel
-              </button>
-              <button
-                onClick={() => setTeamView(true)}
-                className={cn('px-3 py-1.5 flex items-center gap-1.5 transition-colors',
-                  teamView ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50')}
-              >
-                <Users className="w-3.5 h-3.5" /> Équipe
-              </button>
-            </div>
-          )}
-
-          {/* Filtre membre */}
-          {teamView && members.length > 0 && (
-            <select
-              value={selectedMember}
-              onChange={e => setSelectedMember(e.target.value)}
-              className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700"
-            >
-              <option value="">Tous les membres</option>
-              {members.map(m => (
-                <option key={m.userId} value={m.userId}>{m.name}</option>
-              ))}
-            </select>
-          )}
-
-          {/* Mois / Semaine toggle */}
           <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden text-sm">
             <button
               onClick={() => setView('month')}
@@ -268,27 +194,16 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
             </button>
           </div>
 
-          {/* Navigation */}
           <div className="flex items-center gap-1">
             <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
               <ChevronLeft className="w-4 h-4 text-gray-600" />
             </button>
-            <span className="text-sm font-medium text-gray-900 min-w-[180px] text-center">{periodLabel}</span>
+            <span className="text-sm font-medium text-gray-900 min-w-[160px] text-center">{periodLabel}</span>
             <button onClick={() => navigate(1)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
               <ChevronRight className="w-4 h-4 text-gray-600" />
             </button>
           </div>
         </div>
-      </div>
-
-      {/* ── Légende ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {(Object.entries(TYPE_CFG) as [CalEvtType, typeof TYPE_CFG[CalEvtType]][]).map(([type, cfg]) => (
-          <div key={type} className="flex items-center gap-1.5">
-            <div className={cn('w-2.5 h-2.5 rounded-full', cfg.dot)} />
-            <span className="text-xs text-gray-500">{cfg.label}</span>
-          </div>
-        ))}
       </div>
 
       {/* ── Calendar grid ─────────────────────────────────────────────────── */}
@@ -298,9 +213,7 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
         </div>
       ) : view === 'month' ? (
 
-        /* ── Month view ─────────────────────────────────────────────────── */
         <div className="card overflow-hidden p-0">
-          {/* Day headers */}
           <div className="grid grid-cols-7 border-b border-gray-100">
             {DAYS_FR.map(d => (
               <div key={d} className="py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wide">
@@ -308,7 +221,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
               </div>
             ))}
           </div>
-          {/* Cells */}
           <div className="grid grid-cols-7">
             {monthCells.map((dateStr, i) => {
               const dayEvents = dateStr ? (eventsMap[dateStr] ?? []) : []
@@ -363,7 +275,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
 
       ) : (
 
-        /* ── Week view ──────────────────────────────────────────────────── */
         <div className="grid grid-cols-7 gap-2">
           {weekDays.map((dateStr, i) => {
             const dayEvents = eventsMap[dateStr] ?? []
@@ -371,7 +282,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
             const day       = new Date(dateStr + 'T12:00:00')
             return (
               <div key={dateStr} className="card p-2 min-h-[220px] flex flex-col">
-                {/* Day header */}
                 <div className="text-center mb-2">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">{DAYS_FR[i]}</p>
                   <div className={cn(
@@ -381,7 +291,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
                     {day.getDate()}
                   </div>
                 </div>
-                {/* Events */}
                 <div className="flex-1 space-y-1">
                   {dayEvents.map(e => {
                     const cfg = TYPE_CFG[e.type]
@@ -405,7 +314,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
                     )
                   })}
                 </div>
-                {/* Add button */}
                 <button
                   onClick={() => openModal(dateStr)}
                   className="mt-2 w-full flex items-center justify-center gap-1 py-1 text-[10px] text-gray-400 hover:text-auchu-600 hover:bg-auchu-50 rounded-lg transition-colors"
@@ -432,7 +340,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
             </div>
 
             <div className="p-5 space-y-4">
-              {/* Titre */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Titre *</label>
                 <input
@@ -446,7 +353,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
                 />
               </div>
 
-              {/* Type */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -470,7 +376,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
                 </div>
               </div>
 
-              {/* Client */}
               {initialClients.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Client (optionnel)</label>
@@ -487,7 +392,6 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
                 </div>
               )}
 
-              {/* Notes */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Notes (optionnel)</label>
                 <textarea
@@ -501,10 +405,7 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
             </div>
 
             <div className="flex gap-2 px-5 pb-5">
-              <button
-                onClick={() => setModal(null)}
-                className="flex-1 btn-secondary"
-              >
+              <button onClick={() => setModal(null)} className="flex-1 btn-secondary">
                 Annuler
               </button>
               <button

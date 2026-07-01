@@ -24,7 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {children}
         </div>
       </main>
-      <BottomNav role={ctx?.role || 'owner'} canManageTeam={ctx?.canManageTeam ?? false} />
+      <BottomNav role={ctx?.role || 'owner'} />
     </div>
   )
 }

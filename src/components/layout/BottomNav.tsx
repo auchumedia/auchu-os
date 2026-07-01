@@ -4,27 +4,20 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import {
-  LayoutDashboard, Users, CalendarDays, Brain,
-  MoreHorizontal, Receipt, UsersRound,
-  UserCircle, Settings, LogOut, X,
-} from 'lucide-react'
+import { MoreHorizontal, LogOut, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { buildNav } from '@/lib/nav'
 import type { OrgRole } from '@/types'
 
 interface Props {
   role?: OrgRole
-  canManageTeam?: boolean
 }
 
-const NAV_ITEMS = [
-  { href: '/dashboard',              icon: LayoutDashboard, label: 'Dashboard'  },
-  { href: '/dashboard/clients',      icon: Users,           label: 'Clients'    },
-  { href: '/dashboard/calendrier',   icon: CalendarDays,    label: 'Calendrier' },
-  { href: '/agents/productivite',    icon: Brain,           label: 'Agent'      },
-]
+// Bar visible : les 4 premiers items de l'ordre partagé. Le reste (+ Déconnexion)
+// va dans le menu "Plus", en conservant le même ordre.
+const BAR_SLOTS = 4
 
-export default function BottomNav({ role = 'owner', canManageTeam = false }: Props) {
+export default function BottomNav({ role = 'owner' }: Props) {
   const pathname = usePathname()
   const router   = useRouter()
   const [open, setOpen] = useState(false)
@@ -35,20 +28,9 @@ export default function BottomNav({ role = 'owner', canManageTeam = false }: Pro
     router.push('/auth/login')
   }
 
-  const isPartner = role === 'partner'
-
-  const menuItems = [
-    ...(canManageTeam ? [
-      { href: '/dashboard/finance',  icon: Receipt,     label: 'Finance'     },
-      { href: '/dashboard/equipe',   icon: UsersRound,  label: 'Équipe'      },
-    ] : []),
-    ...(role !== 'owner' ? [
-      { href: '/dashboard/mon-espace', icon: UserCircle, label: 'Mon espace' },
-    ] : []),
-    ...(!isPartner ? [
-      { href: '/settings',           icon: Settings,    label: 'Paramètres'  },
-    ] : []),
-  ]
+  const navItems  = buildNav(role)
+  const barItems  = navItems.slice(0, BAR_SLOTS)
+  const menuItems = navItems.slice(BAR_SLOTS)
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
@@ -57,7 +39,7 @@ export default function BottomNav({ role = 'owner', canManageTeam = false }: Pro
     <>
       {/* Bottom bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex md:hidden bg-white border-t border-gray-100 safe-area-inset-bottom">
-        {NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+        {barItems.map(({ href, icon: Icon, label }) => (
           <Link
             key={href}
             href={href}
@@ -72,16 +54,18 @@ export default function BottomNav({ role = 'owner', canManageTeam = false }: Pro
         ))}
 
         {/* Menu button */}
-        <button
-          onClick={() => setOpen(true)}
-          className={cn(
-            'flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors',
-            open ? 'text-auchu-600' : 'text-gray-400'
-          )}
-        >
-          <MoreHorizontal className="w-5 h-5" />
-          Menu
-        </button>
+        {menuItems.length > 0 && (
+          <button
+            onClick={() => setOpen(true)}
+            className={cn(
+              'flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors',
+              open ? 'text-auchu-600' : 'text-gray-400'
+            )}
+          >
+            <MoreHorizontal className="w-5 h-5" />
+            Menu
+          </button>
+        )}
       </nav>
 
       {/* Bottom sheet overlay */}

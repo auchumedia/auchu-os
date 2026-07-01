@@ -35,7 +35,7 @@ export default async function DashboardPage() {
       value: contenuRes.count ?? 0,
       icon: FileText,
       color: 'text-purple-600 bg-purple-50',
-      href: '/dashboard/calendrier',
+      href: '/dashboard/mon-espace',
     },
     {
       label: 'Factures en attente',
@@ -95,7 +95,7 @@ export default async function DashboardPage() {
         <div className="md:col-span-2 card">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-900">Contenus récents</h2>
-            <Link href="/dashboard/calendrier" className="text-xs text-auchu-600 hover:underline">
+            <Link href="/dashboard/mon-espace" className="text-xs text-auchu-600 hover:underline">
               Voir tout
             </Link>
           </div>
@@ -104,7 +104,7 @@ export default async function DashboardPage() {
             <div className="text-center py-8">
               <FileText className="w-8 h-8 text-gray-200 mx-auto mb-2" />
               <p className="text-sm text-gray-400">Aucun contenu pour l'instant</p>
-              <Link href="/dashboard/calendrier" className="text-xs text-auchu-600 hover:underline mt-1 inline-block">
+              <Link href="/dashboard/mon-espace" className="text-xs text-auchu-600 hover:underline mt-1 inline-block">
                 Créer du contenu →
               </Link>
             </div>
@@ -139,7 +139,7 @@ export default async function DashboardPage() {
           <h2 className="text-sm font-semibold text-gray-900">Actions rapides</h2>
           {[
             { href: '/dashboard/clients',    label: 'Ajouter un client',    icon: Users        },
-            { href: '/dashboard/calendrier', label: 'Voir le calendrier',   icon: CalendarDays },
+            { href: '/dashboard/mon-espace', label: 'Voir le calendrier',   icon: CalendarDays },
             { href: '/dashboard/finance',    label: 'Créer une facture',    icon: Receipt      },
           ].map((action) => {
             const Icon = action.icon

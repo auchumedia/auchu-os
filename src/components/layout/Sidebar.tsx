@@ -4,56 +4,9 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import {
-  LayoutDashboard, Users, CalendarDays,
-  Receipt, Brain, Settings, LogOut, Zap,
-  UserCircle, UsersRound,
-} from 'lucide-react'
+import { LogOut, Zap } from 'lucide-react'
+import { buildNav } from '@/lib/nav'
 import type { OrgRole } from '@/types'
-
-type NavItem = { href: string; icon: React.ElementType; label: string }
-
-function buildNav(role: OrgRole): { label: string; items: NavItem[] }[] {
-  const isOwnerOrManager = role === 'owner' || role === 'manager'
-  const isEditor         = role === 'editor'
-  const isPartner        = role === 'partner'
-
-  const principal: NavItem[] = [
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
-  ]
-
-  if (isOwnerOrManager || isEditor) {
-    principal.push({ href: '/dashboard/clients',    icon: Users,        label: 'Clients'    })
-    principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier' })
-  } else if (isPartner) {
-    principal.push({ href: '/dashboard/clients',    icon: Users,        label: 'Mes clients' })
-    principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier'  })
-  } else {
-    // viewer
-    principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier' })
-  }
-
-  if (isOwnerOrManager) {
-    principal.push({ href: '/dashboard/finance', icon: Receipt, label: 'Finance' })
-  }
-
-  const team: NavItem[] = []
-  if (isOwnerOrManager) {
-    team.push({ href: '/dashboard/equipe', icon: UsersRound, label: 'Équipe' })
-  }
-  if (role !== 'owner') {
-    team.push({ href: '/dashboard/mon-espace', icon: UserCircle, label: 'Mon espace' })
-  }
-
-  const agents: NavItem[] = (isOwnerOrManager || isPartner) ? [
-    { href: '/agents/productivite', icon: Brain, label: 'Agent productivité' },
-  ] : []
-
-  const sections = [{ label: 'Principal', items: principal }]
-  if (team.length)   sections.push({ label: 'Équipe', items: team })
-  if (agents.length) sections.push({ label: 'Agents IA', items: agents })
-  return sections
-}
 
 export default function Sidebar({
   agencyName, userName, role = 'owner',
@@ -71,7 +24,7 @@ export default function Sidebar({
     router.push('/auth/login')
   }
 
-  const navSections = buildNav(role)
+  const navItems = buildNav(role)
 
   const ROLE_BADGES: Record<OrgRole, { label: string; cls: string }> = {
     owner:   { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700'  },
@@ -108,39 +61,24 @@ export default function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-        {navSections.map((section) => (
-          <div key={section.label}>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-3 mb-1.5">
-              {section.label}
-            </p>
-            <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const Icon = item.icon
-                const isActive =
-                  item.href === '/dashboard'
-                    ? pathname === '/dashboard'
-                    : pathname.startsWith(item.href)
-                return (
-                  <Link key={item.href} href={item.href} className={cn('sidebar-link', isActive && 'active')}>
-                    <Icon className="w-4 h-4 flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+        {navItems.map((item) => {
+          const Icon = item.icon
+          const isActive =
+            item.href === '/dashboard'
+              ? pathname === '/dashboard'
+              : pathname.startsWith(item.href)
+          return (
+            <Link key={item.href} href={item.href} className={cn('sidebar-link', isActive && 'active')}>
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span>{item.label}</span>
+            </Link>
+          )
+        })}
       </nav>
 
       {/* Bottom */}
       <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
-        {role !== 'partner' && (
-          <Link href="/settings" className={cn('sidebar-link', pathname.startsWith('/settings') && 'active')}>
-            <Settings className="w-4 h-4" />
-            <span>Paramètres</span>
-          </Link>
-        )}
         <button onClick={handleLogout} className="sidebar-link w-full text-left text-red-500 hover:bg-red-50 hover:text-red-600">
           <LogOut className="w-4 h-4" />
           <span>Déconnexion</span>

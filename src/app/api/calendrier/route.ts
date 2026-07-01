@@ -28,19 +28,28 @@ export async function GET(req: Request) {
     // owner/manager : pas de filtre user_id (les policies couvrent toute l'org)
     if (member) eventsQuery = eventsQuery.eq('user_id', member)
   } else {
-    eventsQuery = eventsQuery.eq('user_id', ctx.dataOwnerId)
+    // Vue personnelle : les événements appartiennent à l'utilisateur courant
+    // (créés avec user_id = ctx.userId), pas au owner du workspace.
+    eventsQuery = eventsQuery.eq('user_id', ctx.userId)
   }
 
   const { data: rawEvents } = await eventsQuery
 
-  // ── content_pieces avec scheduled_at (vue personnelle uniquement) ──────────
-  const { data: contents } = await supabase
+  // ── content_pieces avec scheduled_at ────────────────────────────────────────
+  let contentsQuery = supabase
     .from('content_pieces')
     .select('id, title, scheduled_at, client:clients(name)')
     .eq('user_id', ctx.dataOwnerId)
     .not('scheduled_at', 'is', null)
     .gte('scheduled_at', start)
     .lte('scheduled_at', end + 'T23:59:59')
+
+  // Vue personnelle : uniquement le contenu assigné à l'utilisateur courant
+  if (!(team && ctx.canManageTeam)) {
+    contentsQuery = contentsQuery.eq('assigned_user_id', ctx.userId)
+  }
+
+  const { data: contents } = await contentsQuery
 
   // ── profiles pour les noms d'équipe ───────────────────────────────────────
   const seen: Record<string, true> = {}
