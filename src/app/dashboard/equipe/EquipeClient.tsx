@@ -8,8 +8,9 @@ import {
   Loader2, Clock, Link2, Trash2, ShieldCheck, Mail, CheckCircle2, RefreshCw,
   UsersRound, Settings2, PenSquare,
 } from 'lucide-react'
-import type { OrgRole } from '@/types'
+import type { OrgRole, OrgPlan } from '@/types'
 import { roleLabel, manageableRoles as getManageableRoles, canManageRole } from '@/lib/roles'
+import { PLAN_LIMITS } from '@/lib/plans'
 
 const APP_URL = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -28,6 +29,8 @@ interface Props {
   currentUserId:          string
   canManageOrgStructure:  boolean
   isTeamChef:             boolean
+  org:                    { id: string; name: string; plan: OrgPlan; max_members: number } | null
+  activeMemberCount:      number
   allMembers:             AllMemberRow[]
   teams:                  TeamData[]
   invitations:            InvitationRow[]
@@ -42,7 +45,7 @@ function memberName(p: Profile | null) {
 }
 
 export default function EquipeClient({
-  role, currentUserId, canManageOrgStructure, isTeamChef, allMembers,
+  role, currentUserId, canManageOrgStructure, isTeamChef, org, activeMemberCount, allMembers,
   teams: initialTeams, invitations: initialInv, unassignedMembers, unassignedClients,
   chefCandidates, workload,
 }: Props) {
@@ -186,8 +189,41 @@ export default function EquipeClient({
     else alert('Erreur lors de la révocation')
   }
 
+  const plan = org ? (PLAN_LIMITS[org.plan] ?? PLAN_LIMITS.free) : null
+
   return (
     <div className="space-y-6">
+
+      {/* ── Plan bar — owner uniquement ───────────────────────────────────────── */}
+      {role === 'owner' && org && plan && (
+        <div className="card flex items-center justify-between gap-4 p-4">
+          <div className="flex items-center gap-3">
+            <span className={cn('px-2.5 py-1 rounded-lg text-sm font-semibold', {
+              'bg-gray-100   text-gray-600':   org.plan === 'free',
+              'bg-blue-100   text-blue-700':   org.plan === 'starter',
+              'bg-auchu-100  text-auchu-700':  org.plan === 'agence',
+              'bg-purple-100 text-purple-700': org.plan === 'pro',
+            })}>
+              {plan.label}
+            </span>
+            <div className="text-sm text-gray-600">
+              <span className="font-semibold">{activeMemberCount}</span>
+              <span className="text-gray-400"> / </span>
+              <span>{org.max_members === 999 ? '∞' : org.max_members}</span>
+              <span className="text-gray-400 ml-1">membres</span>
+            </div>
+            <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-auchu-500 rounded-full transition-all"
+                style={{ width: `${Math.min(100, (activeMemberCount / (org.max_members === 999 ? Math.max(activeMemberCount, 1) : org.max_members)) * 100)}%` }}
+              />
+            </div>
+          </div>
+          <a href="/settings" className="text-xs text-auchu-600 hover:text-auchu-700 font-medium hover:underline">
+            Gérer le plan →
+          </a>
+        </div>
+      )}
 
       {/* ── En-tête d'actions ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-end gap-2">

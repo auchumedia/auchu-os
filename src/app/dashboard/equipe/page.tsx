@@ -40,11 +40,13 @@ export default async function EquipePage() {
   //    RLS des tables enfants (teams/clients) fait le vrai filtrage par équipe.
   //    Sert à enrichir team_memberships (qui n'a pas de FK vers org_members —
   //    ce sont deux tables sœurs référençant seulement auth.users). ──────────
-  const { data: orgMembersAll } = await supabase
+  const { data: orgMembersAll, error: orgMembersErr } = await supabase
     .from('org_members')
     .select('id, user_id, role, status, profile:profiles(full_name, email, avatar_url)')
     .eq('org_id', ctx.org.id)
     .eq('status', 'actif')
+
+  if (orgMembersErr) console.error('[equipe] orgMembersAll query error:', orgMembersErr.code, orgMembersErr.message)
 
   const orgMemberByUserId = new Map((orgMembersAll ?? []).map(m => [m.user_id, m]))
 
@@ -132,6 +134,8 @@ export default async function EquipePage() {
         currentUserId={ctx.userId}
         canManageOrgStructure={ctx.canManageOrgStructure}
         isTeamChef={ctx.isTeamChef}
+        org={ctx.org}
+        activeMemberCount={(orgMembersAll ?? []).length}
         allMembers={ctx.canManageOrgStructure ? ((orgMembersAll ?? []) as any) : []}
         teams={teams as any}
         invitations={(invitesData ?? []) as any}

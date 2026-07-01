@@ -48,7 +48,17 @@ export async function getOrgContext(): Promise<OrgContext | null> {
     console.error('[getOrgContext] erreur membership:', memberErr.code, memberErr.message)
   }
 
-  if (membership) {
+  // Ignore une ligne org_members non-owner si elle pointe vers l'org que
+  // l'utilisateur possède lui-même (artefact de données — ex: une invitation
+  // acceptée par erreur avec son propre compte). Sinon il serait traité comme
+  // simple membre de sa propre agence : isOwner=false, facturation masquée,
+  // etc. La priorité "membership" ne doit s'appliquer qu'à une AUTRE org.
+  const isSelfOwnedAnomaly = !!membership && (membership.org as unknown as OrgContext['org'])?.owner_id === user.id
+  if (isSelfOwnedAnomaly) {
+    console.error('[getOrgContext] org_members anomaly ignorée — user_id:', user.id, '| role:', membership!.role, '| org_id:', (membership!.org as any)?.id, '(cet utilisateur possède cette org mais a aussi une ligne org_members non-owner dessus)')
+  }
+
+  if (membership && !isSelfOwnedAnomaly) {
     const role    = membership.role as OrgRole
     const orgData = membership.org as unknown as OrgContext['org']
     const isDirector = role === 'director'
