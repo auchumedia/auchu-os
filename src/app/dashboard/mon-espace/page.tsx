@@ -2,9 +2,38 @@ import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
 import { redirect }      from 'next/navigation'
 import MonEspaceClient   from './MonEspaceClient'
+import type { ClientCard } from './ClientGallery'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Mon espace' }
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>
+
+// clientIds === null : pas de filtrage (owner/director, tous les clients de
+// l'org). clientIds === [...] : scopé à une équipe (chef_equipe/stratege/
+// monteur, via team_clients).
+async function fetchClientCards(supabase: SupabaseClient, ownerId: string, clientIds: string[] | null): Promise<ClientCard[]> {
+  let query = supabase.from('clients').select('id, name, logo_url, status').eq('user_id', ownerId).order('name')
+  if (clientIds) query = query.in('id', clientIds.length > 0 ? clientIds : ['00000000-0000-0000-0000-000000000000'])
+
+  const { data: clients } = await query
+  const ids = (clients ?? []).map(c => c.id)
+
+  const reviewCounts: Record<string, number> = {}
+  if (ids.length > 0) {
+    const { data: reviewRows } = await supabase
+      .from('content_pieces')
+      .select('client_id')
+      .eq('user_id', ownerId)
+      .eq('status', 'review')
+      .in('client_id', ids)
+    for (const r of reviewRows ?? []) {
+      if (r.client_id) reviewCounts[r.client_id] = (reviewCounts[r.client_id] ?? 0) + 1
+    }
+  }
+
+  return (clients ?? []).map(c => ({ ...c, pendingReview: reviewCounts[c.id] ?? 0 }))
+}
 
 export default async function MonEspacePage() {
   const ctx = await getOrgContext()
@@ -44,6 +73,8 @@ export default async function MonEspacePage() {
       .order('deadline', { ascending: true, nullsFirst: false })
       .limit(15)
 
+    const clientCards = await fetchClientCards(supabase, ownerId, null)
+
     return (
       <MonEspaceClient
         view="owner"
@@ -51,6 +82,7 @@ export default async function MonEspacePage() {
         initialNote={note?.content ?? ''}
         todayTasks={todayTasks as any ?? []}
         toDelegate={toDelegate as any ?? []}
+        clientCards={clientCards}
         initialClients={clientsForModal ?? []}
       />
     )
@@ -83,14 +115,11 @@ export default async function MonEspacePage() {
   if (ctx.isTeamChef) {
     const clientIds = teamClientIds.length > 0 ? teamClientIds : ['00000000-0000-0000-0000-000000000000']
 
-    const [clientsRes, tasksRes, contentsRes] = await Promise.all([
-      supabase.from('clients').select('id, name, company, status').eq('user_id', ownerId).in('id', clientIds),
+    const [clientCards, tasksRes] = await Promise.all([
+      fetchClientCards(supabase, ownerId, teamClientIds),
       supabase.from('projects').select('id, title, status, priority, deadline, assigned_to, client:clients(name)')
         .eq('user_id', ownerId).in('client_id', clientIds).not('status', 'in', '(termine,annule)')
         .order('deadline', { ascending: true, nullsFirst: false }),
-      supabase.from('content_pieces').select('id, title, status, scheduled_at, assigned_user_id, client:clients(name)')
-        .eq('user_id', ownerId).in('client_id', clientIds).not('status', 'in', '(approuve,publie)')
-        .order('scheduled_at', { ascending: true, nullsFirst: false }),
     ])
 
     return (
@@ -98,9 +127,8 @@ export default async function MonEspacePage() {
         view="chef"
         userName={ctx.userName}
         teamMembers={teamMembers as any}
-        teamClients={clientsRes.data ?? []}
+        clientCards={clientCards}
         teamTasks={tasksRes.data as any ?? []}
-        teamContents={contentsRes.data as any ?? []}
         initialClients={clientsForModal ?? []}
       />
     )
@@ -110,8 +138,8 @@ export default async function MonEspacePage() {
   if (ctx.role === 'stratege') {
     const clientIds = teamClientIds.length > 0 ? teamClientIds : ['00000000-0000-0000-0000-000000000000']
 
-    const [clientsRes, myContentsRes, teamContentsRes] = await Promise.all([
-      supabase.from('clients').select('id, name, company, status').eq('user_id', ownerId).in('id', clientIds),
+    const [clientCards, myContentsRes, teamContentsRes] = await Promise.all([
+      fetchClientCards(supabase, ownerId, teamClientIds),
       supabase.from('content_pieces').select('id, title, status, scheduled_at, client:clients(name)')
         .eq('user_id', ownerId).eq('assigned_user_id', userId).not('status', 'in', '(approuve,publie)')
         .order('scheduled_at', { ascending: true, nullsFirst: false }),
@@ -126,7 +154,7 @@ export default async function MonEspacePage() {
         view="stratege"
         userName={ctx.userName}
         teamMembers={teamMembers as any}
-        teamClients={clientsRes.data ?? []}
+        clientCards={clientCards}
         myContents={myContentsRes.data as any ?? []}
         teamContentCalendar={teamContentsRes.data as any ?? []}
         initialClients={clientsForModal ?? []}
@@ -151,11 +179,14 @@ export default async function MonEspacePage() {
     .not('status', 'in', '(termine,annule)')
     .order('deadline', { ascending: true, nullsFirst: false })
 
+  const clientCards = await fetchClientCards(supabase, ownerId, teamClientIds)
+
   return (
     <MonEspaceClient
       view="monteur"
       userName={ctx.userName}
       teamMembers={teamMembers as any}
+      clientCards={clientCards}
       myTasks={myTasks as any ?? []}
       myContents={myContents as any ?? []}
       initialClients={clientsForModal ?? []}

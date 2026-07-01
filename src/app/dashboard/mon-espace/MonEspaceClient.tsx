@@ -4,11 +4,12 @@ import { useState, useRef } from 'react'
 import { formatDate, cn, getInitials } from '@/lib/utils'
 import {
   FileText, Calendar, Clock, CheckCircle, StickyNote,
-  AlertTriangle, Users, Loader2, Check, UsersRound,
+  AlertTriangle, Loader2, Check, UsersRound,
 } from 'lucide-react'
 import type { OrgRole } from '@/types'
 import { roleLabel } from '@/lib/roles'
 import CalendarPanel from './CalendarPanel'
+import ClientGallery, { type ClientCard } from './ClientGallery'
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   idee:         { label: 'Idée',         cls: 'bg-gray-100  text-gray-600'   },
@@ -54,22 +55,22 @@ interface OwnerProps {
   initialNote: string
   todayTasks: ProjectRow[]
   toDelegate: ProjectRow[]
+  clientCards: ClientCard[]
   initialClients: ClientRow[]
 }
 interface ChefProps {
   view: 'chef'
   userName: string
   teamMembers: TeamMemberRow[]
-  teamClients: ClientRow[]
+  clientCards: ClientCard[]
   teamTasks: ProjectRow[]
-  teamContents: ContentRow[]
   initialClients: ClientRow[]
 }
 interface StrategeProps {
   view: 'stratege'
   userName: string
   teamMembers: TeamMemberRow[]
-  teamClients: ClientRow[]
+  clientCards: ClientCard[]
   myContents: ContentRow[]
   teamContentCalendar: ContentRow[]
   initialClients: ClientRow[]
@@ -78,6 +79,7 @@ interface MonteurProps {
   view: 'monteur'
   userName: string
   teamMembers: TeamMemberRow[]
+  clientCards: ClientCard[]
   myTasks: ProjectRow[]
   myContents: ContentRow[]
   initialClients: ClientRow[]
@@ -199,7 +201,7 @@ export default function MonEspaceClient(props: Props) {
 
 // ─── Vue owner / director ──────────────────────────────────────────────────
 
-function OwnerView({ initialNote, todayTasks, toDelegate, initialClients }: OwnerProps) {
+function OwnerView({ initialNote, todayTasks, toDelegate, clientCards, initialClients }: OwnerProps) {
   const [note,   setNote]   = useState(initialNote)
   const [saving, setSaving] = useState(false)
   const [saved,  setSaved]  = useState(true)
@@ -273,6 +275,8 @@ function OwnerView({ initialNote, todayTasks, toDelegate, initialClients }: Owne
         )}
       </section>
 
+      <ClientGallery title="Tous les clients" clients={clientCards} />
+
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Calendar className="w-4 h-4 text-auchu-500" />
@@ -286,14 +290,14 @@ function OwnerView({ initialNote, todayTasks, toDelegate, initialClients }: Owne
 
 // ─── Vue chef_equipe ────────────────────────────────────────────────────────
 
-function ChefView({ teamMembers, teamClients, teamTasks, teamContents, initialClients }: ChefProps) {
+function ChefView({ teamMembers, clientCards, teamTasks, initialClients }: ChefProps) {
   const nameByUserId = new Map(teamMembers.map(m => [m.user_id, memberName(m.profile)]))
 
   return (
     <>
       <div className="grid grid-cols-3 gap-4">
         <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-900">{teamMembers.length}</p><p className="text-xs text-gray-500 mt-0.5">Membres</p></div>
-        <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-900">{teamClients.length}</p><p className="text-xs text-gray-500 mt-0.5">Clients</p></div>
+        <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-900">{clientCards.length}</p><p className="text-xs text-gray-500 mt-0.5">Clients</p></div>
         <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-900">{teamTasks.length}</p><p className="text-xs text-gray-500 mt-0.5">Tâches en cours</p></div>
       </div>
 
@@ -311,14 +315,7 @@ function ChefView({ teamMembers, teamClients, teamTasks, teamContents, initialCl
         )}
       </section>
 
-      <section>
-        <div className="flex items-center gap-2 mb-4"><FileText className="w-4 h-4 text-auchu-500" /><h2 className="font-semibold text-gray-900">Contenus de l'équipe</h2></div>
-        {teamContents.length === 0 ? (
-          <div className="card text-center py-8"><CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" /><p className="text-sm text-gray-400">Aucun contenu en cours.</p></div>
-        ) : (
-          <ContentTable contents={teamContents} assigneeNameFor={id => nameByUserId.get(id ?? '') ?? '—'} />
-        )}
-      </section>
+      <ClientGallery title="Mes clients" clients={clientCards} />
 
       <section>
         <div className="flex items-center gap-2 mb-4"><Calendar className="w-4 h-4 text-auchu-500" /><h2 className="font-semibold text-gray-900">Calendrier de l'équipe</h2></div>
@@ -330,30 +327,16 @@ function ChefView({ teamMembers, teamClients, teamTasks, teamContents, initialCl
 
 // ─── Vue stratège ───────────────────────────────────────────────────────────
 
-function StrategeView({ teamMembers, teamClients, myContents, teamContentCalendar, initialClients }: StrategeProps) {
+function StrategeView({ teamMembers, clientCards, myContents, teamContentCalendar, initialClients }: StrategeProps) {
   return (
     <>
       <div className="grid grid-cols-3 gap-4">
-        <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-900">{teamClients.length}</p><p className="text-xs text-gray-500 mt-0.5">Clients de l'équipe</p></div>
+        <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-900">{clientCards.length}</p><p className="text-xs text-gray-500 mt-0.5">Clients de l'équipe</p></div>
         <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-900">{myContents.length}</p><p className="text-xs text-gray-500 mt-0.5">Mes livrables</p></div>
         <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-900">{teamMembers.length}</p><p className="text-xs text-gray-500 mt-0.5">Membres de l'équipe</p></div>
       </div>
 
-      <section>
-        <div className="flex items-center gap-2 mb-4"><Users className="w-4 h-4 text-auchu-500" /><h2 className="font-semibold text-gray-900">Clients de l'équipe</h2></div>
-        {teamClients.length === 0 ? (
-          <div className="card text-center py-8"><p className="text-sm text-gray-400">Aucun client assigné à votre équipe pour l'instant.</p></div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {teamClients.map(c => (
-              <div key={c.id} className="card p-4">
-                <p className="font-medium text-gray-900 text-sm truncate">{c.name}</p>
-                {c.company && <p className="text-xs text-gray-400 mt-0.5 truncate">{c.company}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <ClientGallery title="Mes clients" clients={clientCards} />
 
       <section>
         <div className="flex items-center gap-2 mb-4"><FileText className="w-4 h-4 text-auchu-500" /><h2 className="font-semibold text-gray-900">Mes livrables</h2></div>
@@ -393,7 +376,7 @@ function StrategeView({ teamMembers, teamClients, myContents, teamContentCalenda
 
 // ─── Vue monteur ────────────────────────────────────────────────────────────
 
-function MonteurView({ teamMembers, myTasks, myContents, initialClients }: MonteurProps) {
+function MonteurView({ teamMembers, clientCards, myTasks, myContents, initialClients }: MonteurProps) {
   return (
     <>
       <div className="grid grid-cols-3 gap-4">
@@ -424,6 +407,8 @@ function MonteurView({ teamMembers, myTasks, myContents, initialClients }: Monte
         <div className="flex items-center gap-2 mb-4"><UsersRound className="w-4 h-4 text-auchu-500" /><h2 className="font-semibold text-gray-900">Mon équipe</h2></div>
         <TeamRoster members={teamMembers} />
       </section>
+
+      <ClientGallery title="Mes clients" clients={clientCards} />
 
       <section>
         <div className="flex items-center gap-2 mb-4"><Calendar className="w-4 h-4 text-auchu-500" /><h2 className="font-semibold text-gray-900">Mon calendrier</h2></div>
