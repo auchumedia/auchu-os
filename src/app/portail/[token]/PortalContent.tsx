@@ -222,6 +222,10 @@ export default function PortalContent({ content: initial, events, token, primary
   // Contenus à approuver
   const toReview = items.filter(c => c.status === 'review' || c.status === 'pret')
 
+  // "Tous les contenus" ne montre que ce qui est prêt pour le client — pas les
+  // brouillons, idées ou contenus en cours de production côté agence.
+  const readyItems = items.filter(c => c.status === 'pret')
+
   return (
     <div className="space-y-10">
 
@@ -289,13 +293,13 @@ export default function PortalContent({ content: initial, events, token, primary
             </button>
           </div>
         </div>
-        {items.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">Aucun contenu pour l'instant.</p>
+        {readyItems.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">Aucun contenu prêt pour l'instant.</p>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* Mobile card list */}
             <div className="md:hidden divide-y divide-gray-50">
-              {items.map(c => {
+              {readyItems.map(c => {
                 const sc = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.idee
                 return (
                   <button
@@ -336,7 +340,7 @@ export default function PortalContent({ content: initial, events, token, primary
                 </tr>
               </thead>
               <tbody>
-                {items.map(c => {
+                {readyItems.map(c => {
                   const sc = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.idee
                   return (
                     <tr
