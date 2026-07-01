@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Users, CalendarDays, Brain,
-  MoreHorizontal, FileText, Receipt, UsersRound,
+  MoreHorizontal, Receipt, UsersRound,
   UserCircle, Settings, LogOut, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -38,7 +38,6 @@ export default function BottomNav({ role = 'owner', canManageTeam = false }: Pro
   const isPartner = role === 'partner'
 
   const menuItems = [
-    { href: '/dashboard/contenu',    icon: FileText,    label: 'Contenu'     },
     ...(canManageTeam ? [
       { href: '/dashboard/finance',  icon: Receipt,     label: 'Finance'     },
       { href: '/dashboard/equipe',   icon: UsersRound,  label: 'Équipe'      },

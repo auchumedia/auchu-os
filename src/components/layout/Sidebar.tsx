@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard, Users, FileText, CalendarDays,
+  LayoutDashboard, Users, CalendarDays,
   Receipt, Brain, Settings, LogOut, Zap,
   UserCircle, UsersRound,
 } from 'lucide-react'
@@ -24,11 +24,9 @@ function buildNav(role: OrgRole): { label: string; items: NavItem[] }[] {
 
   if (isOwnerOrManager || isEditor) {
     principal.push({ href: '/dashboard/clients',    icon: Users,        label: 'Clients'    })
-    principal.push({ href: '/dashboard/contenu',    icon: FileText,     label: 'Contenu'    })
     principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier' })
   } else if (isPartner) {
     principal.push({ href: '/dashboard/clients',    icon: Users,        label: 'Mes clients' })
-    principal.push({ href: '/dashboard/contenu',    icon: FileText,     label: 'Contenu'     })
     principal.push({ href: '/dashboard/calendrier', icon: CalendarDays, label: 'Calendrier'  })
   } else {
     // viewer
