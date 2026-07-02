@@ -21,6 +21,12 @@ export async function createClient() {
           }
         },
       },
+      global: {
+        // Same fix as src/lib/supabase/anon.ts — force every PostgREST call
+        // through this client to bypass Next.js's Data Cache, so a page load
+        // right after a write always reads the value that was just written.
+        fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, cache: 'no-store' }),
+      },
     }
   )
 }
