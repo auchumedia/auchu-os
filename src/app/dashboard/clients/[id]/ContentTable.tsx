@@ -318,6 +318,7 @@ function ContentPanel({
   const [description, setDescription] = useState(item.description ?? '')
   const [script,      setScript]      = useState(item.script ?? '')
   const [status,      setStatus]      = useState(item.status)
+  const [statusError, setStatusError] = useState<string | null>(null)
   const [refs,        setRefs]        = useState<ReferenceLink[]>(item.reference_links ?? [])
 
   const titleStatus = useAutoSave(title,       v => onPatch({ title: v }).then(() => {}))
@@ -328,8 +329,16 @@ function ContentPanel({
   const anyStatus = [titleStatus, descStatus, scriptStatus].find(s => s !== 'idle') ?? 'idle'
 
   const changeStatus = async (s: string) => {
-    setStatus(s as ContentPiece['status'])
-    await onPatch({ status: s as ContentPiece['status'] })
+    const previous = status
+    setStatus(s as ContentPiece['status']) // affichage optimiste
+    setStatusError(null)
+    const ok = await onPatch({ status: s as ContentPiece['status'] })
+    if (!ok) {
+      // Le PATCH a échoué (RLS, réseau…) — annule l'affichage optimiste au
+      // lieu de laisser l'UI montrer un statut qui n'a jamais été sauvegardé.
+      setStatus(previous)
+      setStatusError('Le changement de statut n’a pas pu être enregistré. Réessaie.')
+    }
   }
 
   const updateRefs = async (newRefs: ReferenceLink[]) => {
@@ -387,6 +396,12 @@ function ContentPanel({
           )
         })}
       </div>
+
+      {statusError && (
+        <div className="px-4 sm:px-8 py-2 bg-red-50 border-b border-red-100 text-sm text-red-600 flex-shrink-0">
+          {statusError}
+        </div>
+      )}
 
       {/* Body — colonne centrée, style Notion */}
       <div className="flex-1 overflow-y-auto">
