@@ -79,7 +79,15 @@ export async function POST(
     .from('client-documents')
     .upload(path, buffer, { contentType: file.type })
 
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+  if (uploadError) {
+    console.error(
+      '[api/clients/documents POST] échec upload storage —',
+      'client_id:', params.id, '| path:', path,
+      '| user:', ctx.userId, '| role:', ctx.role, '| dataOwnerId:', ctx.dataOwnerId,
+      '| error:', uploadError.message,
+    )
+    return NextResponse.json({ error: uploadError.message }, { status: 500 })
+  }
 
   const { data, error } = await supabase
     .from('client_documents')
@@ -95,8 +103,17 @@ export async function POST(
     .single()
 
   if (error) {
+    console.error(
+      '[api/clients/documents POST] échec insert DB —',
+      'client_id:', params.id, '| path:', path,
+      '| supabase error code:', error.code, '| message:', error.message,
+      '| details:', error.details, '| hint:', error.hint,
+    )
     await supabase.storage.from('client-documents').remove([path])
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message, code: error.code, details: error.details, hint: error.hint },
+      { status: 500 }
+    )
   }
   return NextResponse.json({ data }, { status: 201 })
 }

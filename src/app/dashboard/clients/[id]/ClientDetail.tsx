@@ -172,7 +172,13 @@ export default function ClientDetail({
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
-  const patch = useCallback(async (fields: Partial<Client>) => {
+  const [patchError, setPatchError] = useState<string | null>(null)
+
+  // Retourne le client mis à jour en cas de succès, ou null en cas d'échec —
+  // les appelants doivent vérifier le retour avant de considérer une
+  // sauvegarde comme acquise (ex: ne pas quitter le mode édition sur échec).
+  const patch = useCallback(async (fields: Partial<Client>): Promise<Client | null> => {
+    setPatchError(null)
     const res = await fetch(`/api/clients/${client.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -183,6 +189,10 @@ export default function ClientDetail({
       setClient(data)
       return data
     }
+    const json = await res.json().catch(() => null)
+    console.error('[ClientDetail] patch échoué —', 'fields:', Object.keys(fields), '| status:', res.status, '| body:', json)
+    setPatchError(json?.error ?? `Erreur ${res.status} lors de la sauvegarde`)
+    return null
   }, [client.id])
 
   const saveColor = (field: 'brand_primary' | 'brand_secondary', value: string) => {
@@ -218,7 +228,7 @@ export default function ClientDetail({
 
   const saveOverview = async () => {
     setSaving('overview')
-    await patch({
+    const result = await patch({
       name:           editForm.name,
       email:          editForm.email || null,
       phone:          editForm.phone || null,
@@ -231,7 +241,7 @@ export default function ClientDetail({
       platforms:      editForm.platforms,
     })
     setSaving(null)
-    setEditing(false)
+    if (result) setEditing(false) // reste en édition si la sauvegarde a échoué
   }
 
   // ─── Livrables du mois ───────────────────────────────────────────────────────
@@ -260,20 +270,23 @@ export default function ClientDetail({
 
   const saveLinks = async () => {
     setSaving('links')
-    await patch({
+    const result = await patch({
       link_instagram: linksForm.link_instagram || null,
       link_facebook:  linksForm.link_facebook  || null,
       link_tiktok:    linksForm.link_tiktok    || null,
       link_linkedin:  linksForm.link_linkedin  || null,
     })
     setSaving(null)
-    setEditingLinks(false)
+    if (result) setEditingLinks(false) // reste en édition si la sauvegarde a échoué
   }
 
   // ─── Accès plateformes ───────────────────────────────────────────────────────
 
+  const [accessError, setAccessError] = useState<string | null>(null)
+
   const saveAccess = async () => {
     setSavingAccess(true)
+    setAccessError(null)
     const res = await fetch(`/api/clients/${client.id}/access`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -282,9 +295,13 @@ export default function ClientDetail({
     if (res.ok) {
       const { data } = await res.json()
       setPlatformAccess(data)
+      setEditingAccess(false) // seulement en cas de succès
+    } else {
+      const json = await res.json().catch(() => null)
+      console.error('[ClientDetail] access patch échoué —', 'status:', res.status, '| body:', json)
+      setAccessError(json?.error ?? `Erreur ${res.status} lors de la sauvegarde`)
     }
     setSavingAccess(false)
-    setEditingAccess(false)
   }
 
   const togglePasswordVisibility = (key: string) =>
@@ -541,7 +558,13 @@ export default function ClientDetail({
 
       {/* ─── Tab: Vue d'ensemble ─────────────────────────────────────────────── */}
       {tab === 'overview' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="space-y-4">
+          {patchError && (
+            <div className="card bg-red-50 border-red-200 py-3 text-sm text-red-600">
+              {patchError}
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div className="md:col-span-2 space-y-5">
             <div className="card">
               <div className="flex items-center justify-between mb-4">
@@ -784,6 +807,10 @@ export default function ClientDetail({
                   )}
                 </div>
 
+                {accessError && (
+                  <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3">{accessError}</p>
+                )}
+
                 <div className="space-y-3">
                   {ACCESS_PLATFORMS.map(p => {
                     const emailKey    = `${p.key}_email`    as keyof typeof accessForm
@@ -962,6 +989,7 @@ export default function ClientDetail({
                 <p className="text-xs text-gray-400 pt-1">Modifiables via les pastilles dans le header</p>
               </div>
             </div>
+          </div>
           </div>
         </div>
       )}
