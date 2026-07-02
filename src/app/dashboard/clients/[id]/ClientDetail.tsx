@@ -460,18 +460,27 @@ export default function ClientDetail({
 
             {/* Right — colors + portal */}
             <div className="flex flex-col items-end gap-3 flex-shrink-0">
-              {/* Color pickers */}
+              {/* Color pickers — lecture seule pour les rôles non-owner/director */}
               <div className="flex items-center gap-3">
-                <ColorPicker
-                  label="Couleur principale"
-                  value={client.brand_primary}
-                  onChange={v => saveColor('brand_primary', v)}
-                />
-                <ColorPicker
-                  label="Couleur secondaire"
-                  value={client.brand_secondary}
-                  onChange={v => saveColor('brand_secondary', v)}
-                />
+                {canManageSensitive ? (
+                  <>
+                    <ColorPicker
+                      label="Couleur principale"
+                      value={client.brand_primary}
+                      onChange={v => saveColor('brand_primary', v)}
+                    />
+                    <ColorPicker
+                      label="Couleur secondaire"
+                      value={client.brand_secondary}
+                      onChange={v => saveColor('brand_secondary', v)}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <div className="w-6 h-6 rounded-md border-2 border-white shadow-sm" style={{ background: client.brand_primary }} title="Couleur principale" />
+                    <div className="w-6 h-6 rounded-md border-2 border-white shadow-sm" style={{ background: client.brand_secondary }} title="Couleur secondaire" />
+                  </>
+                )}
               </div>
 
               {/* Portal — inline URL when active */}
@@ -565,28 +574,36 @@ export default function ClientDetail({
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div className="md:col-span-2 space-y-5">
+          <div className={cn(canManageSensitive ? 'md:col-span-2' : 'md:col-span-3', 'space-y-5')}>
             <div className="card">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-gray-900">Informations</h2>
-                {editing ? (
-                  <div className="flex gap-2">
-                    <button onClick={() => setEditing(false)} className="btn-secondary py-1.5 text-sm gap-1">
-                      <X className="w-3.5 h-3.5" /> Annuler
+                {canManageSensitive && (
+                  editing ? (
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditing(false)} className="btn-secondary py-1.5 text-sm gap-1">
+                        <X className="w-3.5 h-3.5" /> Annuler
+                      </button>
+                      <button onClick={saveOverview} disabled={saving === 'overview'} className="btn-primary py-1.5 text-sm gap-1 disabled:opacity-50">
+                        {saving === 'overview' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        Sauvegarder
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setEditing(true)} className="btn-secondary py-1.5 text-sm gap-1">
+                      <Pencil className="w-3.5 h-3.5" /> Modifier
                     </button>
-                    <button onClick={saveOverview} disabled={saving === 'overview'} className="btn-primary py-1.5 text-sm gap-1 disabled:opacity-50">
-                      {saving === 'overview' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                      Sauvegarder
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => setEditing(true)} className="btn-secondary py-1.5 text-sm gap-1">
-                    <Pencil className="w-3.5 h-3.5" /> Modifier
-                  </button>
+                  )
                 )}
               </div>
 
-              {editing ? (
+              {!canManageSensitive ? (
+                <div className="space-y-3">
+                  <InfoRow label="Nom"        value={client.name} />
+                  <InfoRow label="Statut"     value={{ actif: 'Actif', inactif: 'Inactif', prospect: 'Prospect' }[client.status]} />
+                  <InfoRow label="Plateformes" value={client.platforms?.length > 0 ? client.platforms.map(p => PLATFORM_LABELS[p] ?? p).join(', ') : null} />
+                </div>
+              ) : editing ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -686,35 +703,43 @@ export default function ClientDetail({
                 <h2 className="text-sm font-semibold text-gray-900">Livrables du mois</h2>
                 {savingDeliverables && <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="label">Vidéo organique</label>
-                  <input
-                    type="number" min={0}
-                    value={deliverables.video_organique}
-                    onChange={e => handleDeliverableChange('video_organique', Number(e.target.value))}
-                    className="input text-sm"
-                  />
+              {canManageSensitive ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="label">Vidéo organique</label>
+                    <input
+                      type="number" min={0}
+                      value={deliverables.video_organique}
+                      onChange={e => handleDeliverableChange('video_organique', Number(e.target.value))}
+                      className="input text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Story</label>
+                    <input
+                      type="number" min={0}
+                      value={deliverables.story}
+                      onChange={e => handleDeliverableChange('story', Number(e.target.value))}
+                      className="input text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Ad</label>
+                    <input
+                      type="number" min={0}
+                      value={deliverables.ad}
+                      onChange={e => handleDeliverableChange('ad', Number(e.target.value))}
+                      className="input text-sm"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="label">Story</label>
-                  <input
-                    type="number" min={0}
-                    value={deliverables.story}
-                    onChange={e => handleDeliverableChange('story', Number(e.target.value))}
-                    className="input text-sm"
-                  />
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <InfoRow label="Vidéo organique" value={String(deliverables.video_organique)} />
+                  <InfoRow label="Story"           value={String(deliverables.story)} />
+                  <InfoRow label="Ad"              value={String(deliverables.ad)} />
                 </div>
-                <div>
-                  <label className="label">Ad</label>
-                  <input
-                    type="number" min={0}
-                    value={deliverables.ad}
-                    onChange={e => handleDeliverableChange('ad', Number(e.target.value))}
-                    className="input text-sm"
-                  />
-                </div>
-              </div>
+              )}
               <p className="text-sm text-gray-500 mt-3">
                 Total : <span className="font-semibold text-gray-900">{deliverablesTotal}</span> livrable{deliverablesTotal !== 1 ? 's' : ''} / mois
               </p>
@@ -725,24 +750,26 @@ export default function ClientDetail({
             <div className="card">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-gray-900">Liens plateformes</h2>
-                {editingLinks ? (
-                  <div className="flex gap-2">
-                    <button onClick={() => setEditingLinks(false)} className="btn-secondary py-1.5 text-sm gap-1">
-                      <X className="w-3.5 h-3.5" /> Annuler
+                {canManageSensitive && (
+                  editingLinks ? (
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingLinks(false)} className="btn-secondary py-1.5 text-sm gap-1">
+                        <X className="w-3.5 h-3.5" /> Annuler
+                      </button>
+                      <button onClick={saveLinks} disabled={saving === 'links'} className="btn-primary py-1.5 text-sm gap-1 disabled:opacity-50">
+                        {saving === 'links' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        Sauvegarder
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setEditingLinks(true)} className="btn-secondary py-1.5 text-sm gap-1">
+                      <Pencil className="w-3.5 h-3.5" /> Modifier
                     </button>
-                    <button onClick={saveLinks} disabled={saving === 'links'} className="btn-primary py-1.5 text-sm gap-1 disabled:opacity-50">
-                      {saving === 'links' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                      Sauvegarder
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => setEditingLinks(true)} className="btn-secondary py-1.5 text-sm gap-1">
-                    <Pencil className="w-3.5 h-3.5" /> Modifier
-                  </button>
+                  )
                 )}
               </div>
 
-              {editingLinks ? (
+              {canManageSensitive && editingLinks ? (
                 <div className="space-y-3">
                   {LINK_PLATFORMS.map(p => (
                     <div key={p.key}>
@@ -953,43 +980,45 @@ export default function ClientDetail({
             )}
           </div>
 
-          <div className="space-y-4">
-            <div className="card">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-gray-900">Notes internes</h2>
-                {saving === 'notes' && <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />}
+          {canManageSensitive && (
+            <div className="space-y-4">
+              <div className="card">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-gray-900">Notes internes</h2>
+                  {saving === 'notes' && <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />}
+                </div>
+                <textarea
+                  value={notesValue}
+                  onChange={e => handleNotesChange(e.target.value)}
+                  placeholder="Notes privées — jamais visibles dans le portail client..."
+                  rows={10}
+                  className="input text-sm resize-none w-full"
+                />
+                <p className="text-xs text-gray-400 mt-1.5">Sauvegarde automatique</p>
               </div>
-              <textarea
-                value={notesValue}
-                onChange={e => handleNotesChange(e.target.value)}
-                placeholder="Notes privées — jamais visibles dans le portail client..."
-                rows={10}
-                className="input text-sm resize-none w-full"
-              />
-              <p className="text-xs text-gray-400 mt-1.5">Sauvegarde automatique</p>
-            </div>
 
-            <div className="card">
-              <h2 className="text-sm font-semibold text-gray-900 mb-3">Couleurs de marque</h2>
-              <div className="space-y-2.5">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg border border-gray-200 flex-shrink-0" style={{ background: client.brand_primary }} />
-                  <div>
-                    <p className="text-xs font-medium text-gray-700">Principale</p>
-                    <p className="text-xs text-gray-400 font-mono">{client.brand_primary}</p>
+              <div className="card">
+                <h2 className="text-sm font-semibold text-gray-900 mb-3">Couleurs de marque</h2>
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg border border-gray-200 flex-shrink-0" style={{ background: client.brand_primary }} />
+                    <div>
+                      <p className="text-xs font-medium text-gray-700">Principale</p>
+                      <p className="text-xs text-gray-400 font-mono">{client.brand_primary}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg border border-gray-200 flex-shrink-0" style={{ background: client.brand_secondary }} />
-                  <div>
-                    <p className="text-xs font-medium text-gray-700">Secondaire</p>
-                    <p className="text-xs text-gray-400 font-mono">{client.brand_secondary}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg border border-gray-200 flex-shrink-0" style={{ background: client.brand_secondary }} />
+                    <div>
+                      <p className="text-xs font-medium text-gray-700">Secondaire</p>
+                      <p className="text-xs text-gray-400 font-mono">{client.brand_secondary}</p>
+                    </div>
                   </div>
+                  <p className="text-xs text-gray-400 pt-1">Modifiables via les pastilles dans le header</p>
                 </div>
-                <p className="text-xs text-gray-400 pt-1">Modifiables via les pastilles dans le header</p>
               </div>
             </div>
-          </div>
+          )}
           </div>
         </div>
       )}
