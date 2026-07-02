@@ -103,8 +103,6 @@ export default function PortalContent({ content: initial, events, token, primary
   const [selected, setSelected] = useState<ContentPiece | null>(null)
   const [notes, setNotes]       = useState('')
   const [saving, setSaving]     = useState<string | null>(null)
-  const [lastSync, setLastSync] = useState<Date | null>(null)
-  const [mounted, setMounted]   = useState(false)
 
   const gradient = `linear-gradient(135deg, ${primary}, ${secondary})`
 
@@ -125,7 +123,6 @@ export default function PortalContent({ content: initial, events, token, primary
     console.log('[portail] items received:', json.data?.length ?? 0, '| count:', json.count)
     const fresh: ContentPiece[] = json.data ?? []
     setItems(fresh)
-    setLastSync(new Date())
     // Sync the open panel: functional update avoids capturing `selected` in closure
     setSelected(prev => {
       if (!prev) return null
@@ -134,7 +131,6 @@ export default function PortalContent({ content: initial, events, token, primary
   }, [token])
 
   useEffect(() => {
-    setMounted(true)
     fetchContent()
     const interval = setInterval(fetchContent, 10_000)
     return () => clearInterval(interval)
@@ -221,158 +217,58 @@ export default function PortalContent({ content: initial, events, token, primary
   const today      = new Date()
   const isThisMonth = today.getFullYear() === year && today.getMonth() === month
 
-  // Contenus à approuver
-  const toReview = items.filter(c => c.status === 'review' || c.status === 'pret')
-
-  // "Tous les contenus" ne montre que ce qui est prêt pour le client — pas les
-  // brouillons, idées ou contenus en cours de production côté agence.
-  const readyItems = items.filter(c => c.status === 'pret')
+  // Contenus à approuver — seule section de contenu affichée au client, ne
+  // montre que ce qui est prêt pour son approbation (pas les brouillons,
+  // idées ou contenus en cours de production côté agence).
+  const toReview = items.filter(c => c.status === 'pret')
 
   return (
     <div className="space-y-10">
 
       {/* ── Contenus à approuver ────────────────────────────────────────────── */}
-      {toReview.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: gradient }}>
-              <ThumbsUp className="w-4 h-4 text-white" />
-            </div>
-            <h2 className="font-semibold text-gray-900">
-              Contenus à approuver
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: gradient }}>
+            <ThumbsUp className="w-4 h-4 text-white" />
+          </div>
+          <h2 className="font-semibold text-gray-900">
+            Contenus à approuver
+            {toReview.length > 0 && (
               <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
                 {toReview.length}
               </span>
-            </h2>
-          </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm text-amber-800">
-            Ces contenus sont prêts pour votre approbation. Cliquez pour voir le détail et laisser vos commentaires.
-          </div>
-          <div className="space-y-2">
-            {toReview.map(c => (
-              <button
-                key={c.id}
-                onClick={() => openItem(c)}
-                className="w-full bg-white rounded-xl border border-amber-200 px-4 py-3 flex items-center justify-between hover:shadow-sm transition-shadow text-left"
-              >
-                <div>
-                  <p className="font-medium text-gray-900 text-sm">{c.title}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', PLATFORM_COLORS[c.platform] ?? 'bg-gray-100 text-gray-600')}>
-                      {PLATFORM_LABELS[c.platform] ?? c.platform}
-                    </span>
-                    <span className="text-xs text-gray-400">{TYPE_LABELS[c.type] ?? c.type}</span>
-                    {c.client_notes && <MessageSquare className="w-3 h-3 text-amber-400" />}
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Tous les contenus ───────────────────────────────────────────────── */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: gradient }}>
-              <MessageSquare className="w-4 h-4 text-white" />
-            </div>
-            <h2 className="font-semibold text-gray-900">Tous les contenus</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            {mounted && lastSync && (
-              <span className="text-xs text-gray-400">
-                Mis à jour {lastSync.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              </span>
             )}
-            <button
-              onClick={fetchContent}
-              className="text-xs px-2.5 py-1 min-h-[40px] rounded-lg border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors"
-            >
-              ↻ Rafraîchir
-            </button>
-          </div>
+          </h2>
         </div>
-        {readyItems.length === 0 ? (
+        {toReview.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">Aucun contenu prêt pour l'instant.</p>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {/* Mobile card list */}
-            <div className="md:hidden divide-y divide-gray-50">
-              {readyItems.map(c => {
-                const sc = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.idee
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => openItem(c)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-medium text-gray-900 text-sm truncate">{c.title}</p>
-                          {c.client_notes && <MessageSquare className="w-3 h-3 text-amber-400 flex-shrink-0" />}
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', PLATFORM_COLORS[c.platform] ?? 'bg-gray-100 text-gray-600')}>
-                            {PLATFORM_LABELS[c.platform] ?? c.platform}
-                          </span>
-                          <span className="text-xs text-gray-400">{TYPE_LABELS[c.type] ?? c.type}</span>
-                        </div>
-                      </div>
-                      <div className="flex-shrink-0 flex flex-col items-end gap-1">
-                        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', sc.cls)}>{sc.label}</span>
-                        <ChevronRight className="w-4 h-4 text-gray-300" />
-                      </div>
-                    </div>
-                  </button>
-                )
-              })}
+          <>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm text-amber-800">
+              Ces contenus sont prêts pour votre approbation. Cliquez pour voir le détail et laisser vos commentaires.
             </div>
-            {/* Desktop table */}
-            <table className="w-full text-sm hidden md:table">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-4 py-3">Titre</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-4 py-3">Type</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-4 py-3">Plateforme</th>
-                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-4 py-3">Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                {readyItems.map(c => {
-                  const sc = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.idee
-                  return (
-                    <tr
-                      key={c.id}
-                      className="border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => openItem(c)}
-                    >
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        <div className="flex items-center gap-1.5">
-                          {c.title}
-                          {c.client_notes && <MessageSquare className="w-3 h-3 text-amber-400 flex-shrink-0" />}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{TYPE_LABELS[c.type] ?? c.type}</td>
-                      <td className="px-4 py-3">
-                        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', PLATFORM_COLORS[c.platform] ?? 'bg-gray-100 text-gray-600')}>
-                          {PLATFORM_LABELS[c.platform] ?? c.platform}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', sc.cls)}>
-                          {sc.label}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+            <div className="space-y-2">
+              {toReview.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => openItem(c)}
+                  className="w-full bg-white rounded-xl border border-amber-200 px-4 py-3 flex items-center justify-between hover:shadow-sm transition-shadow text-left"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900 text-sm">{c.title}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', PLATFORM_COLORS[c.platform] ?? 'bg-gray-100 text-gray-600')}>
+                        {PLATFORM_LABELS[c.platform] ?? c.platform}
+                      </span>
+                      <span className="text-xs text-gray-400">{TYPE_LABELS[c.type] ?? c.type}</span>
+                      {c.client_notes && <MessageSquare className="w-3 h-3 text-amber-400" />}
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </section>
 
