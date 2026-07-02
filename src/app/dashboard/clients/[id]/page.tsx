@@ -73,6 +73,20 @@ export default async function ClientPage({ params }: { params: { id: string } })
     teamMembers = [{ id: ctx.userId, name: ctx.userName || ctx.userEmail }]
   }
 
+  // ── Accès plateformes (sensible) — chargé uniquement pour owner/director,
+  //    jamais présent dans les props d'un rôle non autorisé. ──────────────────
+  const canManageSensitive = ctx.isOwner || ctx.isDirector
+  let platformAccess = null
+  if (canManageSensitive) {
+    const { data } = await supabase
+      .from('client_platform_access')
+      .select('*')
+      .eq('client_id', params.id)
+      .eq('user_id', ownerId)
+      .maybeSingle()
+    platformAccess = data
+  }
+
   return (
     <ClientDetail
       client={client}
@@ -80,6 +94,8 @@ export default async function ClientPage({ params }: { params: { id: string } })
       content={content ?? []}
       events={events ?? []}
       teamMembers={teamMembers}
+      canManageSensitive={canManageSensitive}
+      platformAccess={platformAccess}
     />
   )
 }

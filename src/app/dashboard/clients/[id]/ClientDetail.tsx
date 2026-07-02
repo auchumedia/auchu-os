@@ -5,9 +5,10 @@ import Link from 'next/link'
 import {
   ArrowLeft, Camera, ExternalLink, Copy, Check, Plus, Loader2,
   Calendar, FileText, CreditCard, Globe, Pencil,
-  Save, X, CheckCircle,
+  Save, X, CheckCircle, Eye, EyeOff, Upload, Download, Trash2,
+  Instagram, Facebook, Linkedin,
 } from 'lucide-react'
-import { Client, Invoice, ContentPiece, CalendarEvent } from '@/types'
+import { Client, Invoice, ContentPiece, CalendarEvent, ClientPlatformAccess, ClientDocument } from '@/types'
 import ContentTable from './ContentTable'
 import CalendarView from './CalendarView'
 import { cn, formatCurrency, formatDate, getInitials } from '@/lib/utils'
@@ -40,6 +41,26 @@ const CONTENT_PLATFORM_COLORS: Record<string, string> = {
   meta:      'bg-indigo-100 text-indigo-700',
 }
 
+type LinkPlatformKey = 'link_instagram' | 'link_facebook' | 'link_tiktok' | 'link_linkedin'
+interface LinkPlatformCfg { key: LinkPlatformKey; label: string; icon?: React.ElementType; emoji?: string; color: string }
+const LINK_PLATFORMS: LinkPlatformCfg[] = [
+  { key: 'link_instagram', label: 'Instagram', icon: Instagram, color: 'text-pink-600' },
+  { key: 'link_facebook',  label: 'Facebook',  icon: Facebook,  color: 'text-blue-600' },
+  { key: 'link_tiktok',    label: 'TikTok',     emoji: '🎵',     color: 'text-gray-900' },
+  { key: 'link_linkedin',  label: 'LinkedIn',   icon: Linkedin,  color: 'text-sky-600' },
+]
+
+type AccessPlatformKey = 'instagram' | 'facebook' | 'tiktok' | 'linkedin'
+interface AccessPlatformCfg { key: AccessPlatformKey; label: string; icon?: React.ElementType; emoji?: string }
+const ACCESS_PLATFORMS: AccessPlatformCfg[] = [
+  { key: 'instagram', label: 'Instagram', icon: Instagram },
+  { key: 'facebook',  label: 'Facebook',  icon: Facebook },
+  { key: 'tiktok',    label: 'TikTok',    emoji: '🎵' },
+  { key: 'linkedin',  label: 'LinkedIn',  icon: Linkedin },
+]
+
+const MAX_DOCUMENTS = 10
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -48,11 +69,16 @@ interface Props {
   content:  ContentPiece[]
   events:   CalendarEvent[]
   teamMembers: { id: string; name: string }[]
+  canManageSensitive: boolean
+  platformAccess: ClientPlatformAccess | null
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ClientDetail({ client: initial, invoices, content, events, teamMembers }: Props) {
+export default function ClientDetail({
+  client: initial, invoices, content, events, teamMembers,
+  canManageSensitive, platformAccess: initialPlatformAccess,
+}: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
   const [saving, setSaving] = useState<string | null>(null)
@@ -92,6 +118,57 @@ export default function ClientDetail({ client: initial, invoices, content, event
     status:         client.status,
     platforms:      client.platforms,
   })
+
+  // Livrables du mois
+  const [deliverables, setDeliverables] = useState({
+    video_organique: client.deliverables_video_organique,
+    story:           client.deliverables_story,
+    ad:              client.deliverables_ad,
+  })
+  const [savingDeliverables, setSavingDeliverables] = useState(false)
+  const deliverablesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Liens plateformes
+  const [editingLinks, setEditingLinks] = useState(false)
+  const [linksForm, setLinksForm] = useState({
+    link_instagram: client.link_instagram ?? '',
+    link_facebook:  client.link_facebook  ?? '',
+    link_tiktok:    client.link_tiktok    ?? '',
+    link_linkedin:  client.link_linkedin  ?? '',
+  })
+
+  // Accès plateformes (owner/director uniquement)
+  const [platformAccess, setPlatformAccess] = useState(initialPlatformAccess)
+  const [editingAccess, setEditingAccess] = useState(false)
+  const [savingAccess, setSavingAccess] = useState(false)
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({})
+  const [accessForm, setAccessForm] = useState({
+    instagram_email:    platformAccess?.instagram_email    ?? '',
+    instagram_password:  platformAccess?.instagram_password ?? '',
+    facebook_email:      platformAccess?.facebook_email     ?? '',
+    facebook_password:   platformAccess?.facebook_password  ?? '',
+    tiktok_email:        platformAccess?.tiktok_email       ?? '',
+    tiktok_password:     platformAccess?.tiktok_password    ?? '',
+    linkedin_email:      platformAccess?.linkedin_email     ?? '',
+    linkedin_password:   platformAccess?.linkedin_password  ?? '',
+    notes:               platformAccess?.notes              ?? '',
+  })
+
+  // Documents (owner/director uniquement)
+  const [documents, setDocuments]       = useState<ClientDocument[]>([])
+  const [loadingDocs, setLoadingDocs]   = useState(false)
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [docsError, setDocsError]       = useState<string | null>(null)
+  const docsFileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!canManageSensitive) return
+    setLoadingDocs(true)
+    fetch(`/api/clients/${client.id}/documents`)
+      .then(r => r.json())
+      .then(json => setDocuments(json.data ?? []))
+      .finally(() => setLoadingDocs(false))
+  }, [canManageSensitive, client.id])
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -155,6 +232,88 @@ export default function ClientDetail({ client: initial, invoices, content, event
     })
     setSaving(null)
     setEditing(false)
+  }
+
+  // ─── Livrables du mois ───────────────────────────────────────────────────────
+
+  const handleDeliverableChange = (field: 'video_organique' | 'story' | 'ad', value: number) => {
+    const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0
+    setDeliverables(prev => {
+      const next = { ...prev, [field]: safeValue }
+      if (deliverablesTimeout.current) clearTimeout(deliverablesTimeout.current)
+      deliverablesTimeout.current = setTimeout(async () => {
+        setSavingDeliverables(true)
+        await patch({
+          deliverables_video_organique: next.video_organique,
+          deliverables_story:           next.story,
+          deliverables_ad:              next.ad,
+        })
+        setSavingDeliverables(false)
+      }, 700)
+      return next
+    })
+  }
+
+  const deliverablesTotal = deliverables.video_organique + deliverables.story + deliverables.ad
+
+  // ─── Liens plateformes ───────────────────────────────────────────────────────
+
+  const saveLinks = async () => {
+    setSaving('links')
+    await patch({
+      link_instagram: linksForm.link_instagram || null,
+      link_facebook:  linksForm.link_facebook  || null,
+      link_tiktok:    linksForm.link_tiktok    || null,
+      link_linkedin:  linksForm.link_linkedin  || null,
+    })
+    setSaving(null)
+    setEditingLinks(false)
+  }
+
+  // ─── Accès plateformes ───────────────────────────────────────────────────────
+
+  const saveAccess = async () => {
+    setSavingAccess(true)
+    const res = await fetch(`/api/clients/${client.id}/access`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(accessForm),
+    })
+    if (res.ok) {
+      const { data } = await res.json()
+      setPlatformAccess(data)
+    }
+    setSavingAccess(false)
+    setEditingAccess(false)
+  }
+
+  const togglePasswordVisibility = (key: string) =>
+    setRevealedPasswords(p => ({ ...p, [key]: !p[key] }))
+
+  // ─── Documents ───────────────────────────────────────────────────────────────
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingDoc(true)
+    setDocsError(null)
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch(`/api/clients/${client.id}/documents`, { method: 'POST', body: fd })
+    const json = await res.json()
+    if (!res.ok) {
+      setDocsError(json.error ?? 'Erreur lors du téléversement')
+    } else {
+      setDocuments(prev => [json.data, ...prev])
+    }
+    setUploadingDoc(false)
+    if (docsFileInputRef.current) docsFileInputRef.current.value = ''
+  }
+
+  const deleteDocument = async (docId: string) => {
+    if (!confirm('Supprimer ce document ?')) return
+    await fetch(`/api/clients/${client.id}/documents/${docId}`, { method: 'DELETE' })
+    setDocuments(prev => prev.filter(d => d.id !== docId))
   }
 
   // ─── Portal ────────────────────────────────────────────────────────────────
@@ -497,6 +656,274 @@ export default function ClientDetail({ client: initial, invoices, content, event
                 </div>
               )}
             </div>
+
+            {/* ─── Livrables du mois ───────────────────────────────────────── */}
+            <div className="card">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-900">Livrables du mois</h2>
+                {savingDeliverables && <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="label">Vidéo organique</label>
+                  <input
+                    type="number" min={0}
+                    value={deliverables.video_organique}
+                    onChange={e => handleDeliverableChange('video_organique', Number(e.target.value))}
+                    className="input text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="label">Story</label>
+                  <input
+                    type="number" min={0}
+                    value={deliverables.story}
+                    onChange={e => handleDeliverableChange('story', Number(e.target.value))}
+                    className="input text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="label">Ad</label>
+                  <input
+                    type="number" min={0}
+                    value={deliverables.ad}
+                    onChange={e => handleDeliverableChange('ad', Number(e.target.value))}
+                    className="input text-sm"
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mt-3">
+                Total : <span className="font-semibold text-gray-900">{deliverablesTotal}</span> livrable{deliverablesTotal !== 1 ? 's' : ''} / mois
+              </p>
+              <p className="text-xs text-gray-400 mt-1">Affiché dans le portail client comme "Contenu du mois"</p>
+            </div>
+
+            {/* ─── Liens plateformes ───────────────────────────────────────── */}
+            <div className="card">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-900">Liens plateformes</h2>
+                {editingLinks ? (
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditingLinks(false)} className="btn-secondary py-1.5 text-sm gap-1">
+                      <X className="w-3.5 h-3.5" /> Annuler
+                    </button>
+                    <button onClick={saveLinks} disabled={saving === 'links'} className="btn-primary py-1.5 text-sm gap-1 disabled:opacity-50">
+                      {saving === 'links' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      Sauvegarder
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setEditingLinks(true)} className="btn-secondary py-1.5 text-sm gap-1">
+                    <Pencil className="w-3.5 h-3.5" /> Modifier
+                  </button>
+                )}
+              </div>
+
+              {editingLinks ? (
+                <div className="space-y-3">
+                  {LINK_PLATFORMS.map(p => (
+                    <div key={p.key}>
+                      <label className="label flex items-center gap-1.5">
+                        {p.icon ? <p.icon className={cn('w-3.5 h-3.5', p.color)} /> : <span>{p.emoji}</span>}
+                        {p.label}
+                      </label>
+                      <input
+                        type="url"
+                        value={linksForm[p.key]}
+                        onChange={e => setLinksForm(f => ({ ...f, [p.key]: e.target.value }))}
+                        placeholder="https://…"
+                        className="input text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {LINK_PLATFORMS.filter(p => client[p.key]).map(p => (
+                    <a
+                      key={p.key}
+                      href={client[p.key]!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-gray-700 hover:text-auchu-600 transition-colors"
+                    >
+                      {p.icon ? <p.icon className={cn('w-4 h-4', p.color)} /> : <span>{p.emoji}</span>}
+                      <span className="truncate">{p.label}</span>
+                      <ExternalLink className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                    </a>
+                  ))}
+                  {LINK_PLATFORMS.every(p => !client[p.key]) && (
+                    <p className="text-xs text-gray-300 italic">Aucun lien renseigné</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ─── Accès plateformes (owner/director) ──────────────────────── */}
+            {canManageSensitive && (
+              <div className="card">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900">Accès plateformes</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">Visible uniquement par owner et director</p>
+                  </div>
+                  {editingAccess ? (
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingAccess(false)} className="btn-secondary py-1.5 text-sm gap-1">
+                        <X className="w-3.5 h-3.5" /> Annuler
+                      </button>
+                      <button onClick={saveAccess} disabled={savingAccess} className="btn-primary py-1.5 text-sm gap-1 disabled:opacity-50">
+                        {savingAccess ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        Sauvegarder
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setEditingAccess(true)} className="btn-secondary py-1.5 text-sm gap-1">
+                      <Pencil className="w-3.5 h-3.5" /> Modifier
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {ACCESS_PLATFORMS.map(p => {
+                    const emailKey    = `${p.key}_email`    as keyof typeof accessForm
+                    const passwordKey = `${p.key}_password` as keyof typeof accessForm
+                    const revealed    = !!revealedPasswords[p.key]
+                    return (
+                      <div key={p.key} className="border border-gray-100 rounded-xl p-3">
+                        <p className="text-xs font-semibold text-gray-500 flex items-center gap-1.5 mb-2">
+                          {p.icon ? <p.icon className="w-3.5 h-3.5" /> : <span>{p.emoji}</span>}
+                          {p.label}
+                        </p>
+                        {editingAccess ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                              type="email"
+                              value={accessForm[emailKey]}
+                              onChange={e => setAccessForm(f => ({ ...f, [emailKey]: e.target.value }))}
+                              placeholder="Email de connexion"
+                              className="input text-sm"
+                            />
+                            <div className="relative">
+                              <input
+                                type={revealed ? 'text' : 'password'}
+                                value={accessForm[passwordKey]}
+                                onChange={e => setAccessForm(f => ({ ...f, [passwordKey]: e.target.value }))}
+                                placeholder="Mot de passe"
+                                className="input text-sm pr-9"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => togglePasswordVisibility(p.key)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                              >
+                                {revealed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <span>{accessForm[emailKey] || '—'}</span>
+                            {accessForm[passwordKey] && (
+                              <span className="flex items-center gap-1.5 font-mono">
+                                {revealed ? accessForm[passwordKey] : '••••••••'}
+                                <button type="button" onClick={() => togglePasswordVisibility(p.key)} className="text-gray-400 hover:text-gray-600">
+                                  {revealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                </button>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  <div>
+                    <label className="label">Notes d&apos;accès supplémentaires</label>
+                    {editingAccess ? (
+                      <textarea
+                        rows={3}
+                        value={accessForm.notes}
+                        onChange={e => setAccessForm(f => ({ ...f, notes: e.target.value }))}
+                        className="input text-sm resize-none"
+                        placeholder="2FA, questions de sécurité, contact technique…"
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-600 whitespace-pre-line">{accessForm.notes || '—'}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Documents (owner/director) ──────────────────────────────── */}
+            {canManageSensitive && (
+              <div className="card">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-gray-900">
+                    Documents
+                    <span className="ml-1.5 font-normal text-gray-400">({documents.length}/{MAX_DOCUMENTS})</span>
+                  </h2>
+                  <button
+                    onClick={() => docsFileInputRef.current?.click()}
+                    disabled={uploadingDoc || documents.length >= MAX_DOCUMENTS}
+                    className="btn-secondary py-1.5 text-sm gap-1 disabled:opacity-50"
+                  >
+                    {uploadingDoc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    Ajouter un PDF
+                  </button>
+                  <input
+                    ref={docsFileInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={handleDocUpload}
+                  />
+                </div>
+
+                {docsError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3">{docsError}</p>}
+
+                {loadingDocs ? (
+                  <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 text-gray-300 animate-spin" /></div>
+                ) : documents.length === 0 ? (
+                  <p className="text-sm text-gray-300 italic text-center py-4">Aucun document</p>
+                ) : (
+                  <div className="space-y-2">
+                    {documents.map(doc => (
+                      <div key={doc.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{doc.name}</p>
+                            <p className="text-xs text-gray-400">{formatDate(doc.created_at)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {doc.url && (
+                            <a
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-auchu-600 hover:bg-gray-50 transition-colors"
+                              title="Télécharger"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => deleteDocument(doc.id)}
+                            className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">

@@ -102,8 +102,42 @@ export interface Client {
   portal_token: string | null
   portal_enabled: boolean
   assigned_partner: string | null
+  deliverables_video_organique: number
+  deliverables_story: number
+  deliverables_ad: number
+  link_instagram: string | null
+  link_facebook: string | null
+  link_tiktok: string | null
+  link_linkedin: string | null
   created_at: string
   updated_at: string
+}
+
+// ─── Accès plateformes (sensible — owner/director uniquement) ────────────────
+export interface ClientPlatformAccess {
+  id: string
+  client_id: string
+  instagram_email: string | null
+  instagram_password: string | null
+  facebook_email: string | null
+  facebook_password: string | null
+  tiktok_email: string | null
+  tiktok_password: string | null
+  linkedin_email: string | null
+  linkedin_password: string | null
+  notes: string | null
+  updated_at: string
+}
+
+// ─── Documents client ─────────────────────────────────────────────────────────
+export interface ClientDocument {
+  id: string
+  client_id: string
+  name: string
+  storage_path: string
+  file_size: number | null
+  created_at: string
+  url?: string | null
 }
 
 // ─── Projets ─────────────────────────────────────────────────────────────────

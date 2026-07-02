@@ -2,22 +2,35 @@ import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
 import { NextResponse } from 'next/server'
 
+const ALLOWED_FIELDS = [
+  'instagram_email', 'instagram_password',
+  'facebook_email',  'facebook_password',
+  'tiktok_email',    'tiktok_password',
+  'linkedin_email',  'linkedin_password',
+  'notes',
+]
+
+function canManage(ctx: { isOwner: boolean; isDirector: boolean }) {
+  return ctx.isOwner || ctx.isDirector
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
   const ctx = await getOrgContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!canManage(ctx)) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
 
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('clients')
+    .from('client_platform_access')
     .select('*')
-    .eq('id', params.id)
+    .eq('client_id', params.id)
     .eq('user_id', ctx.dataOwnerId)
-    .single()
+    .maybeSingle()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 }
 
@@ -27,39 +40,25 @@ export async function PATCH(
 ) {
   const ctx = await getOrgContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!canManage(ctx)) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
 
   const supabase = await createClient()
   const body = await req.json()
 
-  // clients.user_id est l'ID du owner de l'org, pas celui de la personne qui
-  // édite — même bug que content_pieces (cf. historique de cette route),
-  // corrigé ici de la même façon.
+  const fields: Record<string, unknown> = {}
+  for (const key of ALLOWED_FIELDS) {
+    if (key in body) fields[key] = body[key]
+  }
+
   const { data, error } = await supabase
-    .from('clients')
-    .update(body)
-    .eq('id', params.id)
-    .eq('user_id', ctx.dataOwnerId)
-    .select('*')
+    .from('client_platform_access')
+    .upsert(
+      { client_id: params.id, user_id: ctx.dataOwnerId, ...fields },
+      { onConflict: 'client_id' }
+    )
+    .select()
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
-}
-
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
-  const ctx = await getOrgContext()
-  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from('clients')
-    .delete()
-    .eq('id', params.id)
-    .eq('user_id', ctx.dataOwnerId)
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ success: true })
 }

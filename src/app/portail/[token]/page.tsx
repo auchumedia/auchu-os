@@ -79,15 +79,12 @@ export default async function PortailPage({
     .filter(i => i.status === 'envoye' || i.status === 'en_retard')
     .reduce((s, i) => s + i.total, 0)
 
-  // Contenu du mois — tous statuts confondus, livrables prévus ce mois-ci
-  const now         = new Date()
-  const monthStart  = new Date(now.getFullYear(), now.getMonth(), 1)
-  const monthEnd    = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-  const contentThisMonth = (content ?? []).filter(c => {
-    if (!c.scheduled_at) return false
-    const d = new Date(c.scheduled_at)
-    return d >= monthStart && d < monthEnd
-  })
+  // Contenu du mois — total des livrables définis dans la fiche client
+  // (vidéos + stories + ads), pas un comptage par scheduled_at.
+  const deliverablesTotal =
+    (client.deliverables_video_organique ?? 0) +
+    (client.deliverables_story ?? 0) +
+    (client.deliverables_ad ?? 0)
 
   const primary   = client.brand_primary   || orgInfo?.primary_color   || '#6366f1'
   const secondary = client.brand_secondary || orgInfo?.secondary_color || '#f95640'
@@ -118,7 +115,7 @@ export default async function PortailPage({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
             <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4">
               <p className="text-white/70 text-xs font-medium uppercase tracking-wide">Contenu du mois</p>
-              <p className="text-2xl font-bold text-white mt-1">{contentThisMonth.length}</p>
+              <p className="text-2xl font-bold text-white mt-1">{deliverablesTotal}</p>
             </div>
             <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4">
               <p className="text-white/70 text-xs font-medium uppercase tracking-wide">Contenus à approuver</p>
