@@ -29,8 +29,14 @@ export async function middleware(request: NextRequest) {
 
   const isAuthRoute   = request.nextUrl.pathname.startsWith('/auth')
   const isPublicRoute = request.nextUrl.pathname === '/'
+  // Les routes API consommées anonymement par ces pages publiques doivent être
+  // exemptées elles aussi — sinon le middleware les redirige vers /auth/login
+  // (307) au lieu de laisser passer la requête, cassant silencieusement le
+  // fetch côté client (JSON attendu, HTML de la page de login reçu à la place).
   const isPortalRoute = request.nextUrl.pathname.startsWith('/portail')
+    || request.nextUrl.pathname.startsWith('/api/portail')
   const isInviteRoute = request.nextUrl.pathname.startsWith('/invite')
+    || request.nextUrl.pathname.startsWith('/api/invitations')
 
   if (!user && !isAuthRoute && !isPublicRoute && !isPortalRoute && !isInviteRoute) {
     const url = request.nextUrl.clone()

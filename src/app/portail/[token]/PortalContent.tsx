@@ -115,8 +115,10 @@ export default function PortalContent({ content: initial, events, token, primary
       cache: 'no-store',
     })
     console.log('[portail] API status:', res.status)
-    if (!res.ok) {
-      console.error('[portail] fetch failed:', res.status)
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!res.ok || !contentType.includes('application/json')) {
+      // Ex: redirigé vers /auth/login (HTML) — évite un JSON.parse qui plante silencieusement.
+      console.error('[portail] fetch failed or non-JSON response:', res.status, contentType)
       return
     }
     const json = await res.json()
