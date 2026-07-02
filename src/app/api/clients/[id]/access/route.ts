@@ -57,7 +57,7 @@ export async function PATCH(
       { onConflict: 'client_id' }
     )
     .select()
-    .single()
+    .maybeSingle()
 
   if (error) {
     console.error(
@@ -74,6 +74,10 @@ export async function PATCH(
       { error: error.message, code: error.code, details: error.details, hint: error.hint },
       { status: 500 }
     )
+  }
+  if (!data) {
+    console.error('[api/clients/access PATCH] upsert sans ligne retournée —', 'client_id:', params.id, '| dataOwnerId:', ctx.dataOwnerId)
+    return NextResponse.json({ error: 'Échec de la sauvegarde des accès' }, { status: 500 })
   }
   return NextResponse.json({ data })
 }
