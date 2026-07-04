@@ -4,18 +4,19 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, Camera, ExternalLink, Copy, Check, Plus, Loader2,
-  Calendar, FileText, CreditCard, Globe, Pencil,
+  Calendar, FileText, CreditCard, Globe, Pencil, ListTodo,
   Save, X, CheckCircle, Eye, EyeOff, Upload, Download, Trash2,
   Instagram, Facebook, Linkedin,
 } from 'lucide-react'
-import { Client, Invoice, ContentPiece, CalendarEvent, ClientPlatformAccess, ClientDocument } from '@/types'
+import { Client, Invoice, ContentPiece, CalendarEvent, ClientPlatformAccess, ClientDocument, Task } from '@/types'
 import ContentTable from './ContentTable'
 import CalendarView from './CalendarView'
+import ClientTasksTab from './ClientTasksTab'
 import { cn, formatCurrency, formatDate, getInitials } from '@/lib/utils'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'content' | 'calendar' | 'invoices' | 'portal'
+type Tab = 'overview' | 'content' | 'calendar' | 'invoices' | 'tasks' | 'portal'
 
 const PLATFORMS = ['instagram', 'facebook', 'tiktok', 'linkedin', 'google', 'meta']
 
@@ -68,16 +69,18 @@ interface Props {
   invoices: Invoice[]
   content:  ContentPiece[]
   events:   CalendarEvent[]
+  tasks:    Task[]
   teamMembers: { id: string; name: string }[]
   canManageSensitive: boolean
+  canCreateTasks: boolean
   platformAccess: ClientPlatformAccess | null
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ClientDetail({
-  client: initial, invoices, content, events, teamMembers,
-  canManageSensitive, platformAccess: initialPlatformAccess,
+  client: initial, invoices, content, events, tasks, teamMembers,
+  canManageSensitive, canCreateTasks, platformAccess: initialPlatformAccess,
 }: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
@@ -380,6 +383,7 @@ export default function ClientDetail({
     { id: 'content',   label: `Contenu (${content.length})`,  icon: FileText  },
     { id: 'calendar',  label: 'Calendrier',                   icon: Calendar  },
     { id: 'invoices',  label: `Factures (${invoices.length})`,icon: CreditCard},
+    { id: 'tasks',     label: `Tâches (${tasks.length})`,     icon: ListTodo  },
     { id: 'portal',    label: 'Portail',                      icon: Globe     },
   ]
 
@@ -1096,6 +1100,16 @@ export default function ClientDetail({
             </div>
           )}
         </div>
+      )}
+
+      {/* ─── Tab: Tâches ─────────────────────────────────────────────────────── */}
+      {tab === 'tasks' && (
+        <ClientTasksTab
+          clientId={client.id}
+          initialTasks={tasks}
+          teamMembers={teamMembers}
+          canCreate={canCreateTasks}
+        />
       )}
 
       {/* ─── Tab: Portail ────────────────────────────────────────────────────── */}

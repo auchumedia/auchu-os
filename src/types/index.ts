@@ -202,6 +202,26 @@ export interface ReferenceLink {
   platform: string
 }
 
+// ─── Tâches ───────────────────────────────────────────────────────────────────
+export type TaskPriority = 'basse' | 'normale' | 'haute' | 'urgente'
+export type TaskStatus = 'a_faire' | 'en_cours' | 'termine'
+
+export interface Task {
+  id: string
+  user_id: string
+  client_id: string | null
+  title: string
+  description: string | null
+  assigned_to: string | null
+  assigned_by: string
+  priority: TaskPriority
+  status: TaskStatus
+  deadline: string | null
+  created_at: string
+  updated_at: string
+  client?: Pick<Client, 'id' | 'name' | 'company'> | null
+}
+
 // ─── Calendrier d'événements ──────────────────────────────────────────────────
 export type CalendarEventType = 'tournage' | 'publication' | 'reunion' | 'deadline'
 

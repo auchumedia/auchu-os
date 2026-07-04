@@ -4,9 +4,9 @@ import { useState, useRef } from 'react'
 import { formatDate, cn, getInitials } from '@/lib/utils'
 import {
   FileText, Calendar, Clock, CheckCircle, StickyNote,
-  AlertTriangle, Loader2, Check, UsersRound,
+  AlertTriangle, Loader2, Check, UsersRound, ListTodo,
 } from 'lucide-react'
-import type { OrgRole } from '@/types'
+import type { OrgRole, TaskPriority, TaskStatus } from '@/types'
 import { roleLabel } from '@/lib/roles'
 import CalendarPanel from './CalendarPanel'
 import ClientGallery, { type ClientCard } from './ClientGallery'
@@ -48,6 +48,14 @@ interface ContentRow {
 interface ClientRow { id: string; name: string; company?: string | null; status?: string }
 interface Profile { full_name: string | null; email: string | null; avatar_url: string | null }
 interface TeamMemberRow { user_id: string; role: OrgRole; profile: Profile | null }
+interface AssignedTaskRow {
+  id: string
+  title: string
+  status: TaskStatus
+  priority: TaskPriority
+  deadline: string | null
+  client: ClientRef | null
+}
 
 interface OwnerProps {
   view: 'owner'
@@ -57,6 +65,7 @@ interface OwnerProps {
   toDelegate: ProjectRow[]
   clientCards: ClientCard[]
   initialClients: ClientRow[]
+  assignedTasks: AssignedTaskRow[]
 }
 interface ChefProps {
   view: 'chef'
@@ -65,6 +74,7 @@ interface ChefProps {
   clientCards: ClientCard[]
   teamTasks: ProjectRow[]
   initialClients: ClientRow[]
+  assignedTasks: AssignedTaskRow[]
 }
 interface StrategeProps {
   view: 'stratege'
@@ -74,6 +84,7 @@ interface StrategeProps {
   myContents: ContentRow[]
   teamContentCalendar: ContentRow[]
   initialClients: ClientRow[]
+  assignedTasks: AssignedTaskRow[]
 }
 interface MonteurProps {
   view: 'monteur'
@@ -83,6 +94,7 @@ interface MonteurProps {
   myTasks: ProjectRow[]
   myContents: ContentRow[]
   initialClients: ClientRow[]
+  assignedTasks: AssignedTaskRow[]
 }
 type Props = OwnerProps | ChefProps | StrategeProps | MonteurProps
 
@@ -191,11 +203,107 @@ export default function MonEspaceClient(props: Props) {
         <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>
       </div>
 
+      <MesTachesSection initialTasks={props.assignedTasks} />
+
       {props.view === 'owner'    && <OwnerView {...props} />}
       {props.view === 'chef'     && <ChefView {...props} />}
       {props.view === 'stratege' && <StrategeView {...props} />}
       {props.view === 'monteur'  && <MonteurView {...props} />}
     </div>
+  )
+}
+
+// ─── Mes tâches (toutes vues — assignées à l'utilisateur connecté) ──────────
+
+function MesTachesSection({ initialTasks }: { initialTasks: AssignedTaskRow[] }) {
+  const [tasks, setTasks] = useState(initialTasks)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  async function updateStatus(id: string, status: TaskStatus) {
+    const prevTasks = tasks
+    setUpdatingId(id)
+    setTasks(ts => ts.map(t => t.id === id ? { ...t, status } : t))
+
+    const res = await fetch(`/api/taches/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+
+    if (!res.ok) setTasks(prevTasks)
+    setUpdatingId(null)
+  }
+
+  return (
+    <section>
+      <div className="flex items-center gap-2 mb-4">
+        <ListTodo className="w-4 h-4 text-auchu-500" />
+        <h2 className="font-semibold text-gray-900">Mes tâches</h2>
+        <span className="text-xs text-gray-400 ml-auto">{tasks.length} tâche{tasks.length !== 1 ? 's' : ''}</span>
+      </div>
+      {tasks.length === 0 ? (
+        <div className="card text-center py-8">
+          <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+          <p className="text-sm text-gray-400">Aucune tâche assignée pour l'instant.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {tasks.map(t => {
+            const pc = PRIORITY_CFG[t.priority] ?? PRIORITY_CFG.normale
+            const isOverdue = !!t.deadline && new Date(t.deadline) < new Date(new Date().toDateString()) && t.status !== 'termine'
+            const isUpdating = updatingId === t.id
+
+            return (
+              <div
+                key={t.id}
+                className={cn(
+                  'flex items-center gap-4 bg-white border rounded-xl px-4 py-3',
+                  isOverdue ? 'border-red-200' : 'border-gray-100'
+                )}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className={cn('font-medium text-sm truncate', t.status === 'termine' ? 'text-gray-400 line-through' : 'text-gray-900')}>
+                    {t.title}
+                  </p>
+                  {t.client?.name && <p className="text-xs text-gray-400 mt-0.5">{t.client.name}</p>}
+                </div>
+
+                <span className={cn('text-xs font-semibold flex-shrink-0', pc.cls)}>{pc.label}</span>
+
+                {isOverdue ? (
+                  <span className="text-xs font-semibold text-white bg-red-500 rounded-full px-2 py-0.5 flex-shrink-0">
+                    En retard · {formatDate(t.deadline!)}
+                  </span>
+                ) : (
+                  <DeadlineTag deadline={t.deadline} />
+                )}
+
+                {t.status !== 'termine' && (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {t.status === 'a_faire' && (
+                      <button
+                        disabled={isUpdating}
+                        onClick={() => updateStatus(t.id, 'en_cours')}
+                        className="btn-secondary py-1 px-2 text-xs disabled:opacity-50"
+                      >
+                        {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : 'En cours'}
+                      </button>
+                    )}
+                    <button
+                      disabled={isUpdating}
+                      onClick={() => updateStatus(t.id, 'termine')}
+                      className="btn-primary py-1 px-2 text-xs disabled:opacity-50"
+                    >
+                      {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Terminé'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 

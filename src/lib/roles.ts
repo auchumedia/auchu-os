@@ -58,3 +58,13 @@ const CLIENT_CREATOR_ROLES: OrgRole[] = ['owner', 'director']
 export function canCreateClients(role: string): boolean {
   return CLIENT_CREATOR_ROLES.includes(role as OrgRole)
 }
+
+// Qui peut créer/assigner des tâches — owner/director (n'importe quel membre
+// de l'org) et chef_equipe (membres de sa propre équipe uniquement, imposé
+// côté RLS — cf. migration 034). stratege/monteur voient leurs tâches et en
+// changent le statut, mais n'en créent jamais.
+const TASK_CREATOR_ROLES: OrgRole[] = ['owner', 'director', 'chef_equipe']
+
+export function canCreateTasks(role: string): boolean {
+  return TASK_CREATOR_ROLES.includes(role as OrgRole)
+}

@@ -48,6 +48,18 @@ export const PROJECT_STATUS_COLORS: Record<string, string> = {
   annule: 'bg-red-50 text-red-700',
 }
 
+export const TASK_STATUS_LABELS: Record<string, string> = {
+  a_faire:  'À faire',
+  en_cours: 'En cours',
+  termine:  'Terminé',
+}
+
+export const TASK_STATUS_COLORS: Record<string, string> = {
+  a_faire:  'bg-gray-100 text-gray-600',
+  en_cours: 'bg-blue-50  text-blue-700',
+  termine:  'bg-green-50 text-green-700',
+}
+
 export const PRIORITY_LABELS: Record<string, string> = {
   basse: 'Basse',
   normale: 'Normale',

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
+import { canCreateTasks } from '@/lib/roles'
 import { notFound } from 'next/navigation'
 import ClientDetail from './ClientDetail'
 
@@ -18,6 +19,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
     { data: invoices },
     { data: content },
     { data: events },
+    { data: tasks },
   ] = await Promise.all([
     supabase
       .from('clients')
@@ -47,6 +49,13 @@ export default async function ClientPage({ params }: { params: { id: string } })
       .eq('client_id', params.id)
       .eq('user_id', ownerId)
       .order('date', { ascending: true }),
+
+    supabase
+      .from('tasks')
+      .select('*')
+      .eq('client_id', params.id)
+      .eq('user_id', ownerId)
+      .order('created_at', { ascending: false }),
   ])
 
   if (error || !client) notFound()
@@ -93,8 +102,10 @@ export default async function ClientPage({ params }: { params: { id: string } })
       invoices={invoices ?? []}
       content={content ?? []}
       events={events ?? []}
+      tasks={tasks ?? []}
       teamMembers={teamMembers}
       canManageSensitive={canManageSensitive}
+      canCreateTasks={canCreateTasks(ctx.role)}
       platformAccess={platformAccess}
     />
   )

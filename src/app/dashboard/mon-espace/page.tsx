@@ -35,6 +35,8 @@ async function fetchClientCards(supabase: SupabaseClient, ownerId: string, clien
   return (clients ?? []).map(c => ({ ...c, pendingReview: reviewCounts[c.id] ?? 0 }))
 }
 
+const TASK_PRIORITY_ORDER: Record<string, number> = { urgente: 0, haute: 1, normale: 2, basse: 3 }
+
 export default async function MonEspacePage() {
   const ctx = await getOrgContext()
   if (!ctx) redirect('/auth/login')
@@ -49,6 +51,20 @@ export default async function MonEspacePage() {
     .select('id, name')
     .eq('user_id', ownerId)
     .order('name')
+
+  // ── Mes tâches — assignées à l'utilisateur connecté, toutes vues confondues.
+  //    Triées par deadline côté requête (nulls en dernier), puis par priorité
+  //    en JS (tri stable — préserve l'ordre de deadline au sein d'une priorité). ─
+  const { data: assignedTasksRaw } = await supabase
+    .from('tasks')
+    .select('id, title, status, priority, deadline, client:clients(name)')
+    .eq('user_id', ownerId)
+    .eq('assigned_to', userId)
+    .order('deadline', { ascending: true, nullsFirst: false })
+
+  const assignedTasks = ((assignedTasksRaw ?? []) as any[])
+    .slice()
+    .sort((a, b) => (TASK_PRIORITY_ORDER[a.priority] ?? 2) - (TASK_PRIORITY_ORDER[b.priority] ?? 2))
 
   // ── Vue owner + director : identique, vue d'ensemble de toute l'agence ────
   if (ctx.isOwner || ctx.isDirector) {
@@ -84,6 +100,7 @@ export default async function MonEspacePage() {
         toDelegate={toDelegate as any ?? []}
         clientCards={clientCards}
         initialClients={clientsForModal ?? []}
+        assignedTasks={assignedTasks}
       />
     )
   }
@@ -130,6 +147,7 @@ export default async function MonEspacePage() {
         clientCards={clientCards}
         teamTasks={tasksRes.data as any ?? []}
         initialClients={clientsForModal ?? []}
+        assignedTasks={assignedTasks}
       />
     )
   }
@@ -158,6 +176,7 @@ export default async function MonEspacePage() {
         myContents={myContentsRes.data as any ?? []}
         teamContentCalendar={teamContentsRes.data as any ?? []}
         initialClients={clientsForModal ?? []}
+        assignedTasks={assignedTasks}
       />
     )
   }
@@ -190,6 +209,7 @@ export default async function MonEspacePage() {
       myTasks={myTasks as any ?? []}
       myContents={myContents as any ?? []}
       initialClients={clientsForModal ?? []}
+      assignedTasks={assignedTasks}
     />
   )
 }
