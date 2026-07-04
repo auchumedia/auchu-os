@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Receipt, Brain, Settings, UserCircle, UsersRound, ListTodo,
+  LayoutDashboard, Users, Receipt, Brain, Settings, UsersRound, ListTodo,
 } from 'lucide-react'
 import type { OrgRole } from '@/types'
 
@@ -7,7 +7,8 @@ export type NavItem = { href: string; icon: React.ElementType; label: string }
 export type NavSection = { key: 'principal' | 'equipe' | 'agents' | 'compte'; label: string; items: NavItem[] }
 
 // Structure exacte requise partout (sidebar desktop + bottom nav mobile) :
-//   Principal : Tableau de bord, Mon espace, Tâches, Clients, Finance
+//   Principal : Tableau de bord, Tâches, Clients, Finance
+//   ("Mon espace" a été fusionné dans le Tableau de bord — plus d'entrée dédiée.)
 //   Équipe    : Équipe (les 5 rôles — owner/director en gestion complète,
 //               chef_equipe sur sa propre équipe, stratege/monteur en lecture seule)
 //   Agents IA : Agent productivité (rôles côté production de contenu)
@@ -17,10 +18,9 @@ export function buildNavSections(role: OrgRole): NavSection[] {
   const isDirector = role === 'director'
 
   const principal: NavItem[] = [
-    { href: '/dashboard',            icon: LayoutDashboard, label: 'Tableau de bord' },
-    { href: '/dashboard/mon-espace', icon: UserCircle,      label: 'Mon espace'      },
-    { href: '/dashboard/taches',     icon: ListTodo,         label: 'Tâches'          },
-    { href: '/dashboard/clients',    icon: Users,            label: 'Clients'         },
+    { href: '/dashboard',         icon: LayoutDashboard, label: 'Tableau de bord' },
+    { href: '/dashboard/taches',  icon: ListTodo,         label: 'Tâches'          },
+    { href: '/dashboard/clients', icon: Users,            label: 'Clients'         },
   ]
 
   // Finance : owner uniquement pour l'instant.
