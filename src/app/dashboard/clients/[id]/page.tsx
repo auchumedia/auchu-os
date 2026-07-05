@@ -107,7 +107,6 @@ export default async function ClientPage({ params }: { params: { id: string } })
       canManageSensitive={canManageSensitive}
       canCreateTasks={canCreateTasks(ctx.role)}
       currentUserId={ctx.userId}
-      isTeamChef={ctx.isTeamChef}
       platformAccess={platformAccess}
     />
   )

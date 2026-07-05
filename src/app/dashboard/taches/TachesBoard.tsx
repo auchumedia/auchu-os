@@ -216,14 +216,20 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
   // réservée au créateur (assigned_by) ou owner/director (cf. migration 035).
   // Changer le statut : créateur, owner/director, OU la personne assignée.
   // Supprimer : édition complète OU (tâche approuvée ET on est l'assigné —
-  // migration 036). Approuver : édition complète OU (vue équipe ET tâche
-  // "terminée" — un chef_equipe gère l'approbation de son équipe, la RLS
-  // fait le vrai filtrage précis par tâche/membre).
+  // migration 036). Approuver : owner/director (toute tâche) OU le créateur
+  // (un chef_equipe n'approuve donc que ce qu'il a lui-même créé — pas
+  // "toute l'équipe") — mais jamais en auto-approbation, même pour
+  // owner/director (migration 037).
   const isOwnerOrDirector = view === 'org'
   const canEditTask         = (task: Task) => isOwnerOrDirector || task.assigned_by === currentUserId
   const canChangeStatusTask = (task: Task) => canEditTask(task) || task.assigned_to === currentUserId
   const canDeleteTask       = (task: Task) => canEditTask(task) || (task.status === 'approuve' && task.assigned_to === currentUserId)
-  const canApproveTask      = (task: Task) => task.status === 'termine' && (isOwnerOrDirector || view === 'team')
+  const canApproveTask      = (task: Task) => {
+    if (task.status !== 'termine') return false
+    const isSelfAssigned = task.assigned_by === currentUserId && task.assigned_to === currentUserId
+    if (isSelfAssigned) return false
+    return isOwnerOrDirector || task.assigned_by === currentUserId
+  }
 
   const title = view === 'org' ? 'Tâches' : view === 'team' ? 'Tâches de l\'équipe' : 'Mes tâches'
 

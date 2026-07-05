@@ -74,7 +74,6 @@ interface Props {
   canManageSensitive: boolean
   canCreateTasks: boolean
   currentUserId: string
-  isTeamChef: boolean
   platformAccess: ClientPlatformAccess | null
 }
 
@@ -82,7 +81,7 @@ interface Props {
 
 export default function ClientDetail({
   client: initial, invoices, content, events, tasks, teamMembers,
-  canManageSensitive, canCreateTasks, currentUserId, isTeamChef, platformAccess: initialPlatformAccess,
+  canManageSensitive, canCreateTasks, currentUserId, platformAccess: initialPlatformAccess,
 }: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
@@ -1113,7 +1112,6 @@ export default function ClientDetail({
           canCreate={canCreateTasks}
           currentUserId={currentUserId}
           isOwnerOrDirector={canManageSensitive}
-          isChefEquipe={isTeamChef}
         />
       )}
 

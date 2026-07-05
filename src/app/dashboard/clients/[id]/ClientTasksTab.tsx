@@ -14,7 +14,6 @@ interface Props {
   canCreate: boolean
   currentUserId: string
   isOwnerOrDirector: boolean
-  isChefEquipe: boolean
 }
 
 // Une tâche 'approuve' reste listée dans la section "Terminé" — pas de
@@ -43,7 +42,7 @@ const NEXT_STATUS_LABEL: Record<TaskStatus, string> = {
 
 const EMPTY_FORM = { title: '', description: '', assigned_to: '', priority: 'normale' as TaskPriority, deadline: '' }
 
-export default function ClientTasksTab({ clientId, initialTasks, teamMembers, canCreate, currentUserId, isOwnerOrDirector, isChefEquipe }: Props) {
+export default function ClientTasksTab({ clientId, initialTasks, teamMembers, canCreate, currentUserId, isOwnerOrDirector }: Props) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -57,12 +56,18 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
   // Édition complète : créateur (assigned_by) ou owner/director seulement.
   // Changer le statut : idem, plus la personne assignée (migration 035).
   // Supprimer : édition complète, OU tâche approuvée ET on est l'assigné.
-  // Approuver : owner/director, ou chef d'équipe (RLS fait le vrai filtrage
-  // par équipe — migration 036).
+  // Approuver : owner/director (toute tâche) OU le créateur — un chef
+  // d'équipe n'approuve donc que ce qu'il a lui-même créé, jamais en
+  // auto-approbation même pour owner/director (migration 037).
   const canEditTask         = (task: Task) => isOwnerOrDirector || task.assigned_by === currentUserId
   const canChangeStatusTask = (task: Task) => canEditTask(task) || task.assigned_to === currentUserId
   const canDeleteTask       = (task: Task) => canEditTask(task) || (task.status === 'approuve' && task.assigned_to === currentUserId)
-  const canApproveTask      = (task: Task) => task.status === 'termine' && (isOwnerOrDirector || isChefEquipe)
+  const canApproveTask = (task: Task) => {
+    if (task.status !== 'termine') return false
+    const isSelfAssigned = task.assigned_by === currentUserId && task.assigned_to === currentUserId
+    if (isSelfAssigned) return false
+    return isOwnerOrDirector || task.assigned_by === currentUserId
+  }
 
   async function updateStatus(id: string, status: TaskStatus) {
     const prev = tasks

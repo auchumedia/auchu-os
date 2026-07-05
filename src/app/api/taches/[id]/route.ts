@@ -24,7 +24,7 @@ export async function PATCH(
 
   const { data: existing, error: fetchError } = await supabase
     .from('tasks')
-    .select('assigned_by')
+    .select('assigned_by, assigned_to, status')
     .eq('id', params.id)
     .eq('user_id', ctx.dataOwnerId)
     .maybeSingle()
@@ -52,10 +52,27 @@ export async function PATCH(
     )
   }
 
-  // Passage à 'approuve' : horodatage/auteur fixés côté serveur, jamais
-  // acceptés depuis le client (la RLS + le trigger tasks_enforce_role_update
-  // — migration 036 — décident qui a le droit de faire ce changement).
-  if (fields.status === 'approuve') {
+  // Approuver (passage à 'approuve') : jamais en auto-approbation (créateur
+  // ET assigné = soi-même) ; sinon réservé à owner/director (toute tâche)
+  // ou au créateur de la tâche (un chef_equipe n'approuve donc que ce qu'il
+  // a lui-même créé — même règle imposée par le trigger SQL
+  // tasks_enforce_role_update, migration 037, défense en profondeur).
+  if (fields.status === 'approuve' && existing.status !== 'approuve') {
+    const isSelfAssigned = existing.assigned_by === ctx.userId && existing.assigned_to === ctx.userId
+    const canApprove = !isSelfAssigned && (ctx.isOwner || ctx.isDirector || existing.assigned_by === ctx.userId)
+
+    if (!canApprove) {
+      return NextResponse.json(
+        {
+          error: isSelfAssigned
+            ? 'Vous ne pouvez pas approuver une tâche que vous vous êtes assignée vous-même'
+            : 'Seul owner/director, ou le créateur de la tâche, peut l\'approuver',
+        },
+        { status: 403 }
+      )
+    }
+
+    // Horodatage/auteur fixés côté serveur, jamais acceptés depuis le client.
     fields.approved_by = ctx.userId
     fields.approved_at = new Date().toISOString()
   }
