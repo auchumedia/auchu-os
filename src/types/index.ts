@@ -204,7 +204,9 @@ export interface ReferenceLink {
 
 // ─── Tâches ───────────────────────────────────────────────────────────────────
 export type TaskPriority = 'basse' | 'normale' | 'haute' | 'urgente'
-export type TaskStatus = 'a_faire' | 'en_cours' | 'termine'
+// 'approuve' n'est pas une colonne de kanban à part — une tâche approuvée
+// reste affichée dans la colonne "Terminé", juste avec un badge différent.
+export type TaskStatus = 'a_faire' | 'en_cours' | 'termine' | 'approuve'
 
 export interface Task {
   id: string
@@ -217,6 +219,8 @@ export interface Task {
   priority: TaskPriority
   status: TaskStatus
   deadline: string | null
+  approved_by: string | null
+  approved_at: string | null
   created_at: string
   updated_at: string
   client?: Pick<Client, 'id' | 'name' | 'company'> | null

@@ -95,7 +95,7 @@ async function OrgDashboard(
   ] = await Promise.all([
     supabase.from('clients').select('id, status').eq('user_id', ownerId),
     supabase.from('content_pieces').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('status', 'review'),
-    supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).lt('deadline', todayISO).neq('status', 'termine'),
+    supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).lt('deadline', todayISO).not('status', 'in', '(termine,approuve)'),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('status', 'en_cours'),
     ctx.canAccessFinance
       ? supabase.from('invoices').select('subtotal').eq('user_id', ownerId).eq('status', 'paye').gte('paid_at', monthStart).lte('paid_at', monthEnd)
@@ -104,7 +104,7 @@ async function OrgDashboard(
     supabase.from('tasks')
       .select('id, title, priority, deadline, assigned_to, client:clients(name)')
       .eq('user_id', ownerId)
-      .neq('status', 'termine')
+      .not('status', 'in', '(termine,approuve)')
       .order('deadline', { ascending: true, nullsFirst: false })
       .limit(30),
     supabase.from('content_pieces')
@@ -275,7 +275,7 @@ async function TeamDashboard(
       .select('id, title, status, priority, deadline, client:clients(name)')
       .eq('user_id', ownerId)
       .eq('assigned_to', userId)
-      .neq('status', 'termine')
+      .not('status', 'in', '(termine,approuve)')
       .order('deadline', { ascending: true, nullsFirst: false }),
     supabase.from('tasks')
       .select('deadline')

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Plus, Calendar, Trash2, X, Loader2, ListTodo, ArrowRight, Pencil } from 'lucide-react'
+import { Plus, Calendar, Trash2, X, Loader2, ListTodo, ArrowRight, Pencil, CheckCheck } from 'lucide-react'
 import type { Task, TaskPriority, TaskStatus } from '@/types'
 import { cn, formatDate, PRIORITY_LABELS, TASK_STATUS_LABELS } from '@/lib/utils'
 
@@ -34,15 +34,19 @@ const PRIORITIES: { value: TaskPriority; chipClass: string }[] = [
   { value: 'urgente', chipClass: 'bg-red-50    text-red-600' },
 ]
 
+// 'approuve' n'avance jamais via ce bouton générique — c'est une action
+// dédiée ("Approuver"), pas une étape du cycle a_faire → en_cours → termine.
 const NEXT_STATUS: Record<TaskStatus, TaskStatus | null> = {
   a_faire: 'en_cours',
   en_cours: 'termine',
   termine: null,
+  approuve: null,
 }
 const NEXT_STATUS_LABEL: Record<TaskStatus, string> = {
   a_faire: 'Démarrer',
   en_cours: 'Terminer',
   termine: '',
+  approuve: '',
 }
 
 type FormState = {
@@ -204,16 +208,22 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  const totalActive = tasks.filter(t => t.status !== 'termine').length
+  const totalActive = tasks.filter(t => t.status !== 'termine' && t.status !== 'approuve').length
   const showMemberFilter = view !== 'perso' && members.length > 0
   const groupByMember = view === 'org'
 
-  // Édition complète (titre/description/priorité/deadline/assigné à/suppression) :
+  // Édition complète (titre/description/priorité/deadline/assigné à) :
   // réservée au créateur (assigned_by) ou owner/director (cf. migration 035).
   // Changer le statut : créateur, owner/director, OU la personne assignée.
+  // Supprimer : édition complète OU (tâche approuvée ET on est l'assigné —
+  // migration 036). Approuver : édition complète OU (vue équipe ET tâche
+  // "terminée" — un chef_equipe gère l'approbation de son équipe, la RLS
+  // fait le vrai filtrage précis par tâche/membre).
   const isOwnerOrDirector = view === 'org'
   const canEditTask         = (task: Task) => isOwnerOrDirector || task.assigned_by === currentUserId
   const canChangeStatusTask = (task: Task) => canEditTask(task) || task.assigned_to === currentUserId
+  const canDeleteTask       = (task: Task) => canEditTask(task) || (task.status === 'approuve' && task.assigned_to === currentUserId)
+  const canApproveTask      = (task: Task) => task.status === 'termine' && (isOwnerOrDirector || view === 'team')
 
   const title = view === 'org' ? 'Tâches' : view === 'team' ? 'Tâches de l\'équipe' : 'Mes tâches'
 
@@ -271,7 +281,11 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3" style={{ minHeight: 540 }}>
           {COLUMNS.map(col => {
-            const colTasks = filteredTasks.filter(t => t.status === col.id)
+            // Une tâche 'approuve' reste dans la colonne "Terminé" — pas de
+            // 4e colonne (cf. migration 036).
+            const colTasks = filteredTasks.filter(t =>
+              t.status === col.id || (col.id === 'termine' && t.status === 'approuve')
+            )
             const isOver = dragOverColumn === col.id
 
             const grouped = groupByMember
@@ -329,7 +343,9 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
                               task={task}
                               assigneeName={task.assigned_to ? memberName.get(task.assigned_to) : undefined}
                               canEdit={canEditTask(task)}
+                              canDelete={canDeleteTask(task)}
                               canChangeStatus={canChangeStatusTask(task)}
+                              canApprove={canApproveTask(task)}
                               isDragging={draggingId === task.id}
                               isDeleting={deletingId === task.id}
                               onDragStart={handleDragStart}
@@ -337,6 +353,7 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
                               onDelete={handleDelete}
                               onEdit={openEditModal}
                               onAdvance={updateStatus}
+                              onApprove={() => updateStatus(task.id, 'approuve')}
                             />
                           ))}
                         </div>
@@ -500,13 +517,15 @@ function groupTasksByMember(tasks: Task[], memberName: Map<string, string>) {
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
 function TaskCard({
-  task, assigneeName, canEdit, canChangeStatus, isDragging, isDeleting,
-  onDragStart, onDragEnd, onDelete, onEdit, onAdvance,
+  task, assigneeName, canEdit, canDelete, canChangeStatus, canApprove, isDragging, isDeleting,
+  onDragStart, onDragEnd, onDelete, onEdit, onAdvance, onApprove,
 }: {
   task: Task
   assigneeName?: string
   canEdit: boolean
+  canDelete: boolean
   canChangeStatus: boolean
+  canApprove: boolean
   isDragging: boolean
   isDeleting: boolean
   onDragStart: (e: React.DragEvent, id: string) => void
@@ -514,9 +533,11 @@ function TaskCard({
   onDelete: (id: string) => void
   onEdit: (task: Task) => void
   onAdvance: (id: string, status: TaskStatus) => void
+  onApprove: () => void
 }) {
   const priority = PRIORITIES.find(p => p.value === task.priority)
-  const isOverdue = task.deadline && new Date(task.deadline) < new Date(new Date().toDateString()) && task.status !== 'termine'
+  const isDone = task.status === 'termine' || task.status === 'approuve'
+  const isOverdue = task.deadline && new Date(task.deadline) < new Date(new Date().toDateString()) && !isDone
   const next = NEXT_STATUS[task.status]
 
   return (
@@ -533,14 +554,18 @@ function TaskCard({
         isDeleting && 'opacity-40 pointer-events-none'
       )}
     >
-      {canEdit && (
+      {(canEdit || canDelete) && (
         <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-          <button onClick={e => { e.stopPropagation(); onEdit(task) }} className="p-1 rounded text-gray-300 hover:text-gray-600 hover:bg-gray-50">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={e => { e.stopPropagation(); onDelete(task.id) }} className="p-1 rounded text-gray-300 hover:text-red-400 hover:bg-red-50">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          {canEdit && (
+            <button onClick={e => { e.stopPropagation(); onEdit(task) }} className="p-1 rounded text-gray-300 hover:text-gray-600 hover:bg-gray-50">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={e => { e.stopPropagation(); onDelete(task.id) }} className="p-1 rounded text-gray-300 hover:text-red-400 hover:bg-red-50">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       )}
 
@@ -564,6 +589,17 @@ function TaskCard({
             {formatDate(task.deadline)}
           </span>
         )}
+        {task.status === 'termine' && (
+          <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-amber-50 text-amber-600">
+            En attente d'approbation
+          </span>
+        )}
+        {task.status === 'approuve' && (
+          <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-700">
+            <CheckCheck className="w-3 h-3" />
+            Approuvé
+          </span>
+        )}
       </div>
 
       {next && canChangeStatus && (
@@ -573,6 +609,16 @@ function TaskCard({
         >
           {NEXT_STATUS_LABEL[task.status]}
           <ArrowRight className="w-3 h-3" />
+        </button>
+      )}
+
+      {canApprove && (
+        <button
+          onClick={e => { e.stopPropagation(); onApprove() }}
+          className="mt-2.5 w-full flex items-center justify-center gap-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-md py-1.5 transition-colors"
+        >
+          <CheckCheck className="w-3 h-3" />
+          Approuver
         </button>
       )}
     </div>

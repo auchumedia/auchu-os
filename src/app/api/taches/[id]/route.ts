@@ -52,6 +52,14 @@ export async function PATCH(
     )
   }
 
+  // Passage à 'approuve' : horodatage/auteur fixés côté serveur, jamais
+  // acceptés depuis le client (la RLS + le trigger tasks_enforce_role_update
+  // — migration 036 — décident qui a le droit de faire ce changement).
+  if (fields.status === 'approuve') {
+    fields.approved_by = ctx.userId
+    fields.approved_at = new Date().toISOString()
+  }
+
   // tasks.user_id est l'ID du owner de l'org (dataOwnerId), pas celui de la
   // personne qui édite — même raison que content_pieces (cf. api/contenus/[id]).
   const { data, error } = await supabase
@@ -81,7 +89,7 @@ export async function DELETE(
   // n'a été supprimé, et l'UI retirerait la tâche à tort de l'écran.
   const { data: existing, error: fetchError } = await supabase
     .from('tasks')
-    .select('assigned_by')
+    .select('assigned_by, assigned_to, status')
     .eq('id', params.id)
     .eq('user_id', ctx.dataOwnerId)
     .maybeSingle()
@@ -89,10 +97,15 @@ export async function DELETE(
   if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 })
   if (!existing) return NextResponse.json({ error: 'Tâche introuvable' }, { status: 404 })
 
-  const isPrivileged = ctx.isOwner || ctx.isDirector || existing.assigned_by === ctx.userId
+  // Créateur ou owner/director : peuvent supprimer peu importe le statut.
+  // Personne assignée : seulement une fois la tâche approuvée (migration 036).
+  const isPrivileged = ctx.isOwner || ctx.isDirector
+    || existing.assigned_by === ctx.userId
+    || (existing.status === 'approuve' && existing.assigned_to === ctx.userId)
+
   if (!isPrivileged) {
     return NextResponse.json(
-      { error: 'Seul le créateur de la tâche ou un owner/director peut la supprimer' },
+      { error: 'Seul le créateur, un owner/director, ou la personne assignée (une fois la tâche approuvée) peut la supprimer' },
       { status: 403 }
     )
   }

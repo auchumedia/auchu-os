@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Calendar, Trash2, X, Loader2, ListTodo, ArrowRight } from 'lucide-react'
+import { Plus, Calendar, Trash2, X, Loader2, ListTodo, ArrowRight, CheckCheck } from 'lucide-react'
 import type { Task, TaskPriority, TaskStatus } from '@/types'
 import { cn, formatDate, PRIORITY_LABELS, TASK_STATUS_LABELS } from '@/lib/utils'
 
@@ -14,8 +14,11 @@ interface Props {
   canCreate: boolean
   currentUserId: string
   isOwnerOrDirector: boolean
+  isChefEquipe: boolean
 }
 
+// Une tâche 'approuve' reste listée dans la section "Terminé" — pas de
+// section supplémentaire (cf. migration 036).
 const COLUMNS: TaskStatus[] = ['a_faire', 'en_cours', 'termine']
 
 const PRIORITY_CHIP: Record<TaskPriority, string> = {
@@ -29,16 +32,18 @@ const NEXT_STATUS: Record<TaskStatus, TaskStatus | null> = {
   a_faire: 'en_cours',
   en_cours: 'termine',
   termine: null,
+  approuve: null,
 }
 const NEXT_STATUS_LABEL: Record<TaskStatus, string> = {
   a_faire: 'Démarrer',
   en_cours: 'Terminer',
   termine: '',
+  approuve: '',
 }
 
 const EMPTY_FORM = { title: '', description: '', assigned_to: '', priority: 'normale' as TaskPriority, deadline: '' }
 
-export default function ClientTasksTab({ clientId, initialTasks, teamMembers, canCreate, currentUserId, isOwnerOrDirector }: Props) {
+export default function ClientTasksTab({ clientId, initialTasks, teamMembers, canCreate, currentUserId, isOwnerOrDirector, isChefEquipe }: Props) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -49,10 +54,15 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
 
   const memberName = new Map(teamMembers.map(m => [m.id, m.name]))
 
-  // Supprimer/modifier : créateur (assigned_by) ou owner/director seulement.
-  // Changer le statut : idem, plus la personne assignée (cf. migration 035).
+  // Édition complète : créateur (assigned_by) ou owner/director seulement.
+  // Changer le statut : idem, plus la personne assignée (migration 035).
+  // Supprimer : édition complète, OU tâche approuvée ET on est l'assigné.
+  // Approuver : owner/director, ou chef d'équipe (RLS fait le vrai filtrage
+  // par équipe — migration 036).
   const canEditTask         = (task: Task) => isOwnerOrDirector || task.assigned_by === currentUserId
   const canChangeStatusTask = (task: Task) => canEditTask(task) || task.assigned_to === currentUserId
+  const canDeleteTask       = (task: Task) => canEditTask(task) || (task.status === 'approuve' && task.assigned_to === currentUserId)
+  const canApproveTask      = (task: Task) => task.status === 'termine' && (isOwnerOrDirector || isChefEquipe)
 
   async function updateStatus(id: string, status: TaskStatus) {
     const prev = tasks
@@ -122,7 +132,7 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
       ) : (
         <div className="space-y-6">
           {COLUMNS.map(status => {
-            const list = tasks.filter(t => t.status === status)
+            const list = tasks.filter(t => t.status === status || (status === 'termine' && t.status === 'approuve'))
             if (list.length === 0) return null
             return (
               <div key={status}>
@@ -131,13 +141,14 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
                 </p>
                 <div className="space-y-2">
                   {list.map(task => {
-                    const isOverdue = task.deadline && new Date(task.deadline) < new Date(new Date().toDateString()) && task.status !== 'termine'
+                    const isDone = task.status === 'termine' || task.status === 'approuve'
+                    const isOverdue = task.deadline && new Date(task.deadline) < new Date(new Date().toDateString()) && !isDone
                     const next = NEXT_STATUS[task.status]
                     const assignee = task.assigned_to ? memberName.get(task.assigned_to) : undefined
                     return (
                       <div key={task.id} className={cn('flex items-center gap-3 bg-white border rounded-xl px-4 py-3', isOverdue ? 'border-red-200' : 'border-gray-100')}>
                         <div className="flex-1 min-w-0">
-                          <p className={cn('text-sm font-medium truncate', task.status === 'termine' ? 'text-gray-400 line-through' : 'text-gray-900')}>
+                          <p className={cn('text-sm font-medium truncate', isDone ? 'text-gray-400 line-through' : 'text-gray-900')}>
                             {task.title}
                           </p>
                           {(assignee || task.description) && (
@@ -155,6 +166,17 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
                             {formatDate(task.deadline)}
                           </span>
                         )}
+                        {task.status === 'termine' && (
+                          <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-amber-50 text-amber-600 flex-shrink-0">
+                            En attente d'approbation
+                          </span>
+                        )}
+                        {task.status === 'approuve' && (
+                          <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-50 text-green-700 flex-shrink-0">
+                            <CheckCheck className="w-3 h-3" />
+                            Approuvé
+                          </span>
+                        )}
                         {next && canChangeStatusTask(task) && (
                           <button
                             disabled={updatingId === task.id}
@@ -164,7 +186,16 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
                             {updatingId === task.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <>{NEXT_STATUS_LABEL[task.status]}<ArrowRight className="w-3 h-3" /></>}
                           </button>
                         )}
-                        {canEditTask(task) && (
+                        {canApproveTask(task) && (
+                          <button
+                            disabled={updatingId === task.id}
+                            onClick={() => updateStatus(task.id, 'approuve')}
+                            className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-md px-2 py-1 flex-shrink-0 disabled:opacity-50"
+                          >
+                            {updatingId === task.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><CheckCheck className="w-3 h-3" />Approuver</>}
+                          </button>
+                        )}
+                        {canDeleteTask(task) && (
                           <button
                             disabled={deletingId === task.id}
                             onClick={() => handleDelete(task.id)}
