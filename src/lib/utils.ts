@@ -90,6 +90,26 @@ export const INVOICE_STATUS_LABELS: Record<string, string> = {
   annule: 'Annulé',
 }
 
+export const MEMBER_INVOICE_STATUS_LABELS: Record<string, string> = {
+  brouillon: 'Brouillon',
+  envoyee:   'Envoyée',
+  approuvee: 'Approuvée',
+  payee:     'Payée',
+}
+
+export const MEMBER_INVOICE_STATUS_COLORS: Record<string, string> = {
+  brouillon: 'bg-gray-100  text-gray-600',
+  envoyee:   'bg-blue-50   text-blue-700',
+  approuvee: 'bg-amber-50  text-amber-700',
+  payee:     'bg-green-50  text-green-700',
+}
+
+export const BILLING_PERIOD_LABELS: Record<string, string> = {
+  weekly:   'Hebdomadaire',
+  biweekly: 'Aux 2 semaines',
+  monthly:  'Mensuel',
+}
+
 export const CONTENT_TYPE_LABELS: Record<string, string> = {
   post: 'Post',
   story: 'Story',
@@ -122,4 +142,21 @@ export function getInitials(name: string) {
 // ─── ID generation ────────────────────────────────────────────────────────────
 export function generateId() {
   return Math.random().toString(36).substring(2, 11)
+}
+
+// ─── Durée (time tracking) ────────────────────────────────────────────────────
+// Format compact "1h 23m" (ou "45m" sous l'heure, "0m" à zéro) — utilisé pour
+// le chrono des tâches et les factures de membres.
+export function formatDuration(totalSeconds: number) {
+  const totalMinutes = Math.floor(Math.max(0, totalSeconds) / 60)
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  if (h === 0) return `${m}m`
+  return `${h}h ${String(m).padStart(2, '0')}m`
+}
+
+// Format décimal "1.38" (heures) — utilisé pour les calculs de facturation
+// horaire (heures × taux).
+export function secondsToHours(totalSeconds: number) {
+  return Math.round((totalSeconds / 3600) * 100) / 100
 }

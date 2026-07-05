@@ -62,6 +62,18 @@ export default async function SettingsPage() {
   const planInfo    = PLAN_LIMITS[currentPlan]
   const activeCount = ctx.memberCount
 
+  // ── Profil de facturation — membres sous-traitants uniquement ─────────────
+  const isBillableMember = ['chef_equipe', 'stratege', 'monteur'].includes(ctx.role)
+  let billingConfig = null
+  if (isBillableMember) {
+    const { data } = await supabase
+      .from('member_billing_config')
+      .select('billing_mode, hourly_rate, fixed_rate, currency, period, payment_info')
+      .eq('user_id', ctx.userId)
+      .maybeSingle()
+    billingConfig = data
+  }
+
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
 
@@ -83,6 +95,14 @@ export default async function SettingsPage() {
           avatar_url: profile?.avatar_url ?? null,
           title:      (profile as any)?.title ?? null,
         }}
+        billingConfig={isBillableMember ? {
+          billing_mode: (billingConfig?.billing_mode ?? 'hourly') as 'hourly' | 'fixed',
+          hourly_rate:  billingConfig?.hourly_rate  ?? null,
+          fixed_rate:   billingConfig?.fixed_rate   ?? null,
+          currency:     billingConfig?.currency     ?? 'CAD',
+          period:       (billingConfig?.period ?? 'monthly') as 'weekly' | 'biweekly' | 'monthly',
+          payment_info: billingConfig?.payment_info ?? null,
+        } : null}
       />
 
       {/* ── Facturation & plan — owner uniquement ────────────────────────────── */}

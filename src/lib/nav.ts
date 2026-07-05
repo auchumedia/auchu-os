@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Receipt, Brain, Settings, UsersRound, ListTodo,
+  LayoutDashboard, Users, Receipt, Brain, Settings, UsersRound, ListTodo, FileText,
 } from 'lucide-react'
 import type { OrgRole } from '@/types'
 
@@ -23,9 +23,15 @@ export function buildNavSections(role: OrgRole): NavSection[] {
     { href: '/dashboard/clients', icon: Users,            label: 'Clients'         },
   ]
 
-  // Finance : owner uniquement pour l'instant.
-  if (isOwner) {
+  // Finance : owner + director (vue globale de l'agence, incl. factures membres).
+  if (isOwner || isDirector) {
     principal.push({ href: '/dashboard/finance', icon: Receipt, label: 'Finance' })
+  }
+
+  // Mes factures : membres sous-traitants uniquement (chef_equipe/stratege/monteur) —
+  // director gère plutôt "Factures membres" côté Finance, pas ses propres factures.
+  if (role === 'chef_equipe' || role === 'stratege' || role === 'monteur') {
+    principal.push({ href: '/dashboard/mes-factures', icon: FileText, label: 'Mes factures' })
   }
 
   const equipe: NavItem[] = [

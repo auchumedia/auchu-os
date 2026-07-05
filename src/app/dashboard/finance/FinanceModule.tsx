@@ -1,14 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Plus, TrendingUp, TrendingDown, CreditCard, Clock, Trash2,
   CheckCircle, Send, AlertCircle, FileText, Loader2, X,
-  ChevronDown, Printer,
+  ChevronDown, Printer, Download, Users,
 } from 'lucide-react'
-import { Invoice, Expense, Client, ExpenseCategory } from '@/types'
-import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { Invoice, Expense, Client, ExpenseCategory, MemberInvoice } from '@/types'
+import { cn, formatCurrency, formatDate, formatDuration, secondsToHours, MEMBER_INVOICE_STATUS_LABELS, MEMBER_INVOICE_STATUS_COLORS } from '@/lib/utils'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -41,10 +41,24 @@ const INVOICE_STATUS_CONFIG = {
   annule:    { label: 'Annulé',     class: 'badge-gray',  icon: X },
 }
 
-type Tab = 'apercu' | 'factures' | 'depenses' | 'rapport'
+type Tab = 'apercu' | 'factures' | 'depenses' | 'rapport' | 'membres'
 type InvoiceStatus = 'draft' | 'envoye' | 'paye' | 'en_retard' | 'annule'
 
 function r2(n: number) { return Math.round(n * 100) / 100 }
+
+interface MemberTimeEntry {
+  member_id: string; member_name: string
+  client_id: string | null; client_name: string | null
+  started_at: string; duration_seconds: number
+}
+
+const TIME_PERIODS = [
+  { id: 'mois',     label: 'Ce mois' },
+  { id: 'dernier',  label: 'Mois dernier' },
+  { id: 'trimestre', label: 'Ce trimestre' },
+  { id: 'tout',     label: 'Tout' },
+] as const
+type TimePeriod = typeof TIME_PERIODS[number]['id']
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -53,6 +67,8 @@ interface Props {
   initialExpenses: (Expense & { client?: { id: string; name: string } | null })[]
   clients: Pick<Client, 'id' | 'name' | 'email'>[]
   currentMonth: { revenue: number; expenses: number; pending: number; pendingCount: number }
+  memberInvoices: MemberInvoice[]
+  memberTimeEntries: MemberTimeEntry[]
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -62,10 +78,15 @@ export default function FinanceModule({
   initialExpenses,
   clients,
   currentMonth,
+  memberInvoices: initialMemberInvoices,
+  memberTimeEntries,
 }: Props) {
   const [tab, setTab] = useState<Tab>('apercu')
   const [invoices, setInvoices] = useState(initialInvoices)
   const [expenses, setExpenses] = useState(initialExpenses)
+  const [memberInvoices, setMemberInvoices] = useState(initialMemberInvoices)
+  const [memberInvoiceBusyId, setMemberInvoiceBusyId] = useState<string | null>(null)
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('mois')
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'tout'>('tout')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -142,6 +163,63 @@ export default function FinanceModule({
   const deleteExpense = async (id: string) => {
     const res = await fetch(`/api/depenses/${id}`, { method: 'DELETE' })
     if (res.ok) setExpenses(prev => prev.filter(e => e.id !== id))
+  }
+
+  // ─── Member invoices actions ────────────────────────────────────────────────
+
+  const updateMemberInvoiceStatus = async (id: string, status: 'approuvee' | 'payee') => {
+    setMemberInvoiceBusyId(id)
+    const res = await fetch(`/api/member-invoices/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    if (res.ok) {
+      const { data } = await res.json()
+      setMemberInvoices(prev => prev.map(inv => inv.id === id ? data : inv))
+    }
+    setMemberInvoiceBusyId(null)
+  }
+
+  // ─── Temps par membre : filtre par période + agrégation ────────────────────
+
+  const timeRange = useMemo(() => {
+    const n = new Date()
+    if (timePeriod === 'mois') return { start: new Date(n.getFullYear(), n.getMonth(), 1), end: new Date(n.getFullYear(), n.getMonth() + 1, 0, 23, 59, 59) }
+    if (timePeriod === 'dernier') return { start: new Date(n.getFullYear(), n.getMonth() - 1, 1), end: new Date(n.getFullYear(), n.getMonth(), 0, 23, 59, 59) }
+    if (timePeriod === 'trimestre') { const q = Math.floor(n.getMonth() / 3); return { start: new Date(n.getFullYear(), q * 3, 1), end: new Date(n.getFullYear(), q * 3 + 3, 0, 23, 59, 59) } }
+    return { start: new Date(2000, 0, 1), end: new Date(2100, 0, 1) }
+  }, [timePeriod])
+
+  const filteredTimeEntries = useMemo(() => memberTimeEntries.filter(e => {
+    const d = new Date(e.started_at)
+    return d >= timeRange.start && d <= timeRange.end
+  }), [memberTimeEntries, timeRange])
+
+  const timeByMember = useMemo(() => {
+    const groups = new Map<string, { member_name: string; client_name: string; seconds: number }>()
+    for (const e of filteredTimeEntries) {
+      const key = `${e.member_id}::${e.client_id ?? 'none'}`
+      const existing = groups.get(key)
+      groups.set(key, {
+        member_name: e.member_name,
+        client_name: e.client_name ?? 'Sans client',
+        seconds: (existing?.seconds ?? 0) + e.duration_seconds,
+      })
+    }
+    return Array.from(groups.values()).sort((a, b) => b.seconds - a.seconds)
+  }, [filteredTimeEntries])
+
+  const exportTimeCsv = () => {
+    const rows = [['Membre', 'Client', 'Heures'], ...timeByMember.map(r => [r.member_name, r.client_name, String(secondsToHours(r.seconds))])]
+    const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `temps-par-membre-${timePeriod}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // ─── KPI calculations ───────────────────────────────────────────────────────
@@ -247,6 +325,7 @@ export default function FinanceModule({
     { id: 'factures', label: `Factures (${invoices.length})` },
     { id: 'depenses', label: `Dépenses (${expenses.length})` },
     { id: 'rapport',  label: 'Rapport fiscal' },
+    { id: 'membres',  label: `Factures membres (${memberInvoices.length})` },
   ]
 
   return (
@@ -704,6 +783,156 @@ export default function FinanceModule({
             <Printer className="w-4 h-4" />
             Générer rapport PDF pour comptable
           </button>
+        </div>
+      )}
+
+      {/* ─── Tab: Factures membres ───────────────────────────────────────────── */}
+      {tab === 'membres' && (
+        <div className="space-y-6">
+          {/* Factures soumises par les membres */}
+          <div className="card p-0 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Factures soumises par les membres</h3>
+            </div>
+            {memberInvoices.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Aucune facture de membre pour l'instant</p>
+              </div>
+            ) : (
+              <>
+                <table className="table hidden md:table">
+                  <thead>
+                    <tr>
+                      <th>Membre</th>
+                      <th>Période</th>
+                      <th>Mode</th>
+                      <th className="text-right">Total</th>
+                      <th>Statut</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {memberInvoices.map(inv => (
+                      <tr key={inv.id}>
+                        <td className="text-sm text-gray-700">{inv.member?.full_name || inv.member?.email || 'Membre'}</td>
+                        <td>
+                          <Link href={`/dashboard/mes-factures/${inv.id}`} className="text-sm font-medium text-auchu-600 hover:underline">
+                            {formatDate(inv.period_start)} – {formatDate(inv.period_end)}
+                          </Link>
+                        </td>
+                        <td className="text-sm text-gray-600">{inv.billing_mode === 'hourly' ? 'Taux horaire' : 'Montant fixe'}</td>
+                        <td className="text-right text-sm font-medium text-gray-900 tabular-nums">{formatCurrency(inv.total, inv.currency)}</td>
+                        <td>
+                          <span className={cn('badge', MEMBER_INVOICE_STATUS_COLORS[inv.status])}>
+                            {MEMBER_INVOICE_STATUS_LABELS[inv.status]}
+                          </span>
+                        </td>
+                        <td>
+                          {memberInvoiceBusyId === inv.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              {inv.status === 'envoyee' && (
+                                <ActionBtn onClick={() => updateMemberInvoiceStatus(inv.id, 'approuvee')} title="Approuver" icon={CheckCircle} colorClass="hover:text-amber-500" />
+                              )}
+                              {inv.status === 'approuvee' && (
+                                <ActionBtn onClick={() => updateMemberInvoiceStatus(inv.id, 'payee')} title="Marquer payée" icon={CreditCard} colorClass="hover:text-green-500" />
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="md:hidden divide-y divide-gray-100">
+                  {memberInvoices.map(inv => (
+                    <div key={inv.id} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{inv.member?.full_name || inv.member?.email || 'Membre'}</p>
+                          <Link href={`/dashboard/mes-factures/${inv.id}`} className="text-xs text-auchu-600 hover:underline">
+                            {formatDate(inv.period_start)} – {formatDate(inv.period_end)}
+                          </Link>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900 tabular-nums">{formatCurrency(inv.total, inv.currency)}</p>
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className={cn('badge', MEMBER_INVOICE_STATUS_COLORS[inv.status])}>
+                          {MEMBER_INVOICE_STATUS_LABELS[inv.status]}
+                        </span>
+                        {memberInvoiceBusyId === inv.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            {inv.status === 'envoyee' && (
+                              <ActionBtn onClick={() => updateMemberInvoiceStatus(inv.id, 'approuvee')} title="Approuver" icon={CheckCircle} colorClass="hover:text-amber-500" size="md" />
+                            )}
+                            {inv.status === 'approuvee' && (
+                              <ActionBtn onClick={() => updateMemberInvoiceStatus(inv.id, 'payee')} title="Marquer payée" icon={CreditCard} colorClass="hover:text-green-500" size="md" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Vue temps par membre */}
+          <div className="card p-0 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-wrap gap-3">
+              <h3 className="text-sm font-semibold text-gray-900">Temps par membre</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                {TIME_PERIODS.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setTimePeriod(p.id)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors',
+                      timePeriod === p.id ? 'bg-auchu-500 text-white border-auchu-500' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+                <button onClick={exportTimeCsv} className="btn-secondary text-xs py-1.5 gap-1.5">
+                  <Download className="w-3.5 h-3.5" />
+                  Export CSV
+                </button>
+              </div>
+            </div>
+
+            {timeByMember.length === 0 ? (
+              <div className="text-center py-12">
+                <Clock className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Aucun temps enregistré pour cette période</p>
+              </div>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Membre</th>
+                    <th>Client</th>
+                    <th className="text-right">Heures</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {timeByMember.map((row, i) => (
+                    <tr key={i}>
+                      <td className="text-sm text-gray-700">{row.member_name}</td>
+                      <td className="text-sm text-gray-500">{row.client_name}</td>
+                      <td className="text-right text-sm font-medium text-gray-900 tabular-nums">{formatDuration(row.seconds)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -1,14 +1,16 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Plus, Calendar, Trash2, X, Loader2, ListTodo, ArrowRight, Pencil, CheckCheck } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Calendar, Trash2, X, Loader2, ListTodo, ArrowRight, Pencil, CheckCheck, Play, Square } from 'lucide-react'
 import type { Task, TaskPriority, TaskStatus } from '@/types'
-import { cn, formatDate, PRIORITY_LABELS, TASK_STATUS_LABELS } from '@/lib/utils'
+import { cn, formatDate, formatDuration, PRIORITY_LABELS, TASK_STATUS_LABELS } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MemberOption { id: string; name: string }
 interface ClientOption { id: string; name: string }
+
+interface ActiveEntry { id: string; task_id: string; started_at: string }
 
 interface TachesBoardProps {
   view: 'org' | 'team' | 'perso'
@@ -17,6 +19,8 @@ interface TachesBoardProps {
   initialTasks: Task[]
   members: MemberOption[]
   clients: ClientOption[]
+  initialTimeTotals: Record<string, number>
+  initialActiveEntry: ActiveEntry | null
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -66,11 +70,56 @@ const EMPTY_FORM: FormState = {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function TachesBoard({ view, currentUserId, canCreate, initialTasks, members, clients }: TachesBoardProps) {
+export default function TachesBoard({ view, currentUserId, canCreate, initialTasks, members, clients, initialTimeTotals, initialActiveEntry }: TachesBoardProps) {
   const [tasks, setTasks]       = useState<Task[]>(initialTasks)
   const [draggingId, setDraggingId]         = useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null)
   const [deletingId, setDeletingId]         = useState<string | null>(null)
+
+  // ─── Time tracking ───────────────────────────────────────────────────────────
+  const [timeTotals, setTimeTotals]   = useState<Record<string, number>>(initialTimeTotals)
+  const [activeEntry, setActiveEntry] = useState<ActiveEntry | null>(initialActiveEntry)
+  const [timerBusy, setTimerBusy]     = useState(false)
+  const [nowTick, setNowTick]         = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!activeEntry) return
+    const id = setInterval(() => setNowTick(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [activeEntry])
+
+  const startTimer = async (taskId: string) => {
+    setTimerBusy(true)
+    const res = await fetch('/api/time-entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId }),
+    })
+    if (res.ok) {
+      const { data, stopped } = await res.json()
+      if (stopped) {
+        setTimeTotals(prev => ({ ...prev, [stopped.task_id]: (prev[stopped.task_id] ?? 0) + stopped.duration_seconds }))
+      }
+      setActiveEntry({ id: data.id, task_id: data.task_id, started_at: data.started_at })
+      setNowTick(Date.now())
+    }
+    setTimerBusy(false)
+  }
+
+  const stopTimer = async () => {
+    if (!activeEntry) return
+    setTimerBusy(true)
+    const res = await fetch(`/api/time-entries/${activeEntry.id}`, { method: 'PATCH' })
+    if (res.ok) {
+      const { data } = await res.json()
+      setTimeTotals(prev => ({ ...prev, [data.task_id]: (prev[data.task_id] ?? 0) + (data.duration_seconds ?? 0) }))
+      setActiveEntry(null)
+    }
+    setTimerBusy(false)
+  }
+
+  const activeTask = activeEntry ? tasks.find(t => t.id === activeEntry.task_id) : undefined
+  const activeElapsedSeconds = activeEntry ? Math.floor((nowTick - new Date(activeEntry.started_at).getTime()) / 1000) : 0
 
   const [priorityFilter, setPriorityFilter] = useState<'all' | TaskPriority>('all')
   const [memberFilter, setMemberFilter]     = useState<'all' | string>('all')
@@ -235,6 +284,29 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
 
   return (
     <>
+      {/* Bannière chrono actif */}
+      {activeEntry && activeTask && (
+        <div className="flex items-center justify-between gap-3 bg-auchu-600 text-white rounded-xl px-4 py-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="relative flex w-2.5 h-2.5 flex-shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
+              <span className="relative inline-flex rounded-full w-2.5 h-2.5 bg-white" />
+            </span>
+            <p className="text-sm font-medium truncate">
+              En cours : {activeTask.title} — <span className="tabular-nums">{formatDuration(activeElapsedSeconds)}</span>
+            </p>
+          </div>
+          <button
+            onClick={stopTimer}
+            disabled={timerBusy}
+            className="flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-60 flex-shrink-0"
+          >
+            <Square className="w-3 h-3 fill-current" />
+            Arrêter
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -343,25 +415,34 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
                           </p>
                         )}
                         <div className="space-y-2">
-                          {group.tasks.map(task => (
-                            <TaskCard
-                              key={task.id}
-                              task={task}
-                              assigneeName={task.assigned_to ? memberName.get(task.assigned_to) : undefined}
-                              canEdit={canEditTask(task)}
-                              canDelete={canDeleteTask(task)}
-                              canChangeStatus={canChangeStatusTask(task)}
-                              canApprove={canApproveTask(task)}
-                              isDragging={draggingId === task.id}
-                              isDeleting={deletingId === task.id}
-                              onDragStart={handleDragStart}
-                              onDragEnd={handleDragEnd}
-                              onDelete={handleDelete}
-                              onEdit={openEditModal}
-                              onAdvance={updateStatus}
-                              onApprove={() => updateStatus(task.id, 'approuve')}
-                            />
-                          ))}
+                          {group.tasks.map(task => {
+                            const isActive = activeEntry?.task_id === task.id
+                            const totalSeconds = (timeTotals[task.id] ?? 0) + (isActive ? activeElapsedSeconds : 0)
+                            return (
+                              <TaskCard
+                                key={task.id}
+                                task={task}
+                                assigneeName={task.assigned_to ? memberName.get(task.assigned_to) : undefined}
+                                canEdit={canEditTask(task)}
+                                canDelete={canDeleteTask(task)}
+                                canChangeStatus={canChangeStatusTask(task)}
+                                canApprove={canApproveTask(task)}
+                                isDragging={draggingId === task.id}
+                                isDeleting={deletingId === task.id}
+                                isTimerActive={isActive}
+                                totalSeconds={totalSeconds}
+                                timerBusy={timerBusy}
+                                onDragStart={handleDragStart}
+                                onDragEnd={handleDragEnd}
+                                onDelete={handleDelete}
+                                onEdit={openEditModal}
+                                onAdvance={updateStatus}
+                                onApprove={() => updateStatus(task.id, 'approuve')}
+                                onStartTimer={() => startTimer(task.id)}
+                                onStopTimer={stopTimer}
+                              />
+                            )
+                          })}
                         </div>
                       </div>
                     ))
@@ -524,7 +605,8 @@ function groupTasksByMember(tasks: Task[], memberName: Map<string, string>) {
 
 function TaskCard({
   task, assigneeName, canEdit, canDelete, canChangeStatus, canApprove, isDragging, isDeleting,
-  onDragStart, onDragEnd, onDelete, onEdit, onAdvance, onApprove,
+  isTimerActive, totalSeconds, timerBusy,
+  onDragStart, onDragEnd, onDelete, onEdit, onAdvance, onApprove, onStartTimer, onStopTimer,
 }: {
   task: Task
   assigneeName?: string
@@ -534,12 +616,17 @@ function TaskCard({
   canApprove: boolean
   isDragging: boolean
   isDeleting: boolean
+  isTimerActive: boolean
+  totalSeconds: number
+  timerBusy: boolean
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void
   onDelete: (id: string) => void
   onEdit: (task: Task) => void
   onAdvance: (id: string, status: TaskStatus) => void
   onApprove: () => void
+  onStartTimer: () => void
+  onStopTimer: () => void
 }) {
   const priority = PRIORITIES.find(p => p.value === task.priority)
   const isDone = task.status === 'termine' || task.status === 'approuve'
@@ -607,6 +694,35 @@ function TaskCard({
           </span>
         )}
       </div>
+
+      {canChangeStatus && (
+        <div className="mt-2.5 flex items-center gap-2">
+          {isTimerActive ? (
+            <button
+              onClick={e => { e.stopPropagation(); onStopTimer() }}
+              disabled={timerBusy}
+              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md py-1.5 transition-colors disabled:opacity-60"
+            >
+              <span className="relative flex w-1.5 h-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400" />
+                <span className="relative inline-flex rounded-full w-1.5 h-1.5 bg-red-500" />
+              </span>
+              {formatDuration(totalSeconds)}
+              <Square className="w-3 h-3 fill-current ml-0.5" />
+            </button>
+          ) : (
+            <button
+              onClick={e => { e.stopPropagation(); onStartTimer() }}
+              disabled={timerBusy}
+              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-md py-1.5 transition-colors disabled:opacity-60"
+            >
+              <Play className="w-3 h-3 fill-current" />
+              Start
+              {totalSeconds > 0 && <span className="text-gray-400">· Total: {formatDuration(totalSeconds)}</span>}
+            </button>
+          )}
+        </div>
+      )}
 
       {next && canChangeStatus && (
         <button

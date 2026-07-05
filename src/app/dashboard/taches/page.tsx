@@ -82,6 +82,29 @@ export default async function TachesPage() {
 
   const view = ctx.isOwner || ctx.isDirector ? 'org' : ctx.isTeamChef ? 'team' : 'perso'
 
+  // ── Time tracking : totaux accumulés (par tâche) + chrono actif de l'utilisateur ──
+  const taskIds = (tasks ?? []).map(t => t.id)
+  let timeTotals: Record<string, number> = {}
+  if (taskIds.length > 0) {
+    const { data: entries } = await supabase
+      .from('time_entries')
+      .select('task_id, duration_seconds')
+      .in('task_id', taskIds)
+      .not('duration_seconds', 'is', null)
+
+    timeTotals = (entries ?? []).reduce((acc: Record<string, number>, e) => {
+      acc[e.task_id] = (acc[e.task_id] ?? 0) + (e.duration_seconds ?? 0)
+      return acc
+    }, {})
+  }
+
+  const { data: activeEntry } = await supabase
+    .from('time_entries')
+    .select('id, task_id, started_at')
+    .eq('user_id', ctx.userId)
+    .is('ended_at', null)
+    .maybeSingle()
+
   return (
     <div className="space-y-6">
       <TachesBoard
@@ -91,6 +114,8 @@ export default async function TachesPage() {
         initialTasks={(tasks ?? []) as any}
         members={members}
         clients={clients}
+        initialTimeTotals={timeTotals}
+        initialActiveEntry={activeEntry ?? null}
       />
     </div>
   )

@@ -287,6 +287,64 @@ export interface InvoiceItem {
   total: number
 }
 
+// ─── Time tracking & facturation des membres ──────────────────────────────────
+export interface TimeEntry {
+  id: string
+  task_id: string
+  user_id: string
+  client_id: string | null
+  started_at: string
+  ended_at: string | null
+  duration_seconds: number | null
+  created_at: string
+}
+
+export type BillingMode = 'hourly' | 'fixed'
+export type BillingPeriod = 'weekly' | 'biweekly' | 'monthly'
+
+export interface MemberBillingConfig {
+  user_id: string
+  org_id: string
+  billing_mode: BillingMode
+  hourly_rate: number | null
+  fixed_rate: number | null
+  currency: string
+  period: BillingPeriod
+  payment_info: string | null
+  updated_at: string
+}
+
+export type MemberInvoiceStatus = 'brouillon' | 'envoyee' | 'approuvee' | 'payee'
+
+export interface MemberInvoiceItem {
+  task_id: string
+  description: string
+  hours?: number
+  rate?: number
+  amount: number
+}
+
+export interface MemberInvoice {
+  id: string
+  org_id: string
+  member_id: string
+  period_start: string
+  period_end: string
+  items: MemberInvoiceItem[]
+  total: number
+  currency: string
+  billing_mode: BillingMode
+  rate: number | null
+  payment_info: string | null
+  status: MemberInvoiceStatus
+  approved_by: string | null
+  approved_at: string | null
+  paid_at: string | null
+  created_at: string
+  updated_at: string
+  member?: { id: string; full_name: string | null; email: string | null } | null
+}
+
 // ─── Dépenses ─────────────────────────────────────────────────────────────────
 export type ExpenseCategory =
   | 'logiciels' | 'publicite' | 'equipement' | 'deplacements'

@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Building2, User, Loader2, Check, Mail, Phone,
-  MapPin, Palette, Camera,
+  MapPin, Palette, Camera, Wallet,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -33,11 +33,21 @@ export interface ProfileSettingsData {
   title:      string | null
 }
 
+export interface BillingConfigData {
+  billing_mode: 'hourly' | 'fixed'
+  hourly_rate:  number | null
+  fixed_rate:   number | null
+  currency:     string
+  period:       'weekly' | 'biweekly' | 'monthly'
+  payment_info: string | null
+}
+
 interface Props {
-  userId:  string
-  isOwner: boolean
-  org:     OrgSettingsData | null
-  profile: ProfileSettingsData
+  userId:        string
+  isOwner:       boolean
+  org:           OrgSettingsData | null
+  profile:       ProfileSettingsData
+  billingConfig: BillingConfigData | null
 }
 
 // ─── Color swatch picker ──────────────────────────────────────────────────────
@@ -121,9 +131,9 @@ function AvatarZone({
 // ─── Save button ──────────────────────────────────────────────────────────────
 
 function SaveButton({ section, saving, saved, onClick }: {
-  section: 'org' | 'profile'
-  saving:  'org' | 'profile' | null
-  saved:   'org' | 'profile' | null
+  section: 'org' | 'profile' | 'billing'
+  saving:  'org' | 'profile' | 'billing' | null
+  saved:   'org' | 'profile' | 'billing' | null
   onClick: () => void
 }) {
   const isLoading = saving === section
@@ -151,7 +161,7 @@ function SaveButton({ section, saving, saved, onClick }: {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function SettingsClient({ userId, isOwner, org, profile }: Props) {
+export default function SettingsClient({ userId, isOwner, org, profile, billingConfig }: Props) {
 
   // ── Org form ─────────────────────────────────────────────────────────────────
   const [orgForm, setOrgForm] = useState({
@@ -176,11 +186,22 @@ export default function SettingsClient({ userId, isOwner, org, profile }: Props)
     title:      profile.title      ?? '',
   })
 
-  const [saving,    setSaving]    = useState<'org' | 'profile' | null>(null)
-  const [saved,     setSaved]     = useState<'org' | 'profile' | null>(null)
-  const [uploading, setUploading] = useState<'logo' | 'avatar' | null>(null)
-  const [orgError,  setOrgError]  = useState<string | null>(null)
-  const [profError, setProfError] = useState<string | null>(null)
+  // ── Billing form (membres sous-traitants) ─────────────────────────────────────
+  const [billingForm, setBillingForm] = useState({
+    billing_mode: billingConfig?.billing_mode ?? 'hourly' as 'hourly' | 'fixed',
+    hourly_rate:  billingConfig?.hourly_rate  != null ? String(billingConfig.hourly_rate) : '',
+    fixed_rate:   billingConfig?.fixed_rate   != null ? String(billingConfig.fixed_rate)  : '',
+    currency:     billingConfig?.currency     ?? 'CAD',
+    period:       billingConfig?.period       ?? 'monthly' as 'weekly' | 'biweekly' | 'monthly',
+    payment_info: billingConfig?.payment_info ?? '',
+  })
+
+  const [saving,     setSaving]     = useState<'org' | 'profile' | 'billing' | null>(null)
+  const [saved,      setSaved]      = useState<'org' | 'profile' | 'billing' | null>(null)
+  const [uploading,  setUploading]  = useState<'logo' | 'avatar' | null>(null)
+  const [orgError,   setOrgError]   = useState<string | null>(null)
+  const [profError,  setProfError]  = useState<string | null>(null)
+  const [billingError, setBillingError] = useState<string | null>(null)
 
   const logoRef   = useRef<HTMLInputElement>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
@@ -222,7 +243,7 @@ export default function SettingsClient({ userId, isOwner, org, profile }: Props)
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────────
-  const flash = (section: 'org' | 'profile') => {
+  const flash = (section: 'org' | 'profile' | 'billing') => {
     setSaved(section)
     setTimeout(() => setSaved(null), 2500)
   }
@@ -252,6 +273,20 @@ export default function SettingsClient({ userId, isOwner, org, profile }: Props)
     if (res.ok) { flash('profile') } else {
       const j = await res.json()
       setProfError(j.error ?? 'Erreur de sauvegarde')
+    }
+  }
+
+  const saveBilling = async () => {
+    setSaving('billing'); setBillingError(null)
+    const res = await fetch('/api/settings/billing-config', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(billingForm),
+    })
+    setSaving(null)
+    if (res.ok) { flash('billing') } else {
+      const j = await res.json()
+      setBillingError(j.error ?? 'Erreur de sauvegarde')
     }
   }
 
@@ -531,6 +566,134 @@ export default function SettingsClient({ userId, isOwner, org, profile }: Props)
         </div>
 
       </section>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION PROFIL DE FACTURATION (membres sous-traitants)
+      ══════════════════════════════════════════════════════════════════════ */}
+      {billingConfig && (
+        <section className="card space-y-6">
+
+          {/* Header */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-auchu-100 rounded-lg flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-auchu-600" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-900">Profil de facturation</h2>
+              <p className="text-xs text-gray-500">Utilisé pour générer tes factures dans "Mes factures"</p>
+            </div>
+          </div>
+
+          {/* Mode de facturation */}
+          <div>
+            <p className="label mb-1.5">Mode de facturation</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setBillingForm(f => ({ ...f, billing_mode: 'hourly' }))}
+                className={cn(
+                  'rounded-xl border-2 p-3 text-left transition-colors',
+                  billingForm.billing_mode === 'hourly' ? 'border-auchu-400 bg-auchu-50' : 'border-gray-200 hover:border-gray-300'
+                )}
+              >
+                <p className="text-sm font-medium text-gray-900">Taux horaire</p>
+                <p className="text-xs text-gray-500 mt-0.5">$/heure, basé sur le temps chronométré</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingForm(f => ({ ...f, billing_mode: 'fixed' }))}
+                className={cn(
+                  'rounded-xl border-2 p-3 text-left transition-colors',
+                  billingForm.billing_mode === 'fixed' ? 'border-auchu-400 bg-auchu-50' : 'border-gray-200 hover:border-gray-300'
+                )}
+              >
+                <p className="text-sm font-medium text-gray-900">Montant fixe</p>
+                <p className="text-xs text-gray-500 mt-0.5">$ par livrable complété</p>
+              </button>
+            </div>
+          </div>
+
+          {/* Taux + devise + période */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {billingForm.billing_mode === 'hourly' ? (
+              <div>
+                <label className="label">Taux horaire</label>
+                <div className="relative">
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={billingForm.hourly_rate}
+                    onChange={e => setBillingForm(f => ({ ...f, hourly_rate: e.target.value }))}
+                    placeholder="45.00"
+                    className="input pr-14"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$/h</span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="label">Montant par livrable</label>
+                <div className="relative">
+                  <input
+                    type="number" min="0" step="0.01"
+                    value={billingForm.fixed_rate}
+                    onChange={e => setBillingForm(f => ({ ...f, fixed_rate: e.target.value }))}
+                    placeholder="150.00"
+                    className="input pr-8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="label">Devise</label>
+              <select
+                value={billingForm.currency}
+                onChange={e => setBillingForm(f => ({ ...f, currency: e.target.value }))}
+                className="select"
+              >
+                <option value="CAD">CAD</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Période de facturation</label>
+              <select
+                value={billingForm.period}
+                onChange={e => setBillingForm(f => ({ ...f, period: e.target.value as any }))}
+                className="select"
+              >
+                <option value="weekly">Hebdomadaire</option>
+                <option value="biweekly">Aux 2 semaines</option>
+                <option value="monthly">Mensuel</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Infos de paiement */}
+          <div>
+            <label className="label">Numéro de compte / infos de paiement</label>
+            <textarea
+              value={billingForm.payment_info}
+              onChange={e => setBillingForm(f => ({ ...f, payment_info: e.target.value }))}
+              placeholder="Virement Interac, numéro de compte, PayPal…"
+              rows={2}
+              className="input resize-none"
+            />
+          </div>
+
+          {/* Erreur + Save */}
+          {billingError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {billingError}
+            </p>
+          )}
+          <div className="pt-2 border-t border-gray-100">
+            <SaveButton section="billing" saving={saving} saved={saved} onClick={saveBilling} />
+          </div>
+
+        </section>
+      )}
     </div>
   )
 }
