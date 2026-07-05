@@ -12,15 +12,45 @@ function computeElapsed(accumulatedSeconds: number, segmentStartedAt: string | n
   return accumulatedSeconds + segment
 }
 
-// Historique des sessions d'une tâche (timer + manuel), le plus récent en premier.
+// Historique des sessions d'une tâche (timer + manuel), le plus récent en
+// premier — OU, avec ?active=true, l'entrée active (en cours/en pause) de
+// l'utilisateur courant, tous appareils/onglets confondus. C'est la seule
+// source de vérité utilisée par la bannière persistante (TimerContext) —
+// elle ne fait jamais confiance à un état local reconstruit après une
+// navigation, elle refetch toujours ici.
 export async function GET(req: Request) {
   const ctx = await getOrgContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const taskId = new URL(req.url).searchParams.get('task_id')
+  const url = new URL(req.url)
+  const supabase = await createClient()
+
+  if (url.searchParams.get('active') === 'true') {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('id, task_id, accumulated_seconds, segment_started_at, task:tasks(title)')
+      .eq('user_id', ctx.userId)
+      .is('ended_at', null)
+      .maybeSingle()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const task = (data as any)?.task as { title: string } | { title: string }[] | null | undefined
+    const taskTitle = Array.isArray(task) ? (task[0]?.title ?? null) : (task?.title ?? null)
+
+    return NextResponse.json({
+      data: data ? {
+        id: data.id,
+        task_id: data.task_id,
+        task_title: taskTitle,
+        accumulated_seconds: data.accumulated_seconds,
+        segment_started_at: data.segment_started_at,
+      } : null,
+    })
+  }
+
+  const taskId = url.searchParams.get('task_id')
   if (!taskId) return NextResponse.json({ error: 'task_id requis' }, { status: 400 })
 
-  const supabase = await createClient()
   const { data, error } = await supabase
     .from('time_entries')
     .select(ENTRY_SELECT)
@@ -47,7 +77,7 @@ export async function POST(req: Request) {
 
   const { data: task, error: taskError } = await supabase
     .from('tasks')
-    .select('id, client_id')
+    .select('id, client_id, title')
     .eq('id', taskId)
     .eq('user_id', ctx.dataOwnerId)
     .maybeSingle()
@@ -95,5 +125,5 @@ export async function POST(req: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ data, stopped }, { status: 201 })
+  return NextResponse.json({ data: { ...data, task_title: task.title }, stopped }, { status: 201 })
 }

@@ -98,12 +98,9 @@ export default async function TachesPage() {
     }, {})
   }
 
-  const { data: activeEntry } = await supabase
-    .from('time_entries')
-    .select('id, task_id, accumulated_seconds, segment_started_at')
-    .eq('user_id', ctx.userId)
-    .is('ended_at', null)
-    .maybeSingle()
+  // Le chrono actif lui-même (running/pausé) est chargé et géré globalement
+  // par TimerContext (monté dans dashboard/layout.tsx) — pas besoin de le
+  // refetch ici, seulement les totaux déjà accumulés ci-dessus.
 
   return (
     <div className="space-y-6">
@@ -115,7 +112,6 @@ export default async function TachesPage() {
         members={members}
         clients={clients}
         initialTimeTotals={timeTotals}
-        initialActiveEntry={activeEntry ?? null}
       />
     </div>
   )

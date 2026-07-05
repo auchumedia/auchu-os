@@ -1,24 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Plus, Calendar, Trash2, X, Loader2, ListTodo, ArrowRight, Pencil, CheckCheck,
   Play, Pause, Square, Clock, History,
 } from 'lucide-react'
 import type { Task, TaskPriority, TaskStatus, TimeEntry } from '@/types'
 import { cn, formatDate, formatDuration, formatDurationWithSeconds, PRIORITY_LABELS, TASK_STATUS_LABELS } from '@/lib/utils'
+import { useTimer } from '@/lib/timer/TimerContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MemberOption { id: string; name: string }
 interface ClientOption { id: string; name: string }
-
-interface ActiveEntry {
-  id: string
-  task_id: string
-  accumulated_seconds: number
-  segment_started_at: string | null
-}
 
 type HistoryEntry = Pick<TimeEntry, 'id' | 'task_id' | 'user_id' | 'started_at' | 'ended_at' | 'duration_seconds' | 'entry_type' | 'note'>
 
@@ -32,7 +26,6 @@ interface TachesBoardProps {
   members: MemberOption[]
   clients: ClientOption[]
   initialTimeTotals: Record<string, number>
-  initialActiveEntry: ActiveEntry | null
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -82,17 +75,19 @@ const EMPTY_FORM: FormState = {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function TachesBoard({ view, currentUserId, canCreate, initialTasks, members, clients, initialTimeTotals, initialActiveEntry }: TachesBoardProps) {
+export default function TachesBoard({ view, currentUserId, canCreate, initialTasks, members, clients, initialTimeTotals }: TachesBoardProps) {
   const [tasks, setTasks]       = useState<Task[]>(initialTasks)
   const [draggingId, setDraggingId]         = useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null)
   const [deletingId, setDeletingId]         = useState<string | null>(null)
 
   // ─── Time tracking ───────────────────────────────────────────────────────────
-  const [timeTotals, setTimeTotals]   = useState<Record<string, number>>(initialTimeTotals)
-  const [activeEntry, setActiveEntry] = useState<ActiveEntry | null>(initialActiveEntry)
-  const [timerBusy, setTimerBusy]     = useState(false)
-  const [nowTick, setNowTick]         = useState(() => Date.now())
+  // Le chrono actif (running/pausé) est géré globalement par TimerContext —
+  // monté dans le layout, partagé avec la bannière persistante visible sur
+  // toutes les pages. Ici on ne garde localement que ce qui est propre à
+  // cette page : le total accumulé par tâche, et l'historique/ajout manuel.
+  const timer = useTimer()
+  const [timeTotals, setTimeTotals] = useState<Record<string, number>>(initialTimeTotals)
 
   // Historique par tâche (chargé à la demande, à l'ouverture du panneau)
   const [entriesByTask, setEntriesByTask] = useState<Record<string, HistoryEntry[]>>({})
@@ -104,14 +99,6 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
   const [addTimeForm, setAddTimeForm]     = useState(EMPTY_ADD_TIME_FORM)
   const [addTimeSaving, setAddTimeSaving] = useState(false)
   const [addTimeError, setAddTimeError]   = useState<string | null>(null)
-
-  const isPaused = !!activeEntry && !activeEntry.segment_started_at
-
-  useEffect(() => {
-    if (!activeEntry || isPaused) return
-    const id = setInterval(() => setNowTick(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [activeEntry, isPaused])
 
   // Source de vérité unique pour le total d'une tâche : on va chercher toutes
   // ses sessions en DB (timer + manuel) et on ressomme, plutôt que de faire
@@ -128,79 +115,21 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
     setEntriesByTask(prev => (taskId in prev ? { ...prev, [taskId]: entries } : prev))
   }
 
-  const startTimer = async (taskId: string) => {
-    setTimerBusy(true)
-    const res = await fetch('/api/time-entries', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task_id: taskId }),
-    })
-    if (res.ok) {
-      const { data, stopped } = await res.json()
-      if (stopped) {
-        await refreshTaskTotal(stopped.task_id)
-      }
-      setActiveEntry({
-        id: data.id, task_id: data.task_id,
-        accumulated_seconds: data.accumulated_seconds, segment_started_at: data.segment_started_at,
-      })
-      setNowTick(Date.now())
+  // Dès que l'entrée active du contexte global change d'identité (démarrage
+  // d'une autre tâche qui finalise celle-ci, ou arrêt — déclenché depuis
+  // CETTE page ou depuis la bannière ailleurs), on rafraîchit le total de la
+  // tâche qui vient de perdre son chrono. Couvre tous les cas en un seul
+  // endroit plutôt que de dupliquer la logique dans chaque bouton.
+  const prevActiveRef = useRef<{ id: string; task_id: string } | null>(null)
+  useEffect(() => {
+    const prev = prevActiveRef.current
+    const current = timer.activeEntry ? { id: timer.activeEntry.id, task_id: timer.activeEntry.task_id } : null
+    if (prev && prev.id !== current?.id) {
+      refreshTaskTotal(prev.task_id)
     }
-    setTimerBusy(false)
-  }
-
-  const pauseTimer = async () => {
-    if (!activeEntry) return
-    setTimerBusy(true)
-    const res = await fetch(`/api/time-entries/${activeEntry.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pause' }),
-    })
-    if (res.ok) {
-      const { data } = await res.json()
-      setActiveEntry(prev => prev ? { ...prev, accumulated_seconds: data.accumulated_seconds, segment_started_at: null } : prev)
-    }
-    setTimerBusy(false)
-  }
-
-  const resumeTimer = async () => {
-    if (!activeEntry) return
-    setTimerBusy(true)
-    const res = await fetch(`/api/time-entries/${activeEntry.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resume' }),
-    })
-    if (res.ok) {
-      const { data } = await res.json()
-      setActiveEntry(prev => prev ? { ...prev, segment_started_at: data.segment_started_at } : prev)
-      setNowTick(Date.now())
-    }
-    setTimerBusy(false)
-  }
-
-  const stopTimer = async () => {
-    if (!activeEntry) return
-    setTimerBusy(true)
-    const taskId = activeEntry.task_id
-    const res = await fetch(`/api/time-entries/${activeEntry.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }),
-    })
-    if (res.ok) {
-      // On efface le chrono actif AVANT le refetch : le total affiché sur la
-      // carte redevient immédiatement "timeTotals seul" (plus d'élapsed live
-      // ajouté par-dessus), pile au moment où timeTotals se met à jour avec
-      // la session tout juste sauvegardée — pas de flash à zéro ni de double
-      // comptage entre-temps.
-      setActiveEntry(null)
-      await refreshTaskTotal(taskId)
-    }
-    setTimerBusy(false)
-  }
-
-  const activeTask = activeEntry ? tasks.find(t => t.id === activeEntry.task_id) : undefined
-  const activeElapsedSeconds = activeEntry
-    ? activeEntry.accumulated_seconds + (activeEntry.segment_started_at
-        ? Math.floor((nowTick - new Date(activeEntry.segment_started_at).getTime()) / 1000)
-        : 0)
-    : 0
+    prevActiveRef.current = current
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timer.activeEntry?.id])
 
   // ─── Historique des sessions ─────────────────────────────────────────────────
 
@@ -415,56 +344,7 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
 
   return (
     <>
-      {/* Bannière chrono actif */}
-      {activeEntry && activeTask && (
-        <div className={cn(
-          'flex items-center justify-between gap-3 text-white rounded-xl px-4 py-3 flex-wrap',
-          isPaused ? 'bg-amber-500' : 'bg-auchu-600'
-        )}>
-          <div className="flex items-center gap-2 min-w-0">
-            {isPaused ? (
-              <Pause className="w-3.5 h-3.5 flex-shrink-0" />
-            ) : (
-              <span className="relative flex w-2.5 h-2.5 flex-shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
-                <span className="relative inline-flex rounded-full w-2.5 h-2.5 bg-white" />
-              </span>
-            )}
-            <p className="text-sm font-medium truncate">
-              {isPaused ? 'En pause' : 'En cours'} : {activeTask.title} — <span className="tabular-nums">{formatDurationWithSeconds(activeElapsedSeconds)}</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {isPaused ? (
-              <button
-                onClick={resumeTimer}
-                disabled={timerBusy}
-                className="flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-60"
-              >
-                <Play className="w-3 h-3 fill-current" />
-                Reprendre
-              </button>
-            ) : (
-              <button
-                onClick={pauseTimer}
-                disabled={timerBusy}
-                className="flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-60"
-              >
-                <Pause className="w-3 h-3" />
-                Pause
-              </button>
-            )}
-            <button
-              onClick={stopTimer}
-              disabled={timerBusy}
-              className="flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-60"
-            >
-              <Square className="w-3 h-3 fill-current" />
-              Arrêter
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Bannière chrono actif : globale, rendue par le layout (ActiveTimerBanner) */}
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -575,8 +455,9 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
                         )}
                         <div className="space-y-2">
                           {group.tasks.map(task => {
-                            const isActive = activeEntry?.task_id === task.id
-                            const totalSeconds = (timeTotals[task.id] ?? 0) + (isActive ? activeElapsedSeconds : 0)
+                            const isActive = timer.activeEntry?.task_id === task.id
+                            const isPaused = isActive && !timer.activeEntry?.segment_started_at
+                            const totalSeconds = (timeTotals[task.id] ?? 0) + (isActive ? timer.elapsedSeconds : 0)
                             return (
                               <TaskCard
                                 key={task.id}
@@ -589,19 +470,19 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
                                 isDragging={draggingId === task.id}
                                 isDeleting={deletingId === task.id}
                                 isTimerActive={isActive}
-                                isTimerPaused={isActive && isPaused}
+                                isTimerPaused={isPaused}
                                 totalSeconds={totalSeconds}
-                                timerBusy={timerBusy}
+                                timerBusy={timer.busy}
                                 onDragStart={handleDragStart}
                                 onDragEnd={handleDragEnd}
                                 onDelete={handleDelete}
                                 onEdit={openEditModal}
                                 onAdvance={updateStatus}
                                 onApprove={() => updateStatus(task.id, 'approuve')}
-                                onStartTimer={() => startTimer(task.id)}
-                                onPauseTimer={pauseTimer}
-                                onResumeTimer={resumeTimer}
-                                onStopTimer={stopTimer}
+                                onStartTimer={() => timer.start(task.id)}
+                                onPauseTimer={timer.pause}
+                                onResumeTimer={timer.resume}
+                                onStopTimer={timer.stop}
                                 onOpenHistory={() => openHistory(task.id)}
                                 onOpenAddTime={() => openAddTime(task.id)}
                               />
