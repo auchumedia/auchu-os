@@ -208,6 +208,13 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
   const showMemberFilter = view !== 'perso' && members.length > 0
   const groupByMember = view === 'org'
 
+  // Édition complète (titre/description/priorité/deadline/assigné à/suppression) :
+  // réservée au créateur (assigned_by) ou owner/director (cf. migration 035).
+  // Changer le statut : créateur, owner/director, OU la personne assignée.
+  const isOwnerOrDirector = view === 'org'
+  const canEditTask         = (task: Task) => isOwnerOrDirector || task.assigned_by === currentUserId
+  const canChangeStatusTask = (task: Task) => canEditTask(task) || task.assigned_to === currentUserId
+
   const title = view === 'org' ? 'Tâches' : view === 'team' ? 'Tâches de l\'équipe' : 'Mes tâches'
 
   return (
@@ -321,7 +328,8 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
                               key={task.id}
                               task={task}
                               assigneeName={task.assigned_to ? memberName.get(task.assigned_to) : undefined}
-                              canManage={canCreate}
+                              canEdit={canEditTask(task)}
+                              canChangeStatus={canChangeStatusTask(task)}
                               isDragging={draggingId === task.id}
                               isDeleting={deletingId === task.id}
                               onDragStart={handleDragStart}
@@ -492,12 +500,13 @@ function groupTasksByMember(tasks: Task[], memberName: Map<string, string>) {
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
 function TaskCard({
-  task, assigneeName, canManage, isDragging, isDeleting,
+  task, assigneeName, canEdit, canChangeStatus, isDragging, isDeleting,
   onDragStart, onDragEnd, onDelete, onEdit, onAdvance,
 }: {
   task: Task
   assigneeName?: string
-  canManage: boolean
+  canEdit: boolean
+  canChangeStatus: boolean
   isDragging: boolean
   isDeleting: boolean
   onDragStart: (e: React.DragEvent, id: string) => void
@@ -512,18 +521,19 @@ function TaskCard({
 
   return (
     <div
-      draggable
+      draggable={canChangeStatus}
       onDragStart={e => onDragStart(e, task.id)}
       onDragEnd={onDragEnd}
       className={cn(
         'group relative bg-white rounded-lg border border-gray-200 p-3',
-        'shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing select-none',
+        'shadow-sm hover:shadow-md select-none',
+        canChangeStatus ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
         'transition-all duration-150',
         isDragging && 'opacity-40 rotate-1 scale-[1.03] shadow-lg',
         isDeleting && 'opacity-40 pointer-events-none'
       )}
     >
-      {canManage && (
+      {canEdit && (
         <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
           <button onClick={e => { e.stopPropagation(); onEdit(task) }} className="p-1 rounded text-gray-300 hover:text-gray-600 hover:bg-gray-50">
             <Pencil className="w-3.5 h-3.5" />
@@ -556,7 +566,7 @@ function TaskCard({
         )}
       </div>
 
-      {next && (
+      {next && canChangeStatus && (
         <button
           onClick={e => { e.stopPropagation(); onAdvance(task.id, next) }}
           className="mt-2.5 w-full flex items-center justify-center gap-1 text-xs font-medium text-auchu-600 bg-auchu-50 hover:bg-auchu-100 rounded-md py-1.5 transition-colors"

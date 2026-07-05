@@ -73,6 +73,7 @@ interface Props {
   teamMembers: { id: string; name: string }[]
   canManageSensitive: boolean
   canCreateTasks: boolean
+  currentUserId: string
   platformAccess: ClientPlatformAccess | null
 }
 
@@ -80,7 +81,7 @@ interface Props {
 
 export default function ClientDetail({
   client: initial, invoices, content, events, tasks, teamMembers,
-  canManageSensitive, canCreateTasks, platformAccess: initialPlatformAccess,
+  canManageSensitive, canCreateTasks, currentUserId, platformAccess: initialPlatformAccess,
 }: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
@@ -1109,6 +1110,8 @@ export default function ClientDetail({
           initialTasks={tasks}
           teamMembers={teamMembers}
           canCreate={canCreateTasks}
+          currentUserId={currentUserId}
+          isOwnerOrDirector={canManageSensitive}
         />
       )}
 

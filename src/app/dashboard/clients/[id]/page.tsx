@@ -106,6 +106,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
       teamMembers={teamMembers}
       canManageSensitive={canManageSensitive}
       canCreateTasks={canCreateTasks(ctx.role)}
+      currentUserId={ctx.userId}
       platformAccess={platformAccess}
     />
   )

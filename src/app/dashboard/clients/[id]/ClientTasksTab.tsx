@@ -12,6 +12,8 @@ interface Props {
   initialTasks: Task[]
   teamMembers: MemberOption[]
   canCreate: boolean
+  currentUserId: string
+  isOwnerOrDirector: boolean
 }
 
 const COLUMNS: TaskStatus[] = ['a_faire', 'en_cours', 'termine']
@@ -36,7 +38,7 @@ const NEXT_STATUS_LABEL: Record<TaskStatus, string> = {
 
 const EMPTY_FORM = { title: '', description: '', assigned_to: '', priority: 'normale' as TaskPriority, deadline: '' }
 
-export default function ClientTasksTab({ clientId, initialTasks, teamMembers, canCreate }: Props) {
+export default function ClientTasksTab({ clientId, initialTasks, teamMembers, canCreate, currentUserId, isOwnerOrDirector }: Props) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -46,6 +48,11 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   const memberName = new Map(teamMembers.map(m => [m.id, m.name]))
+
+  // Supprimer/modifier : créateur (assigned_by) ou owner/director seulement.
+  // Changer le statut : idem, plus la personne assignée (cf. migration 035).
+  const canEditTask         = (task: Task) => isOwnerOrDirector || task.assigned_by === currentUserId
+  const canChangeStatusTask = (task: Task) => canEditTask(task) || task.assigned_to === currentUserId
 
   async function updateStatus(id: string, status: TaskStatus) {
     const prev = tasks
@@ -148,7 +155,7 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
                             {formatDate(task.deadline)}
                           </span>
                         )}
-                        {next && (
+                        {next && canChangeStatusTask(task) && (
                           <button
                             disabled={updatingId === task.id}
                             onClick={() => updateStatus(task.id, next)}
@@ -157,7 +164,7 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
                             {updatingId === task.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <>{NEXT_STATUS_LABEL[task.status]}<ArrowRight className="w-3 h-3" /></>}
                           </button>
                         )}
-                        {canCreate && (
+                        {canEditTask(task) && (
                           <button
                             disabled={deletingId === task.id}
                             onClick={() => handleDelete(task.id)}
