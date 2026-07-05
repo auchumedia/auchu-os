@@ -113,13 +113,19 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
     return () => clearInterval(id)
   }, [activeEntry, isPaused])
 
-  const invalidateHistory = (taskId: string) => {
-    setEntriesByTask(prev => {
-      if (!(taskId in prev)) return prev
-      const next = { ...prev }
-      delete next[taskId]
-      return next
-    })
+  // Source de vérité unique pour le total d'une tâche : on va chercher toutes
+  // ses sessions en DB (timer + manuel) et on ressomme, plutôt que de faire
+  // confiance à de l'arithmétique locale qui peut dériver (double appel,
+  // réponse partielle, etc.). Rafraîchit aussi l'historique si déjà ouvert/
+  // chargé pour cette tâche, pour qu'il reste cohérent avec le total affiché.
+  const refreshTaskTotal = async (taskId: string) => {
+    const res = await fetch(`/api/time-entries?task_id=${taskId}`)
+    if (!res.ok) return
+    const { data } = await res.json()
+    const entries: HistoryEntry[] = data ?? []
+    const total = entries.reduce((sum, e) => sum + (e.duration_seconds ?? 0), 0)
+    setTimeTotals(prev => ({ ...prev, [taskId]: total }))
+    setEntriesByTask(prev => (taskId in prev ? { ...prev, [taskId]: entries } : prev))
   }
 
   const startTimer = async (taskId: string) => {
@@ -132,8 +138,7 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
     if (res.ok) {
       const { data, stopped } = await res.json()
       if (stopped) {
-        setTimeTotals(prev => ({ ...prev, [stopped.task_id]: (prev[stopped.task_id] ?? 0) + stopped.duration_seconds }))
-        invalidateHistory(stopped.task_id)
+        await refreshTaskTotal(stopped.task_id)
       }
       setActiveEntry({
         id: data.id, task_id: data.task_id,
@@ -174,14 +179,18 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
   const stopTimer = async () => {
     if (!activeEntry) return
     setTimerBusy(true)
+    const taskId = activeEntry.task_id
     const res = await fetch(`/api/time-entries/${activeEntry.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }),
     })
     if (res.ok) {
-      const { data } = await res.json()
-      setTimeTotals(prev => ({ ...prev, [data.task_id]: (prev[data.task_id] ?? 0) + (data.duration_seconds ?? 0) }))
-      invalidateHistory(data.task_id)
+      // On efface le chrono actif AVANT le refetch : le total affiché sur la
+      // carte redevient immédiatement "timeTotals seul" (plus d'élapsed live
+      // ajouté par-dessus), pile au moment où timeTotals se met à jour avec
+      // la session tout juste sauvegardée — pas de flash à zéro ni de double
+      // comptage entre-temps.
       setActiveEntry(null)
+      await refreshTaskTotal(taskId)
     }
     setTimerBusy(false)
   }
@@ -208,14 +217,8 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
   }
 
   const deleteHistoryEntry = async (entryId: string, taskId: string) => {
-    const entry = entriesByTask[taskId]?.find(e => e.id === entryId)
     const res = await fetch(`/api/time-entries/${entryId}`, { method: 'DELETE' })
-    if (res.ok) {
-      setEntriesByTask(prev => ({ ...prev, [taskId]: (prev[taskId] ?? []).filter(e => e.id !== entryId) }))
-      if (entry?.duration_seconds) {
-        setTimeTotals(prev => ({ ...prev, [taskId]: Math.max(0, (prev[taskId] ?? 0) - entry.duration_seconds!) }))
-      }
-    }
+    if (res.ok) await refreshTaskTotal(taskId)
   }
 
   // ─── Ajout manuel de temps ───────────────────────────────────────────────────
@@ -245,8 +248,7 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
       return
     }
 
-    setTimeTotals(prev => ({ ...prev, [addTimeTaskId]: (prev[addTimeTaskId] ?? 0) + json.data.duration_seconds }))
-    invalidateHistory(addTimeTaskId)
+    await refreshTaskTotal(addTimeTaskId)
     setAddTimeTaskId(null)
   }
 
