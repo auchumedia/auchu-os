@@ -100,7 +100,7 @@ export default async function TachesPage() {
 
   const { data: activeEntry } = await supabase
     .from('time_entries')
-    .select('id, task_id, started_at')
+    .select('id, task_id, accumulated_seconds, segment_started_at')
     .eq('user_id', ctx.userId)
     .is('ended_at', null)
     .maybeSingle()

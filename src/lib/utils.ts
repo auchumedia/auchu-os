@@ -160,3 +160,16 @@ export function formatDuration(totalSeconds: number) {
 export function secondsToHours(totalSeconds: number) {
   return Math.round((totalSeconds / 3600) * 100) / 100
 }
+
+// Format complet "1h 23m 45s" (avec secondes) — utilisé pour l'affichage
+// temps réel du chrono actif, contrairement à formatDuration (sans secondes)
+// utilisé pour les totaux/historique.
+export function formatDurationWithSeconds(totalSeconds: number) {
+  const total = Math.max(0, Math.floor(totalSeconds))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  if (h === 0 && m === 0) return `${s}s`
+  if (h === 0) return `${m}m ${String(s).padStart(2, '0')}s`
+  return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+}

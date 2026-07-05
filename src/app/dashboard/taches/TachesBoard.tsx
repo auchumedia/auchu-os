@@ -1,16 +1,28 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Calendar, Trash2, X, Loader2, ListTodo, ArrowRight, Pencil, CheckCheck, Play, Square } from 'lucide-react'
-import type { Task, TaskPriority, TaskStatus } from '@/types'
-import { cn, formatDate, formatDuration, PRIORITY_LABELS, TASK_STATUS_LABELS } from '@/lib/utils'
+import {
+  Plus, Calendar, Trash2, X, Loader2, ListTodo, ArrowRight, Pencil, CheckCheck,
+  Play, Pause, Square, Clock, History,
+} from 'lucide-react'
+import type { Task, TaskPriority, TaskStatus, TimeEntry } from '@/types'
+import { cn, formatDate, formatDuration, formatDurationWithSeconds, PRIORITY_LABELS, TASK_STATUS_LABELS } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MemberOption { id: string; name: string }
 interface ClientOption { id: string; name: string }
 
-interface ActiveEntry { id: string; task_id: string; started_at: string }
+interface ActiveEntry {
+  id: string
+  task_id: string
+  accumulated_seconds: number
+  segment_started_at: string | null
+}
+
+type HistoryEntry = Pick<TimeEntry, 'id' | 'task_id' | 'user_id' | 'started_at' | 'ended_at' | 'duration_seconds' | 'entry_type' | 'note'>
+
+const EMPTY_ADD_TIME_FORM = { date: new Date().toISOString().split('T')[0], hours: '', minutes: '', note: '' }
 
 interface TachesBoardProps {
   view: 'org' | 'team' | 'perso'
@@ -82,11 +94,33 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
   const [timerBusy, setTimerBusy]     = useState(false)
   const [nowTick, setNowTick]         = useState(() => Date.now())
 
+  // Historique par tâche (chargé à la demande, à l'ouverture du panneau)
+  const [entriesByTask, setEntriesByTask] = useState<Record<string, HistoryEntry[]>>({})
+  const [historyTaskId, setHistoryTaskId] = useState<string | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  // Ajout manuel de temps
+  const [addTimeTaskId, setAddTimeTaskId] = useState<string | null>(null)
+  const [addTimeForm, setAddTimeForm]     = useState(EMPTY_ADD_TIME_FORM)
+  const [addTimeSaving, setAddTimeSaving] = useState(false)
+  const [addTimeError, setAddTimeError]   = useState<string | null>(null)
+
+  const isPaused = !!activeEntry && !activeEntry.segment_started_at
+
   useEffect(() => {
-    if (!activeEntry) return
+    if (!activeEntry || isPaused) return
     const id = setInterval(() => setNowTick(Date.now()), 1000)
     return () => clearInterval(id)
-  }, [activeEntry])
+  }, [activeEntry, isPaused])
+
+  const invalidateHistory = (taskId: string) => {
+    setEntriesByTask(prev => {
+      if (!(taskId in prev)) return prev
+      const next = { ...prev }
+      delete next[taskId]
+      return next
+    })
+  }
 
   const startTimer = async (taskId: string) => {
     setTimerBusy(true)
@@ -99,8 +133,39 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
       const { data, stopped } = await res.json()
       if (stopped) {
         setTimeTotals(prev => ({ ...prev, [stopped.task_id]: (prev[stopped.task_id] ?? 0) + stopped.duration_seconds }))
+        invalidateHistory(stopped.task_id)
       }
-      setActiveEntry({ id: data.id, task_id: data.task_id, started_at: data.started_at })
+      setActiveEntry({
+        id: data.id, task_id: data.task_id,
+        accumulated_seconds: data.accumulated_seconds, segment_started_at: data.segment_started_at,
+      })
+      setNowTick(Date.now())
+    }
+    setTimerBusy(false)
+  }
+
+  const pauseTimer = async () => {
+    if (!activeEntry) return
+    setTimerBusy(true)
+    const res = await fetch(`/api/time-entries/${activeEntry.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pause' }),
+    })
+    if (res.ok) {
+      const { data } = await res.json()
+      setActiveEntry(prev => prev ? { ...prev, accumulated_seconds: data.accumulated_seconds, segment_started_at: null } : prev)
+    }
+    setTimerBusy(false)
+  }
+
+  const resumeTimer = async () => {
+    if (!activeEntry) return
+    setTimerBusy(true)
+    const res = await fetch(`/api/time-entries/${activeEntry.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'resume' }),
+    })
+    if (res.ok) {
+      const { data } = await res.json()
+      setActiveEntry(prev => prev ? { ...prev, segment_started_at: data.segment_started_at } : prev)
       setNowTick(Date.now())
     }
     setTimerBusy(false)
@@ -109,17 +174,81 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
   const stopTimer = async () => {
     if (!activeEntry) return
     setTimerBusy(true)
-    const res = await fetch(`/api/time-entries/${activeEntry.id}`, { method: 'PATCH' })
+    const res = await fetch(`/api/time-entries/${activeEntry.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }),
+    })
     if (res.ok) {
       const { data } = await res.json()
       setTimeTotals(prev => ({ ...prev, [data.task_id]: (prev[data.task_id] ?? 0) + (data.duration_seconds ?? 0) }))
+      invalidateHistory(data.task_id)
       setActiveEntry(null)
     }
     setTimerBusy(false)
   }
 
   const activeTask = activeEntry ? tasks.find(t => t.id === activeEntry.task_id) : undefined
-  const activeElapsedSeconds = activeEntry ? Math.floor((nowTick - new Date(activeEntry.started_at).getTime()) / 1000) : 0
+  const activeElapsedSeconds = activeEntry
+    ? activeEntry.accumulated_seconds + (activeEntry.segment_started_at
+        ? Math.floor((nowTick - new Date(activeEntry.segment_started_at).getTime()) / 1000)
+        : 0)
+    : 0
+
+  // ─── Historique des sessions ─────────────────────────────────────────────────
+
+  const openHistory = async (taskId: string) => {
+    setHistoryTaskId(taskId)
+    if (entriesByTask[taskId]) return
+    setHistoryLoading(true)
+    const res = await fetch(`/api/time-entries?task_id=${taskId}`)
+    if (res.ok) {
+      const { data } = await res.json()
+      setEntriesByTask(prev => ({ ...prev, [taskId]: data }))
+    }
+    setHistoryLoading(false)
+  }
+
+  const deleteHistoryEntry = async (entryId: string, taskId: string) => {
+    const entry = entriesByTask[taskId]?.find(e => e.id === entryId)
+    const res = await fetch(`/api/time-entries/${entryId}`, { method: 'DELETE' })
+    if (res.ok) {
+      setEntriesByTask(prev => ({ ...prev, [taskId]: (prev[taskId] ?? []).filter(e => e.id !== entryId) }))
+      if (entry?.duration_seconds) {
+        setTimeTotals(prev => ({ ...prev, [taskId]: Math.max(0, (prev[taskId] ?? 0) - entry.duration_seconds!) }))
+      }
+    }
+  }
+
+  // ─── Ajout manuel de temps ───────────────────────────────────────────────────
+
+  const openAddTime = (taskId: string) => {
+    setAddTimeTaskId(taskId)
+    setAddTimeForm(EMPTY_ADD_TIME_FORM)
+    setAddTimeError(null)
+  }
+
+  const submitAddTime = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!addTimeTaskId) return
+    setAddTimeSaving(true)
+    setAddTimeError(null)
+
+    const res = await fetch('/api/time-entries/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: addTimeTaskId, ...addTimeForm }),
+    })
+    const json = await res.json()
+    setAddTimeSaving(false)
+
+    if (!res.ok) {
+      setAddTimeError(json.error || 'Une erreur est survenue')
+      return
+    }
+
+    setTimeTotals(prev => ({ ...prev, [addTimeTaskId]: (prev[addTimeTaskId] ?? 0) + json.data.duration_seconds }))
+    invalidateHistory(addTimeTaskId)
+    setAddTimeTaskId(null)
+  }
 
   const [priorityFilter, setPriorityFilter] = useState<'all' | TaskPriority>('all')
   const [memberFilter, setMemberFilter]     = useState<'all' | string>('all')
@@ -286,24 +415,52 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
     <>
       {/* Bannière chrono actif */}
       {activeEntry && activeTask && (
-        <div className="flex items-center justify-between gap-3 bg-auchu-600 text-white rounded-xl px-4 py-3 flex-wrap">
+        <div className={cn(
+          'flex items-center justify-between gap-3 text-white rounded-xl px-4 py-3 flex-wrap',
+          isPaused ? 'bg-amber-500' : 'bg-auchu-600'
+        )}>
           <div className="flex items-center gap-2 min-w-0">
-            <span className="relative flex w-2.5 h-2.5 flex-shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
-              <span className="relative inline-flex rounded-full w-2.5 h-2.5 bg-white" />
-            </span>
+            {isPaused ? (
+              <Pause className="w-3.5 h-3.5 flex-shrink-0" />
+            ) : (
+              <span className="relative flex w-2.5 h-2.5 flex-shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
+                <span className="relative inline-flex rounded-full w-2.5 h-2.5 bg-white" />
+              </span>
+            )}
             <p className="text-sm font-medium truncate">
-              En cours : {activeTask.title} — <span className="tabular-nums">{formatDuration(activeElapsedSeconds)}</span>
+              {isPaused ? 'En pause' : 'En cours'} : {activeTask.title} — <span className="tabular-nums">{formatDurationWithSeconds(activeElapsedSeconds)}</span>
             </p>
           </div>
-          <button
-            onClick={stopTimer}
-            disabled={timerBusy}
-            className="flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-60 flex-shrink-0"
-          >
-            <Square className="w-3 h-3 fill-current" />
-            Arrêter
-          </button>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {isPaused ? (
+              <button
+                onClick={resumeTimer}
+                disabled={timerBusy}
+                className="flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-60"
+              >
+                <Play className="w-3 h-3 fill-current" />
+                Reprendre
+              </button>
+            ) : (
+              <button
+                onClick={pauseTimer}
+                disabled={timerBusy}
+                className="flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-60"
+              >
+                <Pause className="w-3 h-3" />
+                Pause
+              </button>
+            )}
+            <button
+              onClick={stopTimer}
+              disabled={timerBusy}
+              className="flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-60"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              Arrêter
+            </button>
+          </div>
         </div>
       )}
 
@@ -430,6 +587,7 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
                                 isDragging={draggingId === task.id}
                                 isDeleting={deletingId === task.id}
                                 isTimerActive={isActive}
+                                isTimerPaused={isActive && isPaused}
                                 totalSeconds={totalSeconds}
                                 timerBusy={timerBusy}
                                 onDragStart={handleDragStart}
@@ -439,7 +597,11 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
                                 onAdvance={updateStatus}
                                 onApprove={() => updateStatus(task.id, 'approuve')}
                                 onStartTimer={() => startTimer(task.id)}
+                                onPauseTimer={pauseTimer}
+                                onResumeTimer={resumeTimer}
                                 onStopTimer={stopTimer}
+                                onOpenHistory={() => openHistory(task.id)}
+                                onOpenAddTime={() => openAddTime(task.id)}
                               />
                             )
                           })}
@@ -575,6 +737,140 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
           </div>
         </div>
       )}
+
+      {/* Panneau historique des sessions */}
+      {historyTaskId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setHistoryTaskId(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-gray-900">Historique</h2>
+                <p className="text-xs text-gray-400 truncate">{tasks.find(t => t.id === historyTaskId)?.title}</p>
+              </div>
+              <button onClick={() => setHistoryTaskId(null)} className="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {historyLoading ? (
+                <div className="py-10 flex justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+                </div>
+              ) : (entriesByTask[historyTaskId]?.length ?? 0) === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-10">Aucune session enregistrée</p>
+              ) : (
+                entriesByTask[historyTaskId]!.map(entry => (
+                  <div key={entry.id} className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg border border-gray-100">
+                    <div className="flex items-start gap-2 min-w-0">
+                      {entry.entry_type === 'manual'
+                        ? <Pencil className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                        : <Clock className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />}
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-900">
+                          {formatDate(entry.started_at)} · <span className="font-medium">{formatDuration(entry.duration_seconds ?? 0)}</span>
+                        </p>
+                        {entry.note && <p className="text-xs text-gray-400 truncate">{entry.note}</p>}
+                      </div>
+                    </div>
+                    {entry.user_id === currentUserId && (
+                      <button
+                        onClick={() => deleteHistoryEntry(entry.id, historyTaskId)}
+                        className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ajout manuel de temps */}
+      {addTimeTaskId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAddTimeTaskId(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">Ajouter du temps</h2>
+              <button onClick={() => setAddTimeTaskId(null)} className="text-gray-400 hover:text-gray-700 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={submitAddTime} className="p-5 space-y-3">
+              {addTimeError && (
+                <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-3 py-2">
+                  {addTimeError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Date</label>
+                <input
+                  type="date"
+                  value={addTimeForm.date}
+                  onChange={e => setAddTimeForm(f => ({ ...f, date: e.target.value }))}
+                  className="input"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">Heures</label>
+                  <input
+                    type="number" min="0" step="1"
+                    value={addTimeForm.hours}
+                    onChange={e => setAddTimeForm(f => ({ ...f, hours: e.target.value }))}
+                    placeholder="0"
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">Minutes</label>
+                  <input
+                    type="number" min="0" max="59" step="1"
+                    value={addTimeForm.minutes}
+                    onChange={e => setAddTimeForm(f => ({ ...f, minutes: e.target.value }))}
+                    placeholder="0"
+                    className="input"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Note (optionnel)</label>
+                <input
+                  type="text"
+                  value={addTimeForm.note}
+                  onChange={e => setAddTimeForm(f => ({ ...f, note: e.target.value }))}
+                  placeholder="Ex : Tournage Cardinal Asphalte"
+                  className="input"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setAddTimeTaskId(null)} className="btn-secondary">
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={addTimeSaving || (!addTimeForm.hours && !addTimeForm.minutes)}
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {addTimeSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Ajouter
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -605,8 +901,9 @@ function groupTasksByMember(tasks: Task[], memberName: Map<string, string>) {
 
 function TaskCard({
   task, assigneeName, canEdit, canDelete, canChangeStatus, canApprove, isDragging, isDeleting,
-  isTimerActive, totalSeconds, timerBusy,
-  onDragStart, onDragEnd, onDelete, onEdit, onAdvance, onApprove, onStartTimer, onStopTimer,
+  isTimerActive, isTimerPaused, totalSeconds, timerBusy,
+  onDragStart, onDragEnd, onDelete, onEdit, onAdvance, onApprove,
+  onStartTimer, onPauseTimer, onResumeTimer, onStopTimer, onOpenHistory, onOpenAddTime,
 }: {
   task: Task
   assigneeName?: string
@@ -617,6 +914,7 @@ function TaskCard({
   isDragging: boolean
   isDeleting: boolean
   isTimerActive: boolean
+  isTimerPaused: boolean
   totalSeconds: number
   timerBusy: boolean
   onDragStart: (e: React.DragEvent, id: string) => void
@@ -626,7 +924,11 @@ function TaskCard({
   onAdvance: (id: string, status: TaskStatus) => void
   onApprove: () => void
   onStartTimer: () => void
+  onPauseTimer: () => void
+  onResumeTimer: () => void
   onStopTimer: () => void
+  onOpenHistory: () => void
+  onOpenAddTime: () => void
 }) {
   const priority = PRIORITIES.find(p => p.value === task.priority)
   const isDone = task.status === 'termine' || task.status === 'approuve'
@@ -696,31 +998,78 @@ function TaskCard({
       </div>
 
       {canChangeStatus && (
-        <div className="mt-2.5 flex items-center gap-2">
+        <div className="mt-2.5 space-y-1.5">
           {isTimerActive ? (
-            <button
-              onClick={e => { e.stopPropagation(); onStopTimer() }}
-              disabled={timerBusy}
-              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md py-1.5 transition-colors disabled:opacity-60"
-            >
-              <span className="relative flex w-1.5 h-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400" />
-                <span className="relative inline-flex rounded-full w-1.5 h-1.5 bg-red-500" />
+            <div className="flex items-center gap-1.5">
+              <span className={cn(
+                'flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded-md py-1.5 tabular-nums',
+                isTimerPaused ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50'
+              )}>
+                {isTimerPaused ? (
+                  <Pause className="w-3 h-3" />
+                ) : (
+                  <span className="relative flex w-1.5 h-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400" />
+                    <span className="relative inline-flex rounded-full w-1.5 h-1.5 bg-red-500" />
+                  </span>
+                )}
+                {formatDurationWithSeconds(totalSeconds)}
               </span>
-              {formatDuration(totalSeconds)}
-              <Square className="w-3 h-3 fill-current ml-0.5" />
-            </button>
+              {isTimerPaused ? (
+                <button
+                  onClick={e => { e.stopPropagation(); onResumeTimer() }}
+                  disabled={timerBusy}
+                  title="Reprendre"
+                  className="p-1.5 rounded-md text-gray-500 bg-gray-50 hover:bg-gray-100 transition-colors disabled:opacity-60"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                </button>
+              ) : (
+                <button
+                  onClick={e => { e.stopPropagation(); onPauseTimer() }}
+                  disabled={timerBusy}
+                  title="Pause"
+                  className="p-1.5 rounded-md text-gray-500 bg-gray-50 hover:bg-gray-100 transition-colors disabled:opacity-60"
+                >
+                  <Pause className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                onClick={e => { e.stopPropagation(); onStopTimer() }}
+                disabled={timerBusy}
+                title="Arrêter"
+                className="p-1.5 rounded-md text-red-500 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-60"
+              >
+                <Square className="w-3.5 h-3.5 fill-current" />
+              </button>
+            </div>
           ) : (
             <button
               onClick={e => { e.stopPropagation(); onStartTimer() }}
               disabled={timerBusy}
-              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-md py-1.5 transition-colors disabled:opacity-60"
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-md py-1.5 transition-colors disabled:opacity-60"
             >
               <Play className="w-3 h-3 fill-current" />
               Start
-              {totalSeconds > 0 && <span className="text-gray-400">· Total: {formatDuration(totalSeconds)}</span>}
             </button>
           )}
+
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={e => { e.stopPropagation(); onOpenHistory() }}
+              className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-auchu-600 transition-colors"
+            >
+              <History className="w-3 h-3" />
+              Total : {formatDuration(totalSeconds)}
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); onOpenAddTime() }}
+              className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-auchu-600 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              Ajouter du temps
+            </button>
+          </div>
         </div>
       )}
 

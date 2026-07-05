@@ -288,14 +288,20 @@ export interface InvoiceItem {
 }
 
 // ─── Time tracking & facturation des membres ──────────────────────────────────
+export type TimeEntryType = 'timer' | 'manual'
+
 export interface TimeEntry {
   id: string
   task_id: string
   user_id: string
   client_id: string | null
   started_at: string
+  segment_started_at: string | null
+  accumulated_seconds: number
   ended_at: string | null
   duration_seconds: number | null
+  entry_type: TimeEntryType
+  note: string | null
   created_at: string
 }
 
