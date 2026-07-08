@@ -29,10 +29,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const ctx = await getOrgContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const supabase = await createClient()
   const body = await req.json()
 
   const { data: last } = await supabase
@@ -44,10 +44,13 @@ export async function POST(req: Request) {
     .maybeSingle()
   const nextPosition = (last?.position ?? -1) + 1
 
+  // content_pieces.user_id est toujours l'ID du owner de l'org, jamais celui
+  // de la personne qui crée — sinon la ligne devient invisible pour tout le
+  // monde (owner inclus), tous les reads filtrant sur ctx.dataOwnerId.
   const { data, error } = await supabase
     .from('content_pieces')
     .insert({
-      user_id:     user.id,
+      user_id:     ctx.dataOwnerId,
       client_id:   body.client_id,
       title:       body.title,
       type:        body.type       ?? 'post',
