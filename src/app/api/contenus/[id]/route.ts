@@ -32,13 +32,15 @@ export async function PATCH(
   // pas celui de la personne qui édite — filtrer sur user.id cassait le PATCH
   // pour tout membre d'équipe non-owner (0 ligne trouvée → PGRST116 → 500,
   // alors que le statut restait affiché côté client sans rollback).
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from('content_pieces')
-    .update(fields)
+    .update(fields, { count: 'exact' })
     .eq('id', params.id)
     .eq('user_id', ctx.dataOwnerId)
     .select()
     .single()
+
+  console.log('[PATCH contenus] result:', JSON.stringify({ data, error, count }))
 
   console.log(
     '[api/contenus PATCH] résultat supabase —',
