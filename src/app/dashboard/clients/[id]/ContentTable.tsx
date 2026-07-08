@@ -80,11 +80,17 @@ function getYouTubeThumbnail(url: string): string | null {
 
 // ─── Auto-save hook ───────────────────────────────────────────────────────────
 
-type SaveStatus = 'idle' | 'saving' | 'saved'
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
+// onSave doit renvoyer `false` (pas throw) sur échec — patchItem() résout
+// toujours plutôt que de rejeter (fetch ne rejette que sur erreur réseau),
+// donc un `await onSave(value)` qui ignore la valeur de retour masquait un
+// PATCH refusé par l'API/RLS : le badge affichait "Sauvegardé ✓" alors que
+// rien n'avait été persisté, et le contenu réapparaissait vide au retour
+// sur la page (cf. bug script non sauvegardé pour les non-owners).
 function useAutoSave(
   value: string,
-  onSave: (v: string) => Promise<void>,
+  onSave: (v: string) => Promise<boolean>,
   delay = 1000
 ): SaveStatus {
   const [status, setStatus] = useState<SaveStatus>('idle')
@@ -99,7 +105,11 @@ function useAutoSave(
     clearTimeout(timer.current)
     timer.current = setTimeout(async () => {
       setStatus('saving')
-      await onSave(value)
+      const ok = await onSave(value)
+      if (!ok) {
+        setStatus('error')
+        return
+      }
       savedVal.current = value
       setStatus('saved')
       setTimeout(() => setStatus('idle'), 2000)
@@ -138,6 +148,9 @@ export default function ContentTable({ initialContent, clientId, teamMembers }: 
       const { data } = await res.json()
       setItems(prev => prev.map(i => i.id === id ? data : i))
       setSelected(prev => prev?.id === id ? data : prev)
+    } else {
+      const err = await res.json().catch(() => null)
+      console.error('[ContentTable] PATCH échoué —', 'content_id:', id, '| fields:', Object.keys(fields), '| status:', res.status, '| error:', err)
     }
     return res.ok
   }, [])
@@ -321,9 +334,9 @@ function ContentPanel({
   const [statusError, setStatusError] = useState<string | null>(null)
   const [refs,        setRefs]        = useState<ReferenceLink[]>(item.reference_links ?? [])
 
-  const titleStatus = useAutoSave(title,       v => onPatch({ title: v }).then(() => {}))
-  const descStatus  = useAutoSave(description, v => onPatch({ description: v || null }).then(() => {}))
-  const scriptStatus = useAutoSave(script,     v => onPatch({ script: v || null, body: v || '' }).then(() => {}))
+  const titleStatus = useAutoSave(title,       v => onPatch({ title: v }))
+  const descStatus  = useAutoSave(description, v => onPatch({ description: v || null }))
+  const scriptStatus = useAutoSave(script,     v => onPatch({ script: v || null, body: v || '' }))
 
   // Any field saving indicator
   const anyStatus = [titleStatus, descStatus, scriptStatus].find(s => s !== 'idle') ?? 'idle'
@@ -359,9 +372,10 @@ function ContentPanel({
           <span className={cn(
             'text-xs transition-all',
             anyStatus === 'saved'  ? 'text-green-500' :
-            anyStatus === 'saving' ? 'text-gray-400'  : 'text-transparent'
+            anyStatus === 'saving' ? 'text-gray-400'  :
+            anyStatus === 'error'  ? 'text-red-500'   : 'text-transparent'
           )}>
-            {anyStatus === 'saving' ? 'Sauvegarde…' : 'Sauvegardé ✓'}
+            {anyStatus === 'saving' ? 'Sauvegarde…' : anyStatus === 'error' ? 'Échec de la sauvegarde' : 'Sauvegardé ✓'}
           </span>
         </div>
         <div className="flex gap-1 flex-shrink-0">
@@ -500,9 +514,10 @@ function SaveLabel({ label, status }: { label: string; status: SaveStatus }) {
       <span className={cn(
         'text-xs transition-all',
         status === 'saved'  ? 'text-green-500' :
-        status === 'saving' ? 'text-gray-400'  : 'text-transparent select-none'
+        status === 'saving' ? 'text-gray-400'  :
+        status === 'error'  ? 'text-red-500'   : 'text-transparent select-none'
       )}>
-        {status === 'saving' ? 'Sauvegarde…' : 'Sauvegardé ✓'}
+        {status === 'saving' ? 'Sauvegarde…' : status === 'error' ? 'Échec — non enregistré' : 'Sauvegardé ✓'}
       </span>
     </div>
   )
