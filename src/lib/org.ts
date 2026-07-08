@@ -37,7 +37,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   // on utilise ce contexte même s'il possède aussi sa propre org.
   const { data: membership, error: memberErr } = await supabase
     .from('org_members')
-    .select('role, status, org:organizations(id, name, plan, max_members, owner_id)')
+    .select('role, status, org_id, org:organizations(id, name, plan, max_members, owner_id)')
     .eq('user_id', user.id)
     .eq('status', 'actif')
     .neq('role', 'owner')
@@ -47,6 +47,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   if (memberErr) {
     console.error('[getOrgContext] erreur membership:', memberErr.code, memberErr.message)
   }
+  console.log('[getOrgContext] membership query —', 'user:', user.id, '| found:', !!membership, '| role:', membership?.role, '| org_id:', membership?.org_id, '| org embed:', membership?.org ? 'ok' : 'null')
 
   // Ignore une ligne org_members non-owner si elle pointe vers l'org que
   // l'utilisateur possède lui-même (artefact de données — ex: une invitation
@@ -60,9 +61,50 @@ export async function getOrgContext(): Promise<OrgContext | null> {
 
   if (membership && !isSelfOwnedAnomaly) {
     const role    = membership.role as OrgRole
-    const orgData = membership.org as unknown as OrgContext['org']
+    let orgData = membership.org as unknown as OrgContext['org']
     const isDirector = role === 'director'
     const isTeamChef = role === 'chef_equipe'
+
+    // L'embed PostgREST org:organizations(...) ci-dessus dépend de la policy
+    // RLS "org: member read" (id in my_org_ids()) pour résoudre la relation.
+    // S'il échoue à matcher pour une raison quelconque (cache de schéma,
+    // policy pas encore appliquée sur ce projet Supabase, etc.), l'embed
+    // renvoie silencieusement `org: null` sans erreur PostgREST — et
+    // `orgData?.owner_id ?? user.id` retombait alors sur l'ID du membre
+    // lui-même. Comme content_pieces.user_id (et toutes les autres tables
+    // de data) contient TOUJOURS l'ID du owner, jamais celui du membre, un
+    // dataOwnerId erroné casse silencieusement tout PATCH pour ce membre
+    // (0 ligne ne matche jamais .eq('user_id', dataOwnerId)).
+    // my_org_owner_ids() est SECURITY DEFINER : il lit org_members/organizations
+    // sans passer par RLS et sert donc de filet de sécurité indépendant de
+    // l'embed, pour n'importe quel rôle et n'importe quelle organisation.
+    const { data: ownerIdsRpc, error: ownerIdsErr } = await supabase.rpc('my_org_owner_ids')
+    const rpcOwnerId: string | undefined = Array.isArray(ownerIdsRpc) ? ownerIdsRpc[0] : undefined
+
+    if (ownerIdsErr) {
+      console.error('[getOrgContext] erreur rpc my_org_owner_ids —', 'user:', user.id, '| role:', role, '| code:', ownerIdsErr.code, '| message:', ownerIdsErr.message)
+    }
+
+    // Si l'embed a échoué mais que le RPC a résolu owner_id, retente une
+    // lecture directe (non imbriquée) de organizations — un échec d'embed
+    // PostgREST (cache de schéma / FK ambiguë) n'implique pas forcément un
+    // échec de la policy RLS elle-même sur une requête simple.
+    if (!orgData && rpcOwnerId) {
+      const { data: directOrg } = await supabase
+        .from('organizations')
+        .select('id, name, plan, max_members, owner_id')
+        .eq('id', membership.org_id)
+        .maybeSingle()
+      if (directOrg) orgData = directOrg as OrgContext['org']
+    }
+
+    const dataOwnerId = orgData?.owner_id ?? rpcOwnerId ?? user.id
+
+    if (dataOwnerId === user.id) {
+      console.error('[getOrgContext] ⚠️ dataOwnerId retombe sur user.id pour un membre non-owner —', 'user:', user.id, '| role:', role, '| org_id:', membership.org_id, '| embed owner_id:', orgData?.owner_id, '| rpc owner_id:', rpcOwnerId, '→ tout PATCH/DELETE filtré sur dataOwnerId va échouer silencieusement pour ce membre')
+    } else if (!orgData?.owner_id) {
+      console.warn('[getOrgContext] embed organizations vide, owner_id résolu via rpc fallback —', 'user:', user.id, '| role:', role, '| org_id:', membership.org_id, '| owner_id (rpc):', rpcOwnerId)
+    }
 
     // team_memberships n'a pas de FK directe vers org_members (les deux ne
     // référencent que auth.users) — PostgREST ne peut pas l'embarquer dans
@@ -84,7 +126,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
       canManageTeamRoles:    isDirector || isTeamChef,
       canManageOrgStructure: isDirector,
       canAccessFinance:      false,
-      dataOwnerId: orgData?.owner_id ?? user.id,
+      dataOwnerId,
       teamId,
       memberCount: 0,
     }

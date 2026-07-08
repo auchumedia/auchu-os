@@ -18,6 +18,16 @@ export async function PATCH(
     if (key in body) fields[key] = body[key]
   }
 
+  console.log(
+    '[api/contenus PATCH] tentative —',
+    'content_id:', params.id,
+    '| fields:', Object.keys(fields),
+    '| auth.uid():', ctx.userId,
+    '| role:', ctx.role,
+    '| isOwner:', ctx.isOwner,
+    '| dataOwnerId (filtre user_id):', ctx.dataOwnerId,
+  )
+
   // content_pieces.user_id est toujours l'ID du owner de l'org (cf. page.tsx),
   // pas celui de la personne qui édite — filtrer sur user.id cassait le PATCH
   // pour tout membre d'équipe non-owner (0 ligne trouvée → PGRST116 → 500,
@@ -29,6 +39,14 @@ export async function PATCH(
     .eq('user_id', ctx.dataOwnerId)
     .select()
     .single()
+
+  console.log(
+    '[api/contenus PATCH] résultat supabase —',
+    'content_id:', params.id,
+    '| user:', ctx.userId, '| role:', ctx.role, '| dataOwnerId:', ctx.dataOwnerId,
+    '| data:', data ? { id: data.id, user_id: data.user_id, script_len: typeof data.script === 'string' ? data.script.length : null } : null,
+    '| error:', error,
+  )
 
   if (error) {
     console.error(
