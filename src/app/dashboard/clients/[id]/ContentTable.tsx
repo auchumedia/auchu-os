@@ -157,7 +157,13 @@ export default function ContentTable({ initialContent, clientId, teamMembers }: 
 
   const deleteItem = async (id: string) => {
     if (!confirm('Supprimer ce contenu ?')) return
-    await fetch(`/api/contenus/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/contenus/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const err = await res.json().catch(() => null)
+      console.error('[ContentTable] DELETE échoué —', 'content_id:', id, '| status:', res.status, '| error:', err)
+      alert(err?.error ?? 'Suppression impossible.')
+      return
+    }
     setItems(prev => prev.filter(i => i.id !== id))
     if (selected?.id === id) closePanel()
   }

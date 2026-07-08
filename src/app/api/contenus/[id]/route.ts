@@ -82,12 +82,20 @@ export async function DELETE(
 
   const supabase = await createClient()
 
-  const { error } = await supabase
+  // Pas de filtre .eq('user_id', ctx.dataOwnerId) ici — même raison que le
+  // PATCH : on délègue l'autorisation à la RLS ("users own content" pour le
+  // owner, "content: org members delete" pour director/chef_equipe/stratege/
+  // monteur). count:'exact' permet de détecter un delete qui matche 0 ligne
+  // (RLS qui bloque silencieusement) et de le traiter comme une erreur au
+  // lieu de renvoyer success alors que rien n'a été supprimé.
+  const { error, count } = await supabase
     .from('content_pieces')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('id', params.id)
-    .eq('user_id', ctx.dataOwnerId)
+
+  console.log('[DELETE contenus] result:', JSON.stringify({ error, count }), '| user:', ctx.userId, '| role:', ctx.role)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!count) return NextResponse.json({ error: 'Concept introuvable ou non autorisé' }, { status: 404 })
   return NextResponse.json({ success: true })
 }
