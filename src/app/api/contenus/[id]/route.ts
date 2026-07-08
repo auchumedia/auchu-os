@@ -9,6 +9,8 @@ export async function PATCH(
   const ctx = await getOrgContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  console.log('[debug] user.id:', ctx.userId, 'dataOwnerId:', ctx.dataOwnerId, 'role:', ctx.role)
+
   const supabase = await createClient()
   const body = await req.json()
 
