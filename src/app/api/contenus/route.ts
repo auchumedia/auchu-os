@@ -1,18 +1,23 @@
 import { createClient } from '@/lib/supabase/server'
+import { getOrgContext } from '@/lib/org'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
+  const ctx = await getOrgContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const clientId = searchParams.get('client_id')
 
+  // content_pieces.user_id est toujours l'ID du owner de l'org, jamais celui
+  // de la personne qui édite (cf. api/contenus/[id]/route.ts) — filtrer sur
+  // ctx.userId cassait ce fetch pour tout membre non-owner.
   let query = supabase
     .from('content_pieces')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', ctx.dataOwnerId)
     .order('position', { ascending: true })
     .order('created_at', { ascending: false })
 
