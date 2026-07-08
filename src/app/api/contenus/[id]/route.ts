@@ -30,15 +30,17 @@ export async function PATCH(
     '| dataOwnerId (filtre user_id):', ctx.dataOwnerId,
   )
 
-  // content_pieces.user_id est toujours l'ID du owner de l'org (cf. page.tsx),
-  // pas celui de la personne qui édite — filtrer sur user.id cassait le PATCH
-  // pour tout membre d'équipe non-owner (0 ligne trouvée → PGRST116 → 500,
-  // alors que le statut restait affiché côté client sans rollback).
+  // Pas de filtre .eq('user_id', ctx.dataOwnerId) ici : ce filtre applicatif
+  // dépendait de dataOwnerId, calculé côté Next (embed PostgREST + RPC
+  // fallback) et donc sujet à divergence avec la résolution faite par
+  // Postgres lui-même. On délègue entièrement l'autorisation à la RLS
+  // ("users own content" pour le owner, "content: org members update" pour
+  // director/chef_equipe/stratege/monteur via my_org_owner_ids()) — c'est
+  // elle qui doit décider, pas un recalcul dupliqué côté route.
   const { data, error, count } = await supabase
     .from('content_pieces')
     .update(fields, { count: 'exact' })
     .eq('id', params.id)
-    .eq('user_id', ctx.dataOwnerId)
     .select()
     .single()
 
