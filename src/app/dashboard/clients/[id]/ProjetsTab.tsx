@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, X, ChevronRight, Loader2, ThumbsUp, ThumbsDown, Trash2, ExternalLink, Link2, Check, GripVertical } from 'lucide-react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import {
+  Plus, X, ChevronRight, ChevronLeft, Loader2, ThumbsUp, ThumbsDown, Trash2,
+  ExternalLink, Link2, Check, GripVertical, Video, Send, MapPin, Users,
+} from 'lucide-react'
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent,
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ContentPiece, ReferenceLink } from '@/types'
+import { ContentPiece, ContentStatus, CalendarEvent, ReferenceLink } from '@/types'
 import { cn, formatDate } from '@/lib/utils'
 import RichTextEditor from '@/components/RichTextEditor'
 
@@ -27,8 +30,8 @@ const PLATFORM_LABELS: Record<string, string> = {
   instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok',
   linkedin: 'LinkedIn', google: 'Google Ads', meta: 'Meta Ads',
 }
-// Options du formulaire de création (sans Google Ads, cf. maquette).
 const PLATFORMS = ['toutes','instagram','facebook','tiktok','linkedin','meta']
+const CALENDAR_PLATFORMS = ['instagram','facebook','tiktok','linkedin','google','meta']
 
 const PLATFORM_COLORS: Record<string, string> = {
   toutes:    'bg-auchu-100 text-auchu-700',
@@ -40,17 +43,24 @@ const PLATFORM_COLORS: Record<string, string> = {
   meta:      'bg-indigo-100 text-indigo-700',
 }
 
+// Workflow complet — l'ordre reflète la progression attendue d'une idée.
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   idee:         { label: 'Idée',         cls: 'bg-gray-100   text-gray-600'   },
   en_redaction: { label: 'En rédaction', cls: 'bg-blue-100   text-blue-700'   },
   pret:         { label: 'Prêt',         cls: 'bg-amber-100  text-amber-700'  },
   approuve:     { label: 'Approuvé',     cls: 'bg-green-100  text-green-700'  },
   refuse:       { label: 'Refusé',       cls: 'bg-red-100    text-red-700'    },
-  draft:        { label: 'Brouillon',    cls: 'bg-gray-100   text-gray-600'   },
-  review:       { label: 'En révision',  cls: 'bg-purple-100 text-purple-700' },
-  publie:       { label: 'Publié',       cls: 'bg-green-100  text-green-700'  },
+  filme:        { label: 'Filmé',        cls: 'bg-purple-100 text-purple-700' },
+  publie:       { label: 'Publié',       cls: 'bg-indigo-100 text-indigo-700' },
 }
-const STATUSES = ['idee','en_redaction','pret','approuve','refuse']
+const STATUSES: ContentStatus[] = ['idee','en_redaction','pret','approuve','refuse','filme','publie']
+// Statuts qui comptent comme "livrable produit" pour le compteur du mois.
+const DONE_STATUSES: ContentStatus[] = ['approuve','filme','publie']
+// Statuts affichés dans le calendrier de publication (contenu confirmé).
+const SCHEDULABLE_STATUSES: ContentStatus[] = ['approuve','filme']
+
+const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
+const DAYS_FR   = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
 
 // Reference links config
 const REF_PLATFORMS: Record<string, { label: string; bg: string; color: string; emoji: string }> = {
@@ -78,6 +88,24 @@ function getYouTubeThumbnail(url: string): string | null {
   return m ? `https://img.youtube.com/vi/${m[1]}/mqdefault.jpg` : null
 }
 
+// ─── Mois effectif d'une idée ───────────────────────────────────────────────
+// scheduled_at prime, puis month_target (ciblage explicite d'un mois futur/
+// passé sans date précise), puis à défaut le mois de création.
+function getEffectiveDate(item: ContentPiece): Date {
+  return new Date(item.scheduled_at ?? item.month_target ?? item.created_at)
+}
+
+function filterByMonth(list: ContentPiece[], year: number, month: number): ContentPiece[] {
+  return list.filter(i => {
+    const d = getEffectiveDate(i)
+    return d.getFullYear() === year && d.getMonth() === month
+  })
+}
+
+function monthStartISO(year: number, month: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-01`
+}
+
 // ─── Auto-save hook ───────────────────────────────────────────────────────────
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
@@ -85,9 +113,7 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 // onSave doit renvoyer `false` (pas throw) sur échec — patchItem() résout
 // toujours plutôt que de rejeter (fetch ne rejette que sur erreur réseau),
 // donc un `await onSave(value)` qui ignore la valeur de retour masquait un
-// PATCH refusé par l'API/RLS : le badge affichait "Sauvegardé ✓" alors que
-// rien n'avait été persisté, et le contenu réapparaissait vide au retour
-// sur la page (cf. bug script non sauvegardé pour les non-owners).
+// PATCH refusé par l'API/RLS.
 function useAutoSave(
   value: string,
   onSave: (v: string) => Promise<boolean>,
@@ -124,18 +150,35 @@ function useAutoSave(
 
 interface Props {
   initialContent: ContentPiece[]
+  initialEvents:  CalendarEvent[]
   clientId: string
   teamMembers: { id: string; name: string }[]
+  deliverablesTotal: number
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ContentTable({ initialContent, clientId, teamMembers }: Props) {
+export default function ProjetsTab({ initialContent, initialEvents, clientId, teamMembers, deliverablesTotal }: Props) {
   const [items, setItems]       = useState<ContentPiece[]>(initialContent)
+  const [events, setEvents]     = useState<CalendarEvent[]>(initialEvents)
   const [selected, setSelected] = useState<ContentPiece | null>(null)
   const [showAdd, setShowAdd]   = useState(false)
+  const [showAddEvent, setShowAddEvent] = useState(false)
+  const [calType, setCalType]   = useState<'tournage' | 'publication'>('tournage')
 
-  const openItem  = (item: ContentPiece) => setSelected(item)
+  const now = new Date()
+  const [viewDate, setViewDate] = useState(new Date(now.getFullYear(), now.getMonth(), 1))
+  const year  = viewDate.getFullYear()
+  const month = viewDate.getMonth()
+
+  const monthItems = filterByMonth(items, year, month)
+
+  // ── Compteur de livrables ────────────────────────────────────────────────
+  const doneCount = monthItems.filter(i => DONE_STATUSES.includes(i.status)).length
+  const remaining = Math.max(deliverablesTotal - doneCount, 0)
+  const pct = deliverablesTotal > 0 ? Math.min(100, Math.round((doneCount / deliverablesTotal) * 100)) : 0
+
+  const openItem   = (item: ContentPiece) => setSelected(item)
   const closePanel = () => setSelected(null)
 
   const patchItem = useCallback(async (id: string, fields: Partial<ContentPiece>) => {
@@ -150,7 +193,7 @@ export default function ContentTable({ initialContent, clientId, teamMembers }: 
       setSelected(prev => prev?.id === id ? data : prev)
     } else {
       const err = await res.json().catch(() => null)
-      console.error('[ContentTable] PATCH échoué —', 'content_id:', id, '| fields:', Object.keys(fields), '| status:', res.status, '| error:', err)
+      console.error('[ProjetsTab] PATCH échoué —', 'content_id:', id, '| fields:', Object.keys(fields), '| status:', res.status, '| error:', err)
     }
     return res.ok
   }, [])
@@ -160,7 +203,7 @@ export default function ContentTable({ initialContent, clientId, teamMembers }: 
     const res = await fetch(`/api/contenus/${id}`, { method: 'DELETE' })
     if (!res.ok) {
       const err = await res.json().catch(() => null)
-      console.error('[ContentTable] DELETE échoué —', 'content_id:', id, '| status:', res.status, '| error:', err)
+      console.error('[ProjetsTab] DELETE échoué —', 'content_id:', id, '| status:', res.status, '| error:', err)
       alert(err?.error ?? 'Suppression impossible.')
       return
     }
@@ -168,68 +211,295 @@ export default function ContentTable({ initialContent, clientId, teamMembers }: 
     if (selected?.id === id) closePanel()
   }
 
-  // ── Drag & drop reorder ──────────────────────────────────────────────────
+  const deleteEvent = async (id: string) => {
+    await fetch(`/api/evenements/${id}`, { method: 'DELETE' })
+    setEvents(prev => prev.filter(e => e.id !== id))
+  }
+
+  // ── Drag & drop reorder — restreint aux idées du mois affiché ────────────
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
     setItems(prev => {
-      const oldIndex = prev.findIndex(i => i.id === active.id)
-      const newIndex = prev.findIndex(i => i.id === over.id)
-      const reordered = arrayMove(prev, oldIndex, newIndex)
-      reordered.forEach((item, idx) => {
-        if (item.position !== idx) patchItem(item.id, { position: idx })
+      const subset = filterByMonth(prev, year, month)
+      const oldIndex = subset.findIndex(i => i.id === active.id)
+      const newIndex = subset.findIndex(i => i.id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return prev
+      const reordered = arrayMove(subset, oldIndex, newIndex)
+      const subsetIds = new Set(subset.map(i => i.id))
+      const slots: number[] = []
+      prev.forEach((it, idx) => { if (subsetIds.has(it.id)) slots.push(idx) })
+      const next = [...prev]
+      slots.forEach((slotIdx, i) => { next[slotIdx] = reordered[i] })
+      slots.forEach((slotIdx, i) => {
+        if (next[slotIdx].position !== slotIdx) patchItem(next[slotIdx].id, { position: slotIdx })
       })
-      return reordered
+      return next
     })
   }
 
+  // ── Calendrier — grille du mois affiché ──────────────────────────────────
+  const firstDow    = (new Date(year, month, 1).getDay() + 6) % 7
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells: (number | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  const isThisMonth = now.getFullYear() === year && now.getMonth() === month
+
+  const monthEvents = events.filter(e => {
+    if (e.type !== calType) return false
+    const d = new Date(e.date)
+    return d.getFullYear() === year && d.getMonth() === month
+  })
+
+  // Seuls les contenus approuvés/filmés apparaissent au calendrier, et
+  // uniquement via leur date exacte (scheduled_at) — pas month_target, qui
+  // n'a pas de granularité journalière.
+  const scheduledContent = calType === 'publication'
+    ? items.filter(c => c.scheduled_at && SCHEDULABLE_STATUSES.includes(c.status))
+        .filter(c => {
+          const d = new Date(c.scheduled_at!)
+          return d.getFullYear() === year && d.getMonth() === month
+        })
+    : []
+
+  const eventsByDay: Record<number, CalendarEvent[]> = {}
+  monthEvents.forEach(e => {
+    const day = new Date(e.date).getDate()
+    if (!eventsByDay[day]) eventsByDay[day] = []
+    eventsByDay[day].push(e)
+  })
+
+  const contentByDay: Record<number, ContentPiece[]> = {}
+  scheduledContent.forEach(c => {
+    const day = new Date(c.scheduled_at!).getDate()
+    if (!contentByDay[day]) contentByDay[day] = []
+    contentByDay[day].push(c)
+  })
+
+  const isTournage = calType === 'tournage'
+  const eventBgStyle = isTournage
+    ? { background: '#dbeafe', color: '#1e40af' }
+    : { background: '#fff1f0', color: '#f95640' }
+
   return (
-    <div className="relative">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-gray-500">{items.length} contenu{items.length !== 1 ? 's' : ''}</p>
-        <button onClick={() => setShowAdd(true)} className="btn-primary text-sm gap-1.5">
-          <Plus className="w-3.5 h-3.5" />
-          Ajouter un contenu
-        </button>
+    <div className="relative space-y-8">
+
+      {/* ─── Sélecteur de mois + compteur de livrables ───────────────────── */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="btn-secondary py-1.5 px-2.5 text-sm">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <select
+              value={month}
+              onChange={e => setViewDate(new Date(year, Number(e.target.value), 1))}
+              className="select text-sm w-auto"
+            >
+              {MONTHS_FR.map((m, i) => <option key={m} value={i}>{m}</option>)}
+            </select>
+            <select
+              value={year}
+              onChange={e => setViewDate(new Date(Number(e.target.value), month, 1))}
+              className="select text-sm w-auto"
+            >
+              {Array.from({ length: 6 }, (_, i) => now.getFullYear() - 2 + i).map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="btn-secondary py-1.5 px-2.5 text-sm">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            {!isThisMonth && (
+              <button onClick={() => setViewDate(new Date(now.getFullYear(), now.getMonth(), 1))} className="btn-secondary py-1.5 px-3 text-sm">
+                Aujourd'hui
+              </button>
+            )}
+          </div>
+          <button onClick={() => setShowAdd(true)} className="btn-primary text-sm gap-1.5">
+            <Plus className="w-3.5 h-3.5" />
+            Ajouter un contenu
+          </button>
+        </div>
+
+        {deliverablesTotal > 0 && (
+          <div className="card">
+            <div className="flex items-baseline justify-between mb-2">
+              <p className="text-sm font-medium text-gray-700">
+                {doneCount}/{deliverablesTotal} contenu{deliverablesTotal !== 1 ? 's' : ''} ce mois
+              </p>
+              <span className="text-xs text-gray-400">{pct}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+              <div className="h-full rounded-full bg-auchu-500 transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              {remaining > 0
+                ? `Il reste ${remaining} contenu${remaining !== 1 ? 's' : ''} à créer`
+                : 'Objectif du mois atteint 🎉'}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Table */}
-      {items.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-gray-400 text-sm">Aucun contenu — crée le premier</p>
+      {/* ─── Section idées ────────────────────────────────────────────────── */}
+      <div>
+        <p className="text-sm text-gray-500 mb-3">
+          {monthItems.length} idée{monthItems.length !== 1 ? 's' : ''} — {MONTHS_FR[month]} {year}
+        </p>
+
+        {monthItems.length === 0 ? (
+          <div className="card text-center py-12">
+            <p className="text-gray-400 text-sm">Aucune idée pour ce mois — crée la première</p>
+          </div>
+        ) : (
+          <div className="card p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th className="w-8" />
+                      <th>Titre</th>
+                      <th>Type</th>
+                      <th>Plateforme</th>
+                      <th>Statut</th>
+                      <th>Assigné à</th>
+                      <th>Planifié</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <SortableContext items={monthItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                    <tbody>
+                      {monthItems.map(item => (
+                        <SortableRow key={item.id} item={item} onOpen={openItem} onDelete={deleteItem} />
+                      ))}
+                    </tbody>
+                  </SortableContext>
+                </table>
+              </DndContext>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Section calendrier ───────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2 bg-gray-100 rounded-xl p-1">
+            <button
+              onClick={() => setCalType('tournage')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                calType === 'tournage' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              )}
+            >
+              <Video className="w-3.5 h-3.5" />
+              Tournage
+            </button>
+            <button
+              onClick={() => setCalType('publication')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                calType === 'publication' ? 'bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              )}
+              style={calType === 'publication' ? { color: '#f95640' } : undefined}
+            >
+              <Send className="w-3.5 h-3.5" />
+              Publication
+            </button>
+          </div>
+          <button
+            onClick={() => setShowAddEvent(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white transition-all"
+            style={{ background: isTournage ? '#3b82f6' : '#f95640' }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Ajouter
+          </button>
         </div>
-      ) : (
+
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          {calType === 'tournage' && (
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-blue-200 inline-block" />
+              Séance de tournage
+            </span>
+          )}
+          {calType === 'publication' && (
+            <>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded inline-block" style={{ background: '#ffd5d0' }} />
+                Événement de publication
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded bg-pink-100 inline-block" />
+                Contenu approuvé / filmé
+              </span>
+            </>
+          )}
+        </div>
+
         <div className="card p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th className="w-8" />
-                    <th>Titre</th>
-                    <th>Type</th>
-                    <th>Plateforme</th>
-                    <th>Statut</th>
-                    <th>Assigné à</th>
-                    <th>Planifié</th>
-                    <th />
-                  </tr>
-                </thead>
-                <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
-                  <tbody>
-                    {items.map(item => (
-                      <SortableRow key={item.id} item={item} onOpen={openItem} onDelete={deleteItem} />
+          <div className="grid grid-cols-7 border-b border-gray-100">
+            {DAYS_FR.map(d => (
+              <div key={d} className="py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wide">
+                {d}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
+            {cells.map((day, i) => {
+              if (!day) return <div key={i} className="min-h-[100px] bg-gray-50/40" />
+              const dayEvents  = eventsByDay[day]  ?? []
+              const dayContent = contentByDay[day] ?? []
+              const isToday    = isThisMonth && day === now.getDate()
+              const hasItems   = dayEvents.length > 0 || dayContent.length > 0
+
+              return (
+                <div
+                  key={i}
+                  className={cn('min-h-[100px] p-1.5', isToday && (isTournage ? 'bg-blue-50/40' : 'bg-orange-50/40'), hasItems && 'bg-white')}
+                >
+                  <span className={cn(
+                    'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full',
+                    isToday ? 'text-white' : 'text-gray-500'
+                  )}
+                  style={isToday ? { background: isTournage ? '#3b82f6' : '#f95640' } : undefined}
+                  >
+                    {day}
+                  </span>
+                  <div className="mt-1 space-y-0.5">
+                    {dayEvents.map(ev => (
+                      <EventChip
+                        key={ev.id}
+                        label={ev.title}
+                        sublabel={ev.location ?? (ev.participants?.join(', ') ?? '')}
+                        style={eventBgStyle}
+                        onDelete={() => deleteEvent(ev.id)}
+                      />
                     ))}
-                  </tbody>
-                </SortableContext>
-              </table>
-            </DndContext>
+                    {dayContent.map(c => (
+                      <EventChip
+                        key={c.id}
+                        label={c.title}
+                        sublabel={PLATFORM_LABELS[c.platform] ?? c.platform}
+                        style={{ background: '#fce7f3', color: '#be185d' }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Vue plein écran du concept */}
       {selected && (
@@ -242,16 +512,32 @@ export default function ContentTable({ initialContent, clientId, teamMembers }: 
         />
       )}
 
-      {/* Add modal */}
+      {/* Add content modal */}
       {showAdd && (
         <AddContentModal
           clientId={clientId}
           teamMembers={teamMembers}
+          selectedYear={year}
+          selectedMonth={month}
           onClose={() => setShowAdd(false)}
           onCreated={item => {
             setItems(prev => [...prev, item])
             setShowAdd(false)
             setSelected(item) // ouvre directement la vue plein écran pour écrire description/script
+          }}
+        />
+      )}
+
+      {/* Add event modal */}
+      {showAddEvent && (
+        <AddEventModal
+          clientId={clientId}
+          type={calType}
+          contentPieces={items}
+          onClose={() => setShowAddEvent(false)}
+          onCreated={ev => {
+            setEvents(prev => [...prev, ev])
+            setShowAddEvent(false)
           }}
         />
       )}
@@ -663,16 +949,15 @@ function RefCard({ link, onRemove, readonly }: { link: ReferenceLink; onRemove?:
   )
 }
 
-// Export RefCard + ReferencesSection for reuse in portal
-export { RefCard, ReferencesSection }
-
 // ─── Add content modal ────────────────────────────────────────────────────────
 
 function AddContentModal({
-  clientId, teamMembers, onClose, onCreated,
+  clientId, teamMembers, selectedYear, selectedMonth, onClose, onCreated,
 }: {
   clientId: string
   teamMembers: { id: string; name: string }[]
+  selectedYear: number
+  selectedMonth: number
   onClose: () => void
   onCreated: (item: ContentPiece) => void
 }) {
@@ -696,6 +981,10 @@ function AddContentModal({
         client_id:    clientId,
         assigned_to:  form.assigned_to  || null,
         scheduled_at: form.scheduled_at || null,
+        // Sans date précise, l'idée est explicitement rattachée au mois de
+        // l'onglet actif — sinon elle tomberait par défaut sur le mois de
+        // création (cf. règle de fallback scheduled_at → month_target → created_at).
+        month_target: form.scheduled_at ? null : monthStartISO(selectedYear, selectedMonth),
       }),
     })
     const json = await res.json()
@@ -750,12 +1039,227 @@ function AddContentModal({
           <div>
             <label className="label">Date de publication prévue</label>
             <input type="date" value={form.scheduled_at} onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value }))} className="input text-sm" />
+            <p className="text-xs text-gray-400 mt-1">
+              Laisse vide pour rattacher l'idée au mois affiché ({MONTHS_FR[selectedMonth]} {selectedYear}).
+            </p>
           </div>
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">Annuler</button>
             <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center disabled:opacity-50">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Créer le contenu'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Event chip ───────────────────────────────────────────────────────────────
+
+function EventChip({
+  label, sublabel, style, onDelete,
+}: {
+  label: string
+  sublabel?: string
+  style: React.CSSProperties
+  onDelete?: () => void
+}) {
+  return (
+    <div
+      className="group relative text-[10px] px-1.5 py-1 rounded font-medium leading-tight"
+      style={style}
+      title={sublabel ? `${label} — ${sublabel}` : label}
+    >
+      <div className="truncate">{label}</div>
+      {sublabel && <div className="truncate opacity-70">{sublabel}</div>}
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          className="absolute top-0.5 right-0.5 hidden group-hover:flex w-3.5 h-3.5 items-center justify-center rounded bg-black/20 hover:bg-black/40"
+        >
+          <X className="w-2 h-2 text-white" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Add event modal ──────────────────────────────────────────────────────────
+
+function AddEventModal({
+  clientId, type, contentPieces, onClose, onCreated,
+}: {
+  clientId: string
+  type: 'tournage' | 'publication'
+  contentPieces: ContentPiece[]
+  onClose: () => void
+  onCreated: (ev: CalendarEvent) => void
+}) {
+  const [form, setForm] = useState({
+    title: '', date: '',
+    location: '', participants: '',
+    platform: 'instagram', content_piece_id: '',
+    notes: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState<string | null>(null)
+
+  const isTournage = type === 'tournage'
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.title.trim() || !form.date) return
+    setSaving(true)
+    setError(null)
+
+    const body: Record<string, unknown> = {
+      client_id: clientId,
+      type,
+      title: form.title,
+      date:  form.date,
+      notes: form.notes || null,
+    }
+
+    if (isTournage) {
+      body.location     = form.location     || null
+      body.participants = form.participants
+        ? form.participants.split(',').map(s => s.trim()).filter(Boolean)
+        : null
+    } else {
+      body.platform          = form.platform          || null
+      body.content_piece_id  = form.content_piece_id  || null
+    }
+
+    const res = await fetch('/api/evenements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const json = await res.json()
+    if (!res.ok) { setError(json.error ?? 'Erreur'); setSaving(false); return }
+    onCreated(json.data)
+  }
+
+  const accentColor = isTournage ? '#3b82f6' : '#f95640'
+
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            {isTournage
+              ? <Video className="w-4 h-4 text-blue-500" />
+              : <Send className="w-4 h-4" style={{ color: '#f95640' }} />
+            }
+            <h3 className="font-semibold text-gray-900">
+              {isTournage ? 'Ajouter un tournage' : 'Ajouter une publication'}
+            </h3>
+          </div>
+          <button onClick={onClose} className="p-2 -m-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+          <div>
+            <label className="label">Titre *</label>
+            <input
+              type="text" required value={form.title}
+              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              className="input text-sm"
+              placeholder={isTournage ? 'Shooting Instagram Janvier' : 'Publication lancement produit'}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="label">Date *</label>
+            <input
+              type="date" required value={form.date}
+              onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+              className="input text-sm"
+            />
+          </div>
+
+          {isTournage ? (
+            <>
+              <div>
+                <label className="label">
+                  <MapPin className="w-3 h-3 inline mr-1" />
+                  Lieu
+                </label>
+                <input
+                  type="text" value={form.location}
+                  onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                  className="input text-sm"
+                  placeholder="Studio, adresse…"
+                />
+              </div>
+              <div>
+                <label className="label">
+                  <Users className="w-3 h-3 inline mr-1" />
+                  Participants (séparés par virgule)
+                </label>
+                <input
+                  type="text" value={form.participants}
+                  onChange={e => setForm(f => ({ ...f, participants: e.target.value }))}
+                  className="input text-sm"
+                  placeholder="Jean, Marie, Kevin…"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="label">Plateforme</label>
+                <select
+                  value={form.platform}
+                  onChange={e => setForm(f => ({ ...f, platform: e.target.value }))}
+                  className="select text-sm"
+                >
+                  {CALENDAR_PLATFORMS.map(p => <option key={p} value={p}>{PLATFORM_LABELS[p]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Contenu lié (optionnel)</label>
+                <select
+                  value={form.content_piece_id}
+                  onChange={e => setForm(f => ({ ...f, content_piece_id: e.target.value }))}
+                  className="select text-sm"
+                >
+                  <option value="">— Aucun —</option>
+                  {contentPieces.map(c => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className="label">Notes</label>
+            <textarea
+              rows={2} value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              className="input text-sm resize-none"
+              placeholder="Informations supplémentaires…"
+            />
+          </div>
+
+          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">Annuler</button>
+            <button
+              type="submit" disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{ background: accentColor }}
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ajouter'}
             </button>
           </div>
         </form>

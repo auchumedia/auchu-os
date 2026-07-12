@@ -60,6 +60,7 @@ export async function POST(req: Request) {
       script:      body.script     ?? null,
       assigned_to: body.assigned_to ?? null,
       scheduled_at: body.scheduled_at ?? null,
+      month_target: body.month_target ?? null,
       body:        body.script ?? body.body ?? '',
       variants:    [],
       position:    nextPosition,

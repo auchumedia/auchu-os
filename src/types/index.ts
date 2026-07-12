@@ -162,7 +162,7 @@ export interface Project {
 
 // ─── Contenu ──────────────────────────────────────────────────────────────────
 export type ContentType = 'post' | 'reel' | 'story' | 'script_video' | 'ad' | 'caption' | 'script' | 'email' | 'video_organique'
-export type ContentStatus = 'idee' | 'en_redaction' | 'pret' | 'approuve' | 'refuse' | 'draft' | 'review' | 'publie'
+export type ContentStatus = 'idee' | 'en_redaction' | 'pret' | 'approuve' | 'refuse' | 'filme' | 'publie'
 export type Platform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin' | 'google' | 'meta' | 'toutes'
 
 export interface ContentPiece {
@@ -183,6 +183,7 @@ export interface ContentPiece {
   variants:        ContentVariant[]
   position: number
   scheduled_at: string | null
+  month_target: string | null
   published_at: string | null
   ai_generated: boolean
   created_at: string

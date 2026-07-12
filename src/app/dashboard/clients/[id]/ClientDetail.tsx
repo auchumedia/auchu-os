@@ -9,14 +9,13 @@ import {
   Instagram, Facebook, Linkedin,
 } from 'lucide-react'
 import { Client, Invoice, ContentPiece, CalendarEvent, ClientPlatformAccess, ClientDocument, Task } from '@/types'
-import ContentTable from './ContentTable'
-import CalendarView from './CalendarView'
+import ProjetsTab from './ProjetsTab'
 import ClientTasksTab from './ClientTasksTab'
 import { cn, formatCurrency, formatDate, getInitials } from '@/lib/utils'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'content' | 'calendar' | 'invoices' | 'tasks' | 'portal'
+type Tab = 'overview' | 'projects' | 'invoices' | 'tasks' | 'portal'
 
 const PLATFORMS = ['instagram', 'facebook', 'tiktok', 'linkedin', 'google', 'meta']
 
@@ -381,8 +380,7 @@ export default function ClientDetail({
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'overview',  label: 'Vue d\'ensemble',              icon: FileText  },
-    { id: 'content',   label: `Contenu (${content.length})`,  icon: FileText  },
-    { id: 'calendar',  label: 'Calendrier',                   icon: Calendar  },
+    { id: 'projects',  label: `Projets (${content.length})`,  icon: Calendar  },
     { id: 'invoices',  label: `Factures (${invoices.length})`,icon: CreditCard},
     { id: 'tasks',     label: `Tâches (${tasks.length})`,     icon: ListTodo  },
     { id: 'portal',    label: 'Portail',                      icon: Globe     },
@@ -1028,17 +1026,14 @@ export default function ClientDetail({
         </div>
       )}
 
-      {/* ─── Tab: Contenu (table Notion) ─────────────────────────────────────── */}
-      {tab === 'content' && (
-        <ContentTable initialContent={content} clientId={client.id} teamMembers={teamMembers} />
-      )}
-
-      {/* ─── Tab: Calendrier ─────────────────────────────────────────────────── */}
-      {tab === 'calendar' && (
-        <CalendarView
+      {/* ─── Tab: Projets (idées du mois + calendrier) ───────────────────────── */}
+      {tab === 'projects' && (
+        <ProjetsTab
+          initialContent={content}
           initialEvents={events}
-          contentPieces={content}
           clientId={client.id}
+          teamMembers={teamMembers}
+          deliverablesTotal={deliverablesTotal}
         />
       )}
 

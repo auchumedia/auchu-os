@@ -73,14 +73,13 @@ const PLATFORM_COLORS: Record<string, string> = {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
-  idee:         { label: 'Idée',         cls: 'bg-gray-100  text-gray-600'   },
-  en_redaction: { label: 'En rédaction', cls: 'bg-blue-100  text-blue-700'   },
-  pret:         { label: 'Prêt',         cls: 'bg-amber-100 text-amber-700'  },
-  approuve:     { label: 'Approuvé ✓',   cls: 'bg-green-100 text-green-700'  },
-  refuse:       { label: 'Refusé',       cls: 'bg-red-100   text-red-700'    },
-  draft:        { label: 'Brouillon',    cls: 'bg-gray-100  text-gray-600'   },
-  review:       { label: 'À approuver',  cls: 'bg-amber-100 text-amber-700'  },
-  publie:       { label: 'Publié',       cls: 'bg-green-100 text-green-700'  },
+  idee:         { label: 'Idée',         cls: 'bg-gray-100   text-gray-600'   },
+  en_redaction: { label: 'En rédaction', cls: 'bg-blue-100   text-blue-700'   },
+  pret:         { label: 'Prêt',         cls: 'bg-amber-100  text-amber-700'  },
+  approuve:     { label: 'Approuvé ✓',   cls: 'bg-green-100  text-green-700'  },
+  refuse:       { label: 'Refusé',       cls: 'bg-red-100    text-red-700'    },
+  filme:        { label: 'Filmé',        cls: 'bg-purple-100 text-purple-700' },
+  publie:       { label: 'Publié',       cls: 'bg-indigo-100 text-indigo-700' },
 }
 
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
@@ -192,9 +191,11 @@ export default function PortalContent({ content: initial, events, token, primary
     return d.getFullYear() === year && d.getMonth() === month
   })
 
+  // Seuls les contenus confirmés (approuvés ou filmés) apparaissent au
+  // calendrier de publication — cohérent avec l'onglet Projets côté agence.
   const monthContent = calType === 'publication'
     ? items.filter(c => {
-        if (!c.scheduled_at) return false
+        if (!c.scheduled_at || !['approuve', 'filme'].includes(c.status)) return false
         const d = new Date(c.scheduled_at)
         return d.getFullYear() === year && d.getMonth() === month
       })

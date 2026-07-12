@@ -37,7 +37,7 @@ async function fetchClientCards(supabase: SupabaseClient, ownerId: string, clien
       .from('content_pieces')
       .select('client_id')
       .eq('user_id', ownerId)
-      .eq('status', 'review')
+      .eq('status', 'pret')
       .in('client_id', ids)
     for (const r of reviewRows ?? []) {
       if (r.client_id) reviewCounts[r.client_id] = (reviewCounts[r.client_id] ?? 0) + 1
@@ -94,7 +94,7 @@ async function OrgDashboard(
     revenueRes, clientCards, urgentTasksRes, recentContentRes,
   ] = await Promise.all([
     supabase.from('clients').select('id, status').eq('user_id', ownerId),
-    supabase.from('content_pieces').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('status', 'review'),
+    supabase.from('content_pieces').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('status', 'pret'),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).lt('deadline', todayISO).not('status', 'in', '(termine,approuve)'),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('status', 'en_cours'),
     ctx.canAccessFinance
@@ -228,14 +228,14 @@ async function OrgDashboard(
                     <p className="text-xs text-gray-400">{piece.client?.name}</p>
                   </div>
                   <span className={cn('badge text-xs flex-shrink-0',
-                    piece.status === 'publie'   ? 'badge-green' :
+                    piece.status === 'publie'   ? 'badge-blue'  :
+                    piece.status === 'filme'    ? 'badge-purple':
                     piece.status === 'approuve' ? 'badge-green' :
-                    piece.status === 'review'   ? 'badge-amber' :
-                    piece.status === 'pret'     ? 'badge-blue'  : 'badge-gray'
+                    piece.status === 'pret'     ? 'badge-amber' : 'badge-gray'
                   )}>
                     {piece.status === 'publie'       ? 'Publié'    :
+                     piece.status === 'filme'        ? 'Filmé'     :
                      piece.status === 'approuve'     ? 'Approuvé'  :
-                     piece.status === 'review'       ? 'À réviser' :
                      piece.status === 'pret'         ? 'Prêt'      :
                      piece.status === 'en_redaction' ? 'En cours'  : piece.status}
                   </span>
