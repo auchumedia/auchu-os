@@ -11,7 +11,7 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ContentPiece, ContentStatus, CalendarEvent, ReferenceLink } from '@/types'
-import { cn, formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import RichTextEditor from '@/components/RichTextEditor'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -88,18 +88,40 @@ function getYouTubeThumbnail(url: string): string | null {
   return m ? `https://img.youtube.com/vi/${m[1]}/mqdefault.jpg` : null
 }
 
+// ─── Dates — parsing sans décalage de fuseau ─────────────────────────────────
+// `new Date("2026-07-01")` est interprété comme minuit UTC ; un `.getMonth()`
+// lu ensuite en heure locale (ex: EDT, UTC-4) le fait basculer sur le 30 juin.
+// Pour toute donnée "calendaire" (month_target, scheduled_at, date d'un
+// événement), on lit donc directement les composantes Y/M/D dans la chaîne
+// plutôt que de passer par les getters locaux d'un objet Date.
+function parseISODateParts(dateStr: string): { year: number; month: number; day: number } {
+  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number)
+  return { year: y, month: m - 1, day: d }
+}
+
+function isSameYearMonth(dateStr: string, year: number, month: number): boolean {
+  const p = parseISODateParts(dateStr)
+  return p.year === year && p.month === month
+}
+
+function dayOfMonth(dateStr: string): number {
+  return parseISODateParts(dateStr).day
+}
+
+function formatDateOnly(dateStr: string): string {
+  const { year, month, day } = parseISODateParts(dateStr)
+  return `${day} ${MONTHS_FR[month].slice(0, 3)} ${year}`
+}
+
 // ─── Mois effectif d'une idée ───────────────────────────────────────────────
 // scheduled_at prime, puis month_target (ciblage explicite d'un mois futur/
 // passé sans date précise), puis à défaut le mois de création.
-function getEffectiveDate(item: ContentPiece): Date {
-  return new Date(item.scheduled_at ?? item.month_target ?? item.created_at)
+function getEffectiveDateStr(item: ContentPiece): string {
+  return item.scheduled_at ?? item.month_target ?? item.created_at
 }
 
 function filterByMonth(list: ContentPiece[], year: number, month: number): ContentPiece[] {
-  return list.filter(i => {
-    const d = getEffectiveDate(i)
-    return d.getFullYear() === year && d.getMonth() === month
-  })
+  return list.filter(i => isSameYearMonth(getEffectiveDateStr(i), year, month))
 }
 
 function monthStartISO(year: number, month: number): string {
@@ -251,33 +273,25 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, te
 
   const isThisMonth = now.getFullYear() === year && now.getMonth() === month
 
-  const monthEvents = events.filter(e => {
-    if (e.type !== calType) return false
-    const d = new Date(e.date)
-    return d.getFullYear() === year && d.getMonth() === month
-  })
+  const monthEvents = events.filter(e => e.type === calType && isSameYearMonth(e.date, year, month))
 
   // Seuls les contenus approuvés/filmés apparaissent au calendrier, et
   // uniquement via leur date exacte (scheduled_at) — pas month_target, qui
   // n'a pas de granularité journalière.
   const scheduledContent = calType === 'publication'
-    ? items.filter(c => c.scheduled_at && SCHEDULABLE_STATUSES.includes(c.status))
-        .filter(c => {
-          const d = new Date(c.scheduled_at!)
-          return d.getFullYear() === year && d.getMonth() === month
-        })
+    ? items.filter(c => c.scheduled_at && SCHEDULABLE_STATUSES.includes(c.status) && isSameYearMonth(c.scheduled_at, year, month))
     : []
 
   const eventsByDay: Record<number, CalendarEvent[]> = {}
   monthEvents.forEach(e => {
-    const day = new Date(e.date).getDate()
+    const day = dayOfMonth(e.date)
     if (!eventsByDay[day]) eventsByDay[day] = []
     eventsByDay[day].push(e)
   })
 
   const contentByDay: Record<number, ContentPiece[]> = {}
   scheduledContent.forEach(c => {
-    const day = new Date(c.scheduled_at!).getDate()
+    const day = dayOfMonth(c.scheduled_at!)
     if (!contentByDay[day]) contentByDay[day] = []
     contentByDay[day].push(c)
   })
@@ -506,6 +520,7 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, te
         <ContentPanel
           key={selected.id}
           item={selected}
+          teamMembers={teamMembers}
           onPatch={(fields) => patchItem(selected.id, fields)}
           onClose={closePanel}
           onDelete={() => deleteItem(selected.id)}
@@ -516,7 +531,6 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, te
       {showAdd && (
         <AddContentModal
           clientId={clientId}
-          teamMembers={teamMembers}
           selectedYear={year}
           selectedMonth={month}
           onClose={() => setShowAdd(false)}
@@ -593,7 +607,7 @@ function SortableRow({
       </td>
       <td><span className={cn('badge text-xs', sc.cls)}>{sc.label}</span></td>
       <td className="text-xs text-gray-500">{item.assigned_to ?? '—'}</td>
-      <td className="text-xs text-gray-400">{item.scheduled_at ? formatDate(item.scheduled_at) : '—'}</td>
+      <td className="text-xs text-gray-400">{item.scheduled_at ? formatDateOnly(item.scheduled_at) : '—'}</td>
       <td onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-1">
           <button
@@ -612,9 +626,10 @@ function SortableRow({
 // ─── Content panel (vue plein écran) ─────────────────────────────────────────────
 
 function ContentPanel({
-  item, onPatch, onClose, onDelete,
+  item, teamMembers, onPatch, onClose, onDelete,
 }: {
   item: ContentPiece
+  teamMembers: { id: string; name: string }[]
   onPatch: (fields: Partial<ContentPiece>) => Promise<boolean>
   onClose: () => void
   onDelete: () => void
@@ -626,12 +641,35 @@ function ContentPanel({
   const [statusError, setStatusError] = useState<string | null>(null)
   const [refs,        setRefs]        = useState<ReferenceLink[]>(item.reference_links ?? [])
 
+  // Date de publication et assignation — édition immédiate (pas de debounce,
+  // ce sont des sélections ponctuelles, pas de la saisie continue).
+  const [scheduledAt,     setScheduledAt]     = useState(item.scheduled_at?.slice(0, 10) ?? '')
+  const [assignedTo,      setAssignedTo]      = useState(item.assigned_to ?? '')
+  const [scheduleStatus,  setScheduleStatus]  = useState<SaveStatus>('idle')
+  const [assignStatus,    setAssignStatus]    = useState<SaveStatus>('idle')
+
   const titleStatus = useAutoSave(title,       v => onPatch({ title: v }))
   const descStatus  = useAutoSave(description, v => onPatch({ description: v || null }))
   const scriptStatus = useAutoSave(script,     v => onPatch({ script: v || null, body: v || '' }))
 
   // Any field saving indicator
-  const anyStatus = [titleStatus, descStatus, scriptStatus].find(s => s !== 'idle') ?? 'idle'
+  const anyStatus = [titleStatus, descStatus, scriptStatus, scheduleStatus, assignStatus].find(s => s !== 'idle') ?? 'idle'
+
+  const changeScheduledAt = async (v: string) => {
+    setScheduledAt(v)
+    setScheduleStatus('saving')
+    const ok = await onPatch({ scheduled_at: v || null })
+    setScheduleStatus(ok ? 'saved' : 'error')
+    if (ok) setTimeout(() => setScheduleStatus('idle'), 2000)
+  }
+
+  const changeAssignedTo = async (v: string) => {
+    setAssignedTo(v)
+    setAssignStatus('saving')
+    const ok = await onPatch({ assigned_to: v || null })
+    setAssignStatus(ok ? 'saved' : 'error')
+    if (ok) setTimeout(() => setAssignStatus('idle'), 2000)
+  }
 
   const changeStatus = async (s: string) => {
     const previous = status
@@ -721,6 +759,30 @@ function ContentPanel({
             placeholder="Titre du concept"
             className="text-3xl sm:text-4xl font-bold text-gray-900 w-full bg-transparent border-b border-transparent hover:border-gray-200 focus:border-auchu-400 focus:outline-none py-1 transition-colors"
           />
+
+          {/* Date de publication + Assigné à */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <SaveLabel label="Date de publication" status={scheduleStatus} />
+              <input
+                type="date"
+                value={scheduledAt}
+                onChange={e => changeScheduledAt(e.target.value)}
+                className="input text-sm"
+              />
+            </div>
+            <div>
+              <SaveLabel label="Assigné à" status={assignStatus} />
+              <select
+                value={assignedTo}
+                onChange={e => changeAssignedTo(e.target.value)}
+                className="select text-sm"
+              >
+                <option value="">Personne</option>
+                {teamMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+              </select>
+            </div>
+          </section>
 
           {/* Description */}
           <section>
@@ -952,19 +1014,16 @@ function RefCard({ link, onRemove, readonly }: { link: ReferenceLink; onRemove?:
 // ─── Add content modal ────────────────────────────────────────────────────────
 
 function AddContentModal({
-  clientId, teamMembers, selectedYear, selectedMonth, onClose, onCreated,
+  clientId, selectedYear, selectedMonth, onClose, onCreated,
 }: {
   clientId: string
-  teamMembers: { id: string; name: string }[]
   selectedYear: number
   selectedMonth: number
   onClose: () => void
   onCreated: (item: ContentPiece) => void
 }) {
   const [form, setForm] = useState({
-    title: '', type: 'video_organique', platform: 'toutes',
-    status: 'idee', assigned_to: '',
-    scheduled_at: '',
+    title: '', type: 'video_organique', platform: 'toutes', status: 'idee',
   })
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
@@ -978,17 +1037,20 @@ function AddContentModal({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...form,
-        client_id:    clientId,
-        assigned_to:  form.assigned_to  || null,
-        scheduled_at: form.scheduled_at || null,
-        // Sans date précise, l'idée est explicitement rattachée au mois de
-        // l'onglet actif — sinon elle tomberait par défaut sur le mois de
-        // création (cf. règle de fallback scheduled_at → month_target → created_at).
-        month_target: form.scheduled_at ? null : monthStartISO(selectedYear, selectedMonth),
+        client_id: clientId,
+        // Aucune date précisée à la création — l'idée est toujours rattachée
+        // explicitement au mois de l'onglet actif (celui affiché à l'écran),
+        // pas au mois courant du calendrier.
+        month_target: monthStartISO(selectedYear, selectedMonth),
       }),
     })
-    const json = await res.json()
-    if (!res.ok) { setError(json.error ?? 'Erreur'); setSaving(false); return }
+    const json = await res.json().catch(() => null)
+    if (!res.ok) {
+      console.error('[ProjetsTab] POST /api/contenus échoué —', 'status:', res.status, '| error:', json)
+      setError(json?.error ?? `Erreur ${res.status} — le contenu n'a pas pu être créé.`)
+      setSaving(false)
+      return
+    }
     onCreated(json.data)
   }
 
@@ -1028,21 +1090,10 @@ function AddContentModal({
                 {STATUSES.map(s => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
               </select>
             </div>
-            <div>
-              <label className="label">Assigné à</label>
-              <select value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))} className="select text-sm">
-                <option value="">Personne</option>
-                {teamMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-              </select>
-            </div>
           </div>
-          <div>
-            <label className="label">Date de publication prévue</label>
-            <input type="date" value={form.scheduled_at} onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value }))} className="input text-sm" />
-            <p className="text-xs text-gray-400 mt-1">
-              Laisse vide pour rattacher l'idée au mois affiché ({MONTHS_FR[selectedMonth]} {selectedYear}).
-            </p>
-          </div>
+          <p className="text-xs text-gray-400">
+            Rattaché à {MONTHS_FR[selectedMonth]} {selectedYear}. La date de publication et la personne assignée se règlent après création, dans la fiche du concept.
+          </p>
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">Annuler</button>
