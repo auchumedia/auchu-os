@@ -9,14 +9,12 @@ import {
 import { Invoice, InvoiceItem } from '@/types'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 
-type InvoiceStatus = 'draft' | 'envoye' | 'paye' | 'en_retard' | 'annule'
+type InvoiceStatus = 'envoye' | 'paye' | 'en_retard'
 
 const STATUS_CONFIG: Record<InvoiceStatus, { label: string; class: string }> = {
-  draft:     { label: 'Brouillon',  class: 'badge-gray'  },
-  envoye:    { label: 'Envoyé',     class: 'badge-blue'  },
-  paye:      { label: 'Payé',       class: 'badge-green' },
-  en_retard: { label: 'En retard',  class: 'badge-red'   },
-  annule:    { label: 'Annulé',     class: 'badge-gray'  },
+  envoye:    { label: 'Envoyée',   class: 'badge-blue'  },
+  paye:      { label: 'Payée',     class: 'badge-green' },
+  en_retard: { label: 'En retard', class: 'badge-red'   },
 }
 
 interface OrgInfo {
@@ -87,8 +85,6 @@ export default function InvoiceDetail({ invoice: initial, org }: Props) {
     window.open(
       `mailto:${invoice.client.email}?subject=Facture ${invoice.invoice_number}&body=${encodeURIComponent(body)}`
     )
-
-    if (invoice.status === 'draft') updateStatus('envoye')
   }
 
   const printInvoice = () => {
@@ -250,12 +246,10 @@ ${invoice.notes ? `<div class="notes"><strong>Notes :</strong> ${invoice.notes}<
             <Printer className="w-4 h-4" />
             PDF / Imprimer
           </button>
-          {invoice.status === 'draft' && (
-            <button onClick={sendEmail} className="btn-primary gap-2">
-              <Send className="w-4 h-4" />
-              Envoyer par email
-            </button>
-          )}
+          <button onClick={sendEmail} className="btn-secondary gap-2">
+            <Send className="w-4 h-4" />
+            Envoyer par email
+          </button>
           {(invoice.status === 'envoye' || invoice.status === 'en_retard') && (
             <button
               onClick={() => updateStatus('paye')}
@@ -263,7 +257,7 @@ ${invoice.notes ? `<div class="notes"><strong>Notes :</strong> ${invoice.notes}<
               className="btn-primary gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-50"
             >
               <CheckCircle className="w-4 h-4" />
-              Marquer payé
+              Marquer payée
             </button>
           )}
           {invoice.status === 'envoye' && (

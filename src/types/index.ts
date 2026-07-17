@@ -259,7 +259,7 @@ export interface TeamMember {
 }
 
 // ─── Finance ──────────────────────────────────────────────────────────────────
-export type InvoiceStatus = 'draft' | 'envoye' | 'paye' | 'en_retard' | 'annule'
+export type InvoiceStatus = 'envoye' | 'paye' | 'en_retard'
 
 export interface Invoice {
   id: string
@@ -350,24 +350,6 @@ export interface MemberInvoice {
   created_at: string
   updated_at: string
   member?: { id: string; full_name: string | null; email: string | null } | null
-}
-
-// ─── Dépenses ─────────────────────────────────────────────────────────────────
-export type ExpenseCategory =
-  | 'logiciels' | 'publicite' | 'equipement' | 'deplacements'
-  | 'formation' | 'services' | 'loyer' | 'telephone' | 'autre'
-
-export interface Expense {
-  id: string
-  user_id: string
-  client_id: string | null
-  title: string
-  amount: number
-  category: ExpenseCategory
-  date: string
-  notes: string | null
-  created_at: string
-  client?: Pick<Client, 'id' | 'name'> | null
 }
 
 // ─── Agents IA ────────────────────────────────────────────────────────────────

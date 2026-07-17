@@ -8,11 +8,9 @@ import PortalContent from './PortalContent'
 export const dynamic = 'force-dynamic'
 
 const INVOICE_STATUS_CONFIG = {
-  draft:     { label: 'Brouillon', cls: 'bg-gray-100   text-gray-600'  },
-  envoye:    { label: 'Envoyé',    cls: 'bg-blue-100   text-blue-700'  },
-  paye:      { label: 'Payé',      cls: 'bg-green-100  text-green-700' },
+  envoye:    { label: 'Envoyée',   cls: 'bg-blue-100   text-blue-700'  },
+  paye:      { label: 'Payée',     cls: 'bg-green-100  text-green-700' },
   en_retard: { label: 'En retard', cls: 'bg-red-100    text-red-700'   },
-  annule:    { label: 'Annulé',    cls: 'bg-gray-100   text-gray-600'  },
 }
 
 export default async function PortailPage({

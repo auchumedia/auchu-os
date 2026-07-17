@@ -6,12 +6,12 @@ import {
   ArrowLeft, Camera, ExternalLink, Copy, Check, Plus, Loader2,
   Calendar, FileText, CreditCard, Globe, Pencil, ListTodo,
   Save, X, CheckCircle, Eye, EyeOff, Upload, Download, Trash2,
-  Instagram, Facebook, Linkedin,
+  Instagram, Facebook, Linkedin, Clock,
 } from 'lucide-react'
 import { Client, Invoice, ContentPiece, CalendarEvent, ClientPlatformAccess, ClientDocument, Task } from '@/types'
 import ProjetsTab from './ProjetsTab'
 import ClientTasksTab from './ClientTasksTab'
-import { cn, formatCurrency, formatDate, getInitials } from '@/lib/utils'
+import { cn, formatCurrency, formatDate, formatDuration, getInitials } from '@/lib/utils'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -25,11 +25,9 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 
 const INVOICE_STATUS_CONFIG = {
-  draft:     { label: 'Brouillon', cls: 'badge-gray'  },
-  envoye:    { label: 'Envoyé',    cls: 'badge-blue'  },
-  paye:      { label: 'Payé',      cls: 'badge-green' },
+  envoye:    { label: 'Envoyée',   cls: 'badge-blue'  },
+  paye:      { label: 'Payée',     cls: 'badge-green' },
   en_retard: { label: 'En retard', cls: 'badge-red'   },
-  annule:    { label: 'Annulé',    cls: 'badge-gray'  },
 }
 
 const CONTENT_PLATFORM_COLORS: Record<string, string> = {
@@ -74,6 +72,7 @@ interface Props {
   canCreateTasks: boolean
   currentUserId: string
   platformAccess: ClientPlatformAccess | null
+  clientTimeThisMonth: { totalSeconds: number; byMember: { name: string; seconds: number }[] } | null
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -81,6 +80,7 @@ interface Props {
 export default function ClientDetail({
   client: initial, invoices, content, events, tasks, teamMembers,
   canManageSensitive, canCreateTasks, currentUserId, platformAccess: initialPlatformAccess,
+  clientTimeThisMonth,
 }: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
@@ -378,6 +378,10 @@ export default function ClientDetail({
   const headerBg = `linear-gradient(135deg, ${client.brand_primary}18 0%, ${client.brand_secondary}18 100%)`
   const accentBg = `linear-gradient(135deg, ${client.brand_primary}, ${client.brand_secondary})`
 
+  const pendingInvoices = invoices.filter(i => i.status === 'envoye' || i.status === 'en_retard')
+  const pendingInvoicesTotal = pendingInvoices.reduce((s, i) => s + i.total, 0)
+  const hasOverdueInvoice = pendingInvoices.some(i => i.status === 'en_retard')
+
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'overview',  label: 'Vue d\'ensemble',              icon: FileText  },
     { id: 'projects',  label: `Projets (${content.length})`,  icon: Calendar  },
@@ -458,6 +462,20 @@ export default function ClientDetail({
                 <p className="text-sm text-gray-500 mt-1.5">
                   Budget mensuel : <span className="font-semibold text-gray-700">{formatCurrency(client.monthly_budget)}</span>
                 </p>
+              )}
+              {pendingInvoices.length > 0 && (
+                <button
+                  onClick={() => setTab('invoices')}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
+                    hasOverdueInvoice
+                      ? 'bg-red-50 border-red-200 text-red-700 hover:border-red-300'
+                      : 'bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-300'
+                  )}
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  {pendingInvoices.length} facture{pendingInvoices.length !== 1 ? 's' : ''} en attente · {formatCurrency(pendingInvoicesTotal)}
+                </button>
               )}
             </div>
 
@@ -985,6 +1003,27 @@ export default function ClientDetail({
 
           {canManageSensitive && (
             <div className="space-y-4">
+              {clientTimeThisMonth && (
+                <div className="card">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                    <h2 className="text-sm font-semibold text-gray-900">Temps équipe ce mois</h2>
+                  </div>
+                  <p className="text-xl font-semibold text-gray-900">{formatDuration(clientTimeThisMonth.totalSeconds)}</p>
+                  {clientTimeThisMonth.byMember.length > 0 ? (
+                    <ul className="mt-3 space-y-1.5">
+                      {clientTimeThisMonth.byMember.map(m => (
+                        <li key={m.name} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-500">{m.name}</span>
+                          <span className="font-medium text-gray-700 tabular-nums">{formatDuration(m.seconds)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-1.5">Aucun temps enregistré ce mois</p>
+                  )}
+                </div>
+              )}
               <div className="card">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-semibold text-gray-900">Notes internes</h2>
@@ -1177,11 +1216,9 @@ function PortalTab({
   onOpen: () => void
 }) {
   const INVOICE_STATUS_CONFIG = {
-    draft: { label: 'Brouillon', cls: 'badge-gray' },
-    envoye: { label: 'Envoyé', cls: 'badge-blue' },
-    paye: { label: 'Payé', cls: 'badge-green' },
+    envoye: { label: 'Envoyée', cls: 'badge-blue' },
+    paye: { label: 'Payée', cls: 'badge-green' },
     en_retard: { label: 'En retard', cls: 'badge-red' },
-    annule: { label: 'Annulé', cls: 'badge-gray' },
   }
 
   return (

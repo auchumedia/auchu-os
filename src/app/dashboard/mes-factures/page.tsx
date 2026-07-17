@@ -6,7 +6,7 @@ import MesFacturesClient from './MesFacturesClient'
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Mes factures' }
 
-const BILLABLE_ROLES = ['chef_equipe', 'stratege', 'monteur']
+const BILLABLE_ROLES = ['director', 'chef_equipe', 'stratege', 'monteur']
 
 export default async function MesFacturesPage() {
   const ctx = await getOrgContext()

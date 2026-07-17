@@ -96,6 +96,43 @@ export default async function ClientPage({ params }: { params: { id: string } })
     platformAccess = data
   }
 
+  // ── Temps passé par l'équipe sur ce client ce mois — owner/director
+  //    uniquement (mêmes lecteurs que "Rapports temps") : un chef_equipe/
+  //    stratege/monteur n'a en RLS accès qu'à ses propres time_entries,
+  //    donc un total "équipe" serait trompeur pour ces rôles. ────────────────
+  let clientTimeThisMonth: { totalSeconds: number; byMember: { name: string; seconds: number }[] } | null = null
+  if (canManageSensitive) {
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+
+    const { data: timeEntries } = await supabase
+      .from('time_entries')
+      .select('user_id, duration_seconds')
+      .eq('client_id', params.id)
+      .not('duration_seconds', 'is', null)
+      .gte('started_at', monthStart)
+      .lte('started_at', monthEnd)
+
+    const memberIds = Array.from(new Set((timeEntries ?? []).map(e => e.user_id)))
+    const { data: entryProfiles } = memberIds.length > 0
+      ? await supabase.from('profiles').select('id, full_name, email').in('id', memberIds)
+      : { data: [] as { id: string; full_name: string | null; email: string | null }[] }
+    const profileById = new Map((entryProfiles ?? []).map(p => [p.id, p]))
+
+    const secondsByMember = new Map<string, number>()
+    for (const e of timeEntries ?? []) {
+      secondsByMember.set(e.user_id, (secondsByMember.get(e.user_id) ?? 0) + (e.duration_seconds ?? 0))
+    }
+
+    clientTimeThisMonth = {
+      totalSeconds: (timeEntries ?? []).reduce((s, e) => s + (e.duration_seconds ?? 0), 0),
+      byMember: Array.from(secondsByMember.entries())
+        .map(([id, seconds]) => ({ name: profileById.get(id)?.full_name || profileById.get(id)?.email || 'Membre', seconds }))
+        .sort((a, b) => b.seconds - a.seconds),
+    }
+  }
+
   return (
     <ClientDetail
       client={client}
@@ -108,6 +145,7 @@ export default async function ClientPage({ params }: { params: { id: string } })
       canCreateTasks={canCreateTasks(ctx.role)}
       currentUserId={ctx.userId}
       platformAccess={platformAccess}
+      clientTimeThisMonth={clientTimeThisMonth}
     />
   )
 }

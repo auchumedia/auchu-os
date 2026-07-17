@@ -2,7 +2,7 @@ import { createClient }  from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
 import { NextResponse }  from 'next/server'
 
-const BILLABLE_ROLES = ['chef_equipe', 'stratege', 'monteur']
+const BILLABLE_ROLES = ['director', 'chef_equipe', 'stratege', 'monteur']
 
 export async function POST(req: Request) {
   const ctx = await getOrgContext()

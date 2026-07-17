@@ -6,7 +6,7 @@ import NouvelleFactureMembre from './NouvelleFactureMembre'
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Générer une facture' }
 
-const BILLABLE_ROLES = ['chef_equipe', 'stratege', 'monteur']
+const BILLABLE_ROLES = ['director', 'chef_equipe', 'stratege', 'monteur']
 
 export default async function NouvelleFactureMembrePage() {
   const ctx = await getOrgContext()

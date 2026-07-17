@@ -44,7 +44,6 @@ export default function NouvelleFacturePage() {
     invoice_number: generateInvoiceNumber(),
     due_date:       '',
     notes:          '',
-    status:         'draft' as 'draft' | 'envoye',
   })
 
   const [items, setItems] = useState<LineItem[]>([
@@ -84,7 +83,7 @@ export default function NouvelleFacturePage() {
 
   // ─── Submit ───────────────────────────────────────────────────────────────
 
-  const handleSubmit = async (status: 'draft' | 'envoye') => {
+  const handleSubmit = async () => {
     if (!items.some(i => i.description.trim())) {
       setError('Au moins un article avec une description est requis.')
       return
@@ -103,7 +102,7 @@ export default function NouvelleFacturePage() {
         due_date:       form.due_date || null,
         notes:          form.notes || null,
         items:          validItems,
-        status,
+        status:         'envoye',
       }),
     })
 
@@ -115,8 +114,7 @@ export default function NouvelleFacturePage() {
       return
     }
 
-    // If sending, open mailto
-    if (status === 'envoye' && json.data?.client?.email) {
+    if (json.data?.client?.email) {
       const body = `Bonjour,\n\nVeuillez trouver votre facture ${json.data.invoice_number} d'un montant de ${formatCurrency(json.data.total)} TTC.\n\nMerci de votre confiance,`
       window.open(`mailto:${json.data.client.email}?subject=Facture ${json.data.invoice_number}&body=${encodeURIComponent(body)}`)
     }
@@ -317,24 +315,15 @@ export default function NouvelleFacturePage() {
             <button
               type="button"
               disabled={saving}
-              onClick={() => handleSubmit('draft')}
-              className="w-full btn-secondary justify-center disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Sauvegarder brouillon
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => handleSubmit('envoye')}
+              onClick={() => handleSubmit()}
               className="w-full btn-primary justify-center disabled:opacity-50"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Créer et envoyer
+              Créer la facture
             </button>
           </div>
           <p className="text-xs text-gray-400 text-center">
-            "Créer et envoyer" ouvre votre client email avec un message pré-rempli
+            Ouvre votre client email avec un message pré-rempli si le client a une adresse courriel
           </p>
         </div>
       </div>

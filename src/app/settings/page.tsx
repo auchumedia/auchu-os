@@ -62,8 +62,8 @@ export default async function SettingsPage() {
   const planInfo    = PLAN_LIMITS[currentPlan]
   const activeCount = ctx.memberCount
 
-  // ── Profil de facturation — membres sous-traitants uniquement ─────────────
-  const isBillableMember = ['chef_equipe', 'stratege', 'monteur'].includes(ctx.role)
+  // ── Profil de facturation — tous les membres non-owner ────────────────────
+  const isBillableMember = ['director', 'chef_equipe', 'stratege', 'monteur'].includes(ctx.role)
   let billingConfig = null
   if (isBillableMember) {
     const { data } = await supabase

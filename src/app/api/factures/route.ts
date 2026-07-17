@@ -61,7 +61,7 @@ export async function POST(req: Request) {
       total,
       due_date: due_date || null,
       notes: notes || null,
-      status: status || 'draft',
+      status: status || 'envoye',
     })
     .select('*, client:clients(id, name, email, company)')
     .single()
