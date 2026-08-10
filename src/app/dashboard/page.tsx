@@ -138,7 +138,7 @@ async function OrgDashboard(
     { label: 'Tâches en retard',     value: enRetard,      icon: AlertTriangle, color: 'text-red-600 bg-red-50',     href: '/dashboard/taches'  },
     ctx.canAccessFinance
       ? { label: 'Revenus du mois',  value: formatCurrency(revenue), icon: Receipt, color: 'text-green-600 bg-green-50', href: '/dashboard/finance' }
-      : { label: 'Tâches actives',   value: activeTasksCountRes.count ?? 0, icon: ListChecks, color: 'text-indigo-600 bg-indigo-50', href: '/dashboard/taches' },
+      : { label: 'Tâches actives',   value: activeTasksCountRes.count ?? 0, icon: ListChecks, color: 'text-gray-700 bg-gray-100', href: '/dashboard/taches' },
   ]
 
   return (

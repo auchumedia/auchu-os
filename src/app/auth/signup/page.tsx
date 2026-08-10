@@ -119,10 +119,10 @@ function SignupForm() {
           </button>
           <button
             onClick={() => setStep('join_code')}
-            className="w-full group flex items-start gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+            className="w-full group flex items-start gap-4 p-4 rounded-xl border-2 border-gray-200 hover:border-auchu-400 hover:bg-auchu-50 transition-all text-left"
           >
-            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-200 transition-colors">
-              <Users className="w-5 h-5 text-indigo-600" />
+            <div className="w-10 h-10 rounded-lg bg-auchu-100 flex items-center justify-center flex-shrink-0 group-hover:bg-auchu-200 transition-colors">
+              <Users className="w-5 h-5 text-auchu-600" />
             </div>
             <div>
               <p className="font-semibold text-gray-900">Rejoindre une équipe</p>

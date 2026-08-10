@@ -30,17 +30,17 @@ export default function Sidebar({
 
   return (
     <aside
-      className="fixed left-0 top-0 h-full bg-white border-r border-gray-100 flex-col z-10 hidden md:flex"
+      className="fixed left-0 top-0 h-full bg-[#191919] border-r border-black/40 flex-col z-10 hidden md:flex"
       style={{ width: 'var(--sidebar-width, 240px)' }}
     >
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-gray-100">
+      <div className="px-4 py-5 border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-auchu-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Zap className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
+            <Zap className="w-4 h-4 text-[#191919]" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{agencyName || 'AuchuOS'}</p>
+            <p className="text-sm font-semibold text-white truncate">{agencyName || 'AuchuOS'}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <p className="text-xs text-gray-400 truncate">{userName || ''}</p>
               {role !== 'owner' && (
@@ -56,9 +56,9 @@ export default function Sidebar({
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {navSections.map((section, i) => (
-          <div key={section.key} className={cn(i > 0 && 'mt-4 pt-4 border-t border-gray-100')}>
+          <div key={section.key} className={cn(i > 0 && 'mt-4 pt-4 border-t border-white/10')}>
             {section.key !== 'principal' && (
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-3 mb-1.5">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider px-3 mb-1.5">
                 {section.label}
               </p>
             )}
@@ -82,8 +82,8 @@ export default function Sidebar({
       </nav>
 
       {/* Bottom */}
-      <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
-        <button onClick={handleLogout} className="sidebar-link w-full text-left text-red-500 hover:bg-red-50 hover:text-red-600">
+      <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
+        <button onClick={handleLogout} className="sidebar-link w-full text-left text-red-400 hover:bg-red-500/10 hover:text-red-400">
           <LogOut className="w-4 h-4" />
           <span>Déconnexion</span>
         </button>

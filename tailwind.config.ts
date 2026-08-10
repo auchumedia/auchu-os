@@ -9,19 +9,33 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // AuchuOS brand palette
+        // AuchuOS brand palette — style Notion (noir / blanc / gris)
         auchu: {
-          50:  '#f0f4ff',
-          100: '#e0e9ff',
-          200: '#c7d6fe',
-          300: '#a5b8fc',
-          400: '#8090f8',
-          500: '#6366f1',  // primary
-          600: '#4f46e5',
-          700: '#4038ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+          50:  '#f5f5f5',
+          100: '#ececec',
+          200: '#e0e0e0',
+          300: '#c7c7c7',
+          400: '#a0a0a0',
+          500: '#1a1a1a',  // primary
+          600: '#0d0d0d',
+          700: '#000000',
+          800: '#000000',
+          900: '#000000',
+          950: '#000000',
+        },
+        // Palette grise Notion — remplace l'échelle gray par défaut de Tailwind.
+        gray: {
+          50:  '#f5f5f5',
+          100: '#f0f0f0',
+          200: '#e0e0e0',
+          300: '#c7c7c7',
+          400: '#a3a3a3',
+          500: '#6b6b6b',
+          600: '#525252',
+          700: '#404040',
+          800: '#262626',
+          900: '#1a1a1a',
+          950: '#0d0d0d',
         },
         coral: {
           50:  '#fff4f2',

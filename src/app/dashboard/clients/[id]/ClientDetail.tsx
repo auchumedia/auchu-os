@@ -36,7 +36,7 @@ const CONTENT_PLATFORM_COLORS: Record<string, string> = {
   tiktok:    'bg-slate-100  text-slate-700',
   linkedin:  'bg-sky-100    text-sky-700',
   google:    'bg-amber-100  text-amber-700',
-  meta:      'bg-indigo-100 text-indigo-700',
+  meta:      'bg-gray-200 text-gray-700',
 }
 
 type LinkPlatformKey = 'link_instagram' | 'link_facebook' | 'link_tiktok' | 'link_linkedin'

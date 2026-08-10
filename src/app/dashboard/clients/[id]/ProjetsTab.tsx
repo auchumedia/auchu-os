@@ -40,7 +40,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   tiktok:    'bg-slate-100 text-slate-700',
   linkedin:  'bg-sky-100 text-sky-700',
   google:    'bg-amber-100 text-amber-700',
-  meta:      'bg-indigo-100 text-indigo-700',
+  meta:      'bg-gray-200 text-gray-700',
 }
 
 // Workflow complet — l'ordre reflète la progression attendue d'une idée.
@@ -51,7 +51,7 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   approuve:     { label: 'Approuvé',     cls: 'bg-green-100  text-green-700'  },
   refuse:       { label: 'Refusé',       cls: 'bg-red-100    text-red-700'    },
   filme:        { label: 'Filmé',        cls: 'bg-purple-100 text-purple-700' },
-  publie:       { label: 'Publié',       cls: 'bg-indigo-100 text-indigo-700' },
+  publie:       { label: 'Publié',       cls: 'bg-gray-200 text-gray-700' },
 }
 const STATUSES: ContentStatus[] = ['idee','en_redaction','pret','approuve','refuse','filme','publie']
 // Statuts qui comptent comme "livrable produit" pour le compteur du mois.

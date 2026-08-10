@@ -23,7 +23,7 @@ const PLATEFORMES = [
   { id: 'tiktok',    label: 'TikTok',    bg: 'bg-slate-50',    border: 'border-slate-200',  text: 'text-slate-700',  dot: 'bg-slate-800' },
   { id: 'linkedin',  label: 'LinkedIn',  bg: 'bg-sky-50',      border: 'border-sky-200',    text: 'text-sky-700',    dot: 'bg-sky-600' },
   { id: 'google',    label: 'Google Ads',bg: 'bg-amber-50',    border: 'border-amber-200',  text: 'text-amber-700',  dot: 'bg-amber-500' },
-  { id: 'meta',      label: 'Meta Ads',  bg: 'bg-indigo-50',   border: 'border-indigo-200', text: 'text-indigo-700', dot: 'bg-indigo-600' },
+  { id: 'meta',      label: 'Meta Ads',  bg: 'bg-gray-100',    border: 'border-gray-300',   text: 'text-gray-700',   dot: 'bg-gray-700' },
 ] as const
 
 const INDUSTRIES = [
