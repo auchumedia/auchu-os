@@ -54,8 +54,6 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   publie:       { label: 'Publié',       cls: 'bg-gray-200 text-gray-700' },
 }
 const STATUSES: ContentStatus[] = ['idee','en_redaction','pret','approuve','refuse','filme','publie']
-// Statuts qui comptent comme "livrable produit" pour le compteur du mois.
-const DONE_STATUSES: ContentStatus[] = ['approuve','filme','publie']
 // Statuts affichés dans le calendrier de publication (contenu confirmé).
 const SCHEDULABLE_STATUSES: ContentStatus[] = ['approuve','filme']
 
@@ -196,7 +194,14 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, te
   const monthItems = filterByMonth(items, year, month)
 
   // ── Compteur de livrables ────────────────────────────────────────────────
-  const doneCount = monthItems.filter(i => DONE_STATUSES.includes(i.status)).length
+  // Y (deliverablesTotal) est la cible mensuelle fixée dans Vue d'ensemble.
+  // X ne compte que les contenus déjà PUBLIÉS ce mois — approuvé/filmé ne
+  // sont pas encore "livrés" au client. Comme monthItems est scopé à
+  // year+month, le compteur repart naturellement de zéro à chaque nouveau
+  // mois (donc automatiquement au 1er janvier de chaque année) — les
+  // contenus des mois/années passés restent consultables en y naviguant,
+  // sans jamais entrer dans le calcul du mois actif.
+  const doneCount = monthItems.filter(i => i.status === 'publie').length
   const remaining = Math.max(deliverablesTotal - doneCount, 0)
   const pct = deliverablesTotal > 0 ? Math.min(100, Math.round((doneCount / deliverablesTotal) * 100)) : 0
 

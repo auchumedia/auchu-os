@@ -77,12 +77,30 @@ export default async function PortailPage({
     .filter(i => i.status === 'envoye' || i.status === 'en_retard')
     .reduce((s, i) => s + i.total, 0)
 
-  // Contenu du mois — total des livrables définis dans la fiche client
-  // (vidéos + stories + ads), pas un comptage par scheduled_at.
+  // Contenu du mois — Y est la cible mensuelle définie dans la fiche client
+  // (vidéos + stories + ads). Même logique que l'onglet Projets côté agence :
+  // seuls les contenus déjà PUBLIÉS ce mois-ci comptent comme "livrés", donc
+  // le compteur affiché est Y moins les publications du mois — pas Y brut.
+  // Le mois est celui du calendrier réel (pas de sélecteur ici), donc ce
+  // compteur repart naturellement à zéro à chaque 1er janvier ; l'historique
+  // des mois/années passés reste consultable via le calendrier plus bas.
   const deliverablesTotal =
     (client.deliverables_video_organique ?? 0) +
     (client.deliverables_story ?? 0) +
     (client.deliverables_ad ?? 0)
+
+  const now         = new Date()
+  const currentYear  = now.getFullYear()
+  const currentMonth = now.getMonth()
+
+  const publishedThisMonth = (content ?? []).filter(c => {
+    if (c.status !== 'publie') return false
+    const effective = c.scheduled_at ?? c.month_target ?? c.created_at
+    const [y, m] = effective.slice(0, 10).split('-').map(Number)
+    return y === currentYear && (m - 1) === currentMonth
+  }).length
+
+  const deliverablesRemaining = Math.max(deliverablesTotal - publishedThisMonth, 0)
 
   const primary   = client.brand_primary   || orgInfo?.primary_color   || '#6366f1'
   const secondary = client.brand_secondary || orgInfo?.secondary_color || '#f95640'
@@ -112,8 +130,11 @@ export default async function PortailPage({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
             <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4">
-              <p className="text-white/70 text-xs font-medium uppercase tracking-wide">Contenu du mois</p>
-              <p className="text-2xl font-bold text-white mt-1">{deliverablesTotal}</p>
+              <p className="text-white/70 text-xs font-medium uppercase tracking-wide">Contenu restant ce mois</p>
+              <p className="text-2xl font-bold text-white mt-1">{deliverablesRemaining}</p>
+              {deliverablesTotal > 0 && (
+                <p className="text-white/60 text-xs mt-0.5">{publishedThisMonth}/{deliverablesTotal} publiés</p>
+              )}
             </div>
             <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4">
               <p className="text-white/70 text-xs font-medium uppercase tracking-wide">Contenus à approuver</p>
