@@ -372,9 +372,14 @@ export default function ClientDetail({
   const headerBg = `linear-gradient(135deg, ${client.brand_primary}18 0%, ${client.brand_secondary}18 100%)`
   const accentBg = `linear-gradient(135deg, ${client.brand_primary}, ${client.brand_secondary})`
 
+  // Le badge de l'onglet Projets ne compte que les concepts actifs — les
+  // contenus déjà "publiés" sont archivés (toujours visibles en naviguant
+  // vers leur mois dans l'onglet, mais retirés de ce total).
+  const activeContentCount = content.filter(c => c.status !== 'publie').length
+
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'overview',  label: 'Vue d\'ensemble',              icon: FileText  },
-    { id: 'projects',  label: `Projets (${content.length})`,  icon: Calendar  },
+    { id: 'overview',  label: 'Vue d\'ensemble',                     icon: FileText  },
+    { id: 'projects',  label: `Projets (${activeContentCount})`,     icon: Calendar  },
     { id: 'tasks',     label: `Tâches (${tasks.length})`,     icon: ListTodo  },
     { id: 'portal',    label: 'Portail',                      icon: Globe     },
   ]
