@@ -3,8 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  ArrowLeft, Camera, ExternalLink, Copy, Check, Plus, Loader2,
-  Calendar, FileText, CreditCard, Globe, Pencil, ListTodo,
+  ArrowLeft, Camera, ExternalLink, Copy, Check, Loader2,
+  Calendar, FileText, Globe, Pencil, ListTodo,
   Save, X, CheckCircle, Eye, EyeOff, Upload, Download, Trash2,
   Instagram, Facebook, Linkedin, Clock,
 } from 'lucide-react'
@@ -15,19 +15,13 @@ import { cn, formatCurrency, formatDate, formatDuration, getInitials } from '@/l
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'projects' | 'invoices' | 'tasks' | 'portal'
+type Tab = 'overview' | 'projects' | 'tasks' | 'portal'
 
 const PLATFORMS = ['instagram', 'facebook', 'tiktok', 'linkedin', 'google', 'meta']
 
 const PLATFORM_LABELS: Record<string, string> = {
   instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok',
   linkedin: 'LinkedIn', google: 'Google Ads', meta: 'Meta Ads',
-}
-
-const INVOICE_STATUS_CONFIG = {
-  envoye:    { label: 'Envoyée',   cls: 'badge-blue'  },
-  paye:      { label: 'Payée',     cls: 'badge-green' },
-  en_retard: { label: 'En retard', cls: 'badge-red'   },
 }
 
 const CONTENT_PLATFORM_COLORS: Record<string, string> = {
@@ -378,14 +372,9 @@ export default function ClientDetail({
   const headerBg = `linear-gradient(135deg, ${client.brand_primary}18 0%, ${client.brand_secondary}18 100%)`
   const accentBg = `linear-gradient(135deg, ${client.brand_primary}, ${client.brand_secondary})`
 
-  const pendingInvoices = invoices.filter(i => i.status === 'envoye' || i.status === 'en_retard')
-  const pendingInvoicesTotal = pendingInvoices.reduce((s, i) => s + i.total, 0)
-  const hasOverdueInvoice = pendingInvoices.some(i => i.status === 'en_retard')
-
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'overview',  label: 'Vue d\'ensemble',              icon: FileText  },
     { id: 'projects',  label: `Projets (${content.length})`,  icon: Calendar  },
-    { id: 'invoices',  label: `Factures (${invoices.length})`,icon: CreditCard},
     { id: 'tasks',     label: `Tâches (${tasks.length})`,     icon: ListTodo  },
     { id: 'portal',    label: 'Portail',                      icon: Globe     },
   ]
@@ -462,20 +451,6 @@ export default function ClientDetail({
                 <p className="text-sm text-gray-500 mt-1.5">
                   Budget mensuel : <span className="font-semibold text-gray-700">{formatCurrency(client.monthly_budget)}</span>
                 </p>
-              )}
-              {pendingInvoices.length > 0 && (
-                <button
-                  onClick={() => setTab('invoices')}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors',
-                    hasOverdueInvoice
-                      ? 'bg-red-50 border-red-200 text-red-700 hover:border-red-300'
-                      : 'bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-300'
-                  )}
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  {pendingInvoices.length} facture{pendingInvoices.length !== 1 ? 's' : ''} en attente · {formatCurrency(pendingInvoicesTotal)}
-                </button>
               )}
             </div>
 
@@ -1074,67 +1049,6 @@ export default function ClientDetail({
           teamMembers={teamMembers}
           deliverablesTotal={deliverablesTotal}
         />
-      )}
-
-      {/* ─── Tab: Factures ───────────────────────────────────────────────────── */}
-      {tab === 'invoices' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">
-              {invoices.length} facture{invoices.length !== 1 ? 's' : ''} ·{' '}
-              <span className="font-medium text-gray-700">
-                {formatCurrency(invoices.filter(i => i.status === 'paye').reduce((s, i) => s + i.total, 0))} encaissé
-              </span>
-            </p>
-            <Link href="/dashboard/finance/factures/nouvelle" className="btn-primary text-sm gap-1.5">
-              <Plus className="w-3.5 h-3.5" />
-              Nouvelle facture
-            </Link>
-          </div>
-
-          {invoices.length === 0 ? (
-            <div className="card text-center py-12">
-              <CreditCard className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">Aucune facture pour ce client</p>
-            </div>
-          ) : (
-            <div className="card p-0 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>N°</th>
-                      <th>Date</th>
-                      <th className="text-right">HT</th>
-                      <th className="text-right">TTC</th>
-                      <th>Statut</th>
-                      <th>Échéance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.map(inv => {
-                      const cfg = INVOICE_STATUS_CONFIG[inv.status as keyof typeof INVOICE_STATUS_CONFIG]
-                      return (
-                        <tr key={inv.id}>
-                          <td>
-                            <Link href={`/dashboard/finance/factures/${inv.id}`} className="text-sm font-medium text-auchu-600 hover:underline">
-                              {inv.invoice_number}
-                            </Link>
-                          </td>
-                          <td className="text-xs text-gray-400">{formatDate(inv.created_at)}</td>
-                          <td className="text-right tabular-nums text-sm text-gray-600">{formatCurrency(inv.subtotal)}</td>
-                          <td className="text-right tabular-nums text-sm font-medium text-gray-900">{formatCurrency(inv.total)}</td>
-                          <td><span className={cn('badge', cfg?.cls)}>{cfg?.label}</span></td>
-                          <td className="text-xs text-gray-400">{inv.due_date ? formatDate(inv.due_date) : '—'}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
       )}
 
       {/* ─── Tab: Tâches ─────────────────────────────────────────────────────── */}

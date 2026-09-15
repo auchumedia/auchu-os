@@ -3,12 +3,12 @@ import { getOrgContext } from '@/lib/org'
 import { redirect }      from 'next/navigation'
 import Link              from 'next/link'
 import {
-  Users, FileText, Receipt, ListChecks, AlertTriangle,
+  Users, FileText, ListChecks, AlertTriangle,
   CalendarDays, Clock,
 } from 'lucide-react'
 import ClientGallery, { type ClientCard } from '@/components/dashboard/ClientGallery'
 import TasksTodayList from './TasksTodayList'
-import { cn, formatDate, formatCurrency, PRIORITY_LABELS } from '@/lib/utils'
+import { cn, formatDate, PRIORITY_LABELS } from '@/lib/utils'
 import type { TaskPriority } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -85,21 +85,16 @@ async function OrgDashboard(
   ownerId: string,
   todayISO: string,
 ) {
-  const now        = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+  const now = new Date()
 
   const [
     clientsRes, reviewCountRes, overdueCountRes, activeTasksCountRes,
-    revenueRes, clientCards, urgentTasksRes, recentContentRes,
+    clientCards, urgentTasksRes, recentContentRes,
   ] = await Promise.all([
     supabase.from('clients').select('id, status').eq('user_id', ownerId),
     supabase.from('content_pieces').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('status', 'pret'),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).lt('deadline', todayISO).not('status', 'in', '(termine,approuve)'),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('status', 'en_cours'),
-    ctx.canAccessFinance
-      ? supabase.from('invoices').select('subtotal').eq('user_id', ownerId).eq('status', 'paye').gte('paid_at', monthStart).lte('paid_at', monthEnd)
-      : Promise.resolve({ data: null as { subtotal: number }[] | null }),
     fetchClientCards(supabase, ownerId, null),
     supabase.from('tasks')
       .select('id, title, priority, deadline, assigned_to, client:clients(name)')
@@ -117,7 +112,6 @@ async function OrgDashboard(
   const clientsActifs   = (clientsRes.data ?? []).filter(c => c.status === 'actif').length
   const aApprouver      = reviewCountRes.count ?? 0
   const enRetard        = overdueCountRes.count ?? 0
-  const revenue         = (revenueRes.data ?? []).reduce((s, r) => s + (r.subtotal ?? 0), 0)
 
   // ── Noms des assignés (org_members + profiles, résolution à plat) ─────────
   const assignedIds = Array.from(new Set((urgentTasksRes.data ?? []).map((t: any) => t.assigned_to).filter(Boolean)))
@@ -136,9 +130,7 @@ async function OrgDashboard(
     { label: 'Clients actifs',       value: clientsActifs, icon: Users,       color: 'text-blue-600 bg-blue-50',     href: '/dashboard/clients' },
     { label: 'À approuver',          value: aApprouver,    icon: FileText,    color: 'text-purple-600 bg-purple-50', href: '/dashboard/clients' },
     { label: 'Tâches en retard',     value: enRetard,      icon: AlertTriangle, color: 'text-red-600 bg-red-50',     href: '/dashboard/taches'  },
-    ctx.canAccessFinance
-      ? { label: 'Revenus du mois',  value: formatCurrency(revenue), icon: Receipt, color: 'text-green-600 bg-green-50', href: '/dashboard/finance' }
-      : { label: 'Tâches actives',   value: activeTasksCountRes.count ?? 0, icon: ListChecks, color: 'text-gray-700 bg-gray-100', href: '/dashboard/taches' },
+    { label: 'Tâches actives',       value: activeTasksCountRes.count ?? 0, icon: ListChecks, color: 'text-gray-700 bg-gray-100', href: '/dashboard/taches' },
   ]
 
   return (

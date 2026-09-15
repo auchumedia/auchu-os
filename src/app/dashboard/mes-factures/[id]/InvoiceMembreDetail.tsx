@@ -142,7 +142,7 @@ export default function InvoiceMembreDetail({ invoice: initial, org, member, vie
   }
 
   const items = (invoice.items as MemberInvoiceItem[]) || []
-  const backHref = viewerIsSelf ? '/dashboard/mes-factures' : '/dashboard/finance'
+  const backHref = viewerIsSelf ? '/dashboard/mes-factures' : '/dashboard'
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">

@@ -13,7 +13,7 @@ interface Props {
   role?: OrgRole
 }
 
-// Bar visible : section "Principal". Le reste (Équipe, Agents IA, Compte),
+// Bar visible : section "Principal". Le reste (Équipe, Compte),
 // dans le même ordre, va dans le menu "Plus".
 export default function BottomNav({ role = 'owner' }: Props) {
   const pathname = usePathname()

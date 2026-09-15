@@ -16,7 +16,6 @@ export interface OrgContext {
   isTeamChef:  boolean
   canManageTeamRoles:    boolean
   canManageOrgStructure: boolean
-  canAccessFinance:      boolean
   dataOwnerId: string
   teamId:      string | null
   memberCount: number
@@ -125,7 +124,6 @@ export async function getOrgContext(): Promise<OrgContext | null> {
       role, isOwner: false, isDirector, isTeamChef,
       canManageTeamRoles:    isDirector || isTeamChef,
       canManageOrgStructure: isDirector,
-      canAccessFinance:      false,
       dataOwnerId,
       teamId,
       memberCount: 0,
@@ -159,7 +157,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
       userId: user.id, userName, userEmail,
       org: effectiveOrg,
       role: 'owner', isOwner: true, isDirector: false, isTeamChef: false,
-      canManageTeamRoles: true, canManageOrgStructure: true, canAccessFinance: true,
+      canManageTeamRoles: true, canManageOrgStructure: true,
       dataOwnerId: user.id,
       teamId: null,
       memberCount: count ?? 1,
@@ -170,7 +168,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   return {
     userId: user.id, userName, userEmail,
     org: null, role: 'owner', isOwner: true, isDirector: false, isTeamChef: false,
-    canManageTeamRoles: true, canManageOrgStructure: true, canAccessFinance: true,
+    canManageTeamRoles: true, canManageOrgStructure: true,
     dataOwnerId: user.id, teamId: null, memberCount: 1,
   }
 }
