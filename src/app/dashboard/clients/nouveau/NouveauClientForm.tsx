@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Loader2, User, Mail, Phone, Building2,
-  Briefcase, DollarSign, Palette, FileText, CheckCircle2,
+  Briefcase, FileText, CheckCircle2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,9 +21,6 @@ const PLATEFORMES = [
   { id: 'instagram', label: 'Instagram', bg: 'bg-pink-50',     border: 'border-pink-200',   text: 'text-pink-700',   dot: 'bg-gradient-to-br from-purple-500 to-pink-500' },
   { id: 'facebook',  label: 'Facebook',  bg: 'bg-blue-50',     border: 'border-blue-200',   text: 'text-blue-700',   dot: 'bg-blue-600' },
   { id: 'tiktok',    label: 'TikTok',    bg: 'bg-slate-50',    border: 'border-slate-200',  text: 'text-slate-700',  dot: 'bg-slate-800' },
-  { id: 'linkedin',  label: 'LinkedIn',  bg: 'bg-sky-50',      border: 'border-sky-200',    text: 'text-sky-700',    dot: 'bg-sky-600' },
-  { id: 'google',    label: 'Google Ads',bg: 'bg-amber-50',    border: 'border-amber-200',  text: 'text-amber-700',  dot: 'bg-amber-500' },
-  { id: 'meta',      label: 'Meta Ads',  bg: 'bg-gray-100',    border: 'border-gray-300',   text: 'text-gray-700',   dot: 'bg-gray-700' },
 ] as const
 
 const INDUSTRIES = [
@@ -47,8 +44,6 @@ export default function NouveauClientForm() {
     industry: '',
     status: 'prospect' as Statut,
     monthly_budget: '',
-    brand_tone: '',
-    brand_notes: '',
     platforms: [] as string[],
   })
   const [saving, setSaving] = useState(false)
@@ -195,10 +190,10 @@ export default function NouveauClientForm() {
           </div>
         </section>
 
-        {/* ─── Statut & budget ─────────────────────────────────────────────── */}
+        {/* ─── Statut & contenus ────────────────────────────────────────────── */}
         <section className="card space-y-4">
           <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-gray-400" />
+            <FileText className="w-4 h-4 text-gray-400" />
             Profil client
           </h2>
 
@@ -247,23 +242,20 @@ export default function NouveauClientForm() {
             </div>
           </div>
 
-          {/* Budget */}
+          {/* Nombre de contenus / mois */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Budget mensuel (CAD)
+              Nombre de contenus / mois
             </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
-              <input
-                type="number"
-                min="0"
-                step="100"
-                value={form.monthly_budget}
-                onChange={e => set('monthly_budget', e.target.value)}
-                placeholder="0"
-                className="input pl-7"
-              />
-            </div>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={form.monthly_budget}
+              onChange={e => set('monthly_budget', e.target.value)}
+              placeholder="0"
+              className="input"
+            />
           </div>
         </section>
 
@@ -304,45 +296,6 @@ export default function NouveauClientForm() {
               {form.platforms.length} plateforme{form.platforms.length > 1 ? 's' : ''} sélectionnée{form.platforms.length > 1 ? 's' : ''}
             </p>
           )}
-        </section>
-
-        {/* ─── Identité de marque ───────────────────────────────────────────── */}
-        <section className="card space-y-4">
-          <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            <Palette className="w-4 h-4 text-gray-400" />
-            Identité de marque
-          </h2>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Ton de marque
-            </label>
-            <textarea
-              value={form.brand_tone}
-              onChange={e => set('brand_tone', e.target.value)}
-              placeholder="Ex : Professionnel et inspirant, avec une touche d'humour. Tutoyement. Éviter le jargon technique."
-              rows={3}
-              className="input resize-none"
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Décris la voix et le ton à utiliser dans les contenus pour ce client.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              <span className="flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-gray-400" /> Notes de marque
-              </span>
-            </label>
-            <textarea
-              value={form.brand_notes}
-              onChange={e => set('brand_notes', e.target.value)}
-              placeholder="Informations supplémentaires : couleurs de marque, sujets à éviter, audience cible, concurrents..."
-              rows={4}
-              className="input resize-none"
-            />
-          </div>
         </section>
 
         {/* ─── Error ───────────────────────────────────────────────────────── */}

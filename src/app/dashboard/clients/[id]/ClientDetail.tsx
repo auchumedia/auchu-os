@@ -17,7 +17,7 @@ import { cn, formatCurrency, formatDate, formatDuration, getInitials } from '@/l
 
 type Tab = 'overview' | 'projects' | 'tasks' | 'portal'
 
-const PLATFORMS = ['instagram', 'facebook', 'tiktok', 'linkedin', 'google', 'meta']
+const PLATFORMS = ['instagram', 'facebook', 'tiktok']
 
 const PLATFORM_LABELS: Record<string, string> = {
   instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok',
@@ -80,7 +80,6 @@ export default function ClientDetail({
   const [client, setClient] = useState(initial)
   const [saving, setSaving] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Logo
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -110,8 +109,6 @@ export default function ClientDetail({
     company:        client.company ?? '',
     industry:       client.industry ?? '',
     monthly_budget: client.monthly_budget?.toString() ?? '',
-    brand_tone:     client.brand_tone ?? '',
-    brand_notes:    client.brand_notes ?? '',
     status:         client.status,
     platforms:      client.platforms,
   })
@@ -192,12 +189,6 @@ export default function ClientDetail({
     return null
   }, [client.id])
 
-  const saveColor = (field: 'brand_primary' | 'brand_secondary', value: string) => {
-    setClient(c => ({ ...c, [field]: value }))
-    if (saveTimeout.current) clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => patch({ [field]: value }), 600)
-  }
-
   const handleNotesChange = (value: string) => {
     setNotesValue(value)
     if (notesTimeout.current) clearTimeout(notesTimeout.current)
@@ -232,8 +223,6 @@ export default function ClientDetail({
       company:        editForm.company || null,
       industry:       editForm.industry || null,
       monthly_budget: editForm.monthly_budget ? Number(editForm.monthly_budget) : null,
-      brand_tone:     editForm.brand_tone || null,
-      brand_notes:    editForm.brand_notes || null,
       status:         editForm.status,
       platforms:      editForm.platforms,
     })
@@ -454,36 +443,13 @@ export default function ClientDetail({
               )}
               {client.monthly_budget && (
                 <p className="text-sm text-gray-500 mt-1.5">
-                  Budget mensuel : <span className="font-semibold text-gray-700">{formatCurrency(client.monthly_budget)}</span>
+                  Contenus / mois : <span className="font-semibold text-gray-700">{client.monthly_budget}</span>
                 </p>
               )}
             </div>
 
-            {/* Right — colors + portal */}
+            {/* Right — portal */}
             <div className="flex flex-col items-end gap-3 flex-shrink-0">
-              {/* Color pickers — lecture seule pour les rôles non-owner/director */}
-              <div className="flex items-center gap-3">
-                {canManageSensitive ? (
-                  <>
-                    <ColorPicker
-                      label="Couleur principale"
-                      value={client.brand_primary}
-                      onChange={v => saveColor('brand_primary', v)}
-                    />
-                    <ColorPicker
-                      label="Couleur secondaire"
-                      value={client.brand_secondary}
-                      onChange={v => saveColor('brand_secondary', v)}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <div className="w-6 h-6 rounded-md border-2 border-white shadow-sm" style={{ background: client.brand_primary }} title="Couleur principale" />
-                    <div className="w-6 h-6 rounded-md border-2 border-white shadow-sm" style={{ background: client.brand_secondary }} title="Couleur secondaire" />
-                  </>
-                )}
-              </div>
-
               {/* Portal — inline URL when active */}
               {portalUrl ? (
                 <div className="flex items-center gap-2">
@@ -636,8 +602,8 @@ export default function ClientDetail({
                       <input type="text" value={editForm.industry} onChange={e => setEditForm(f => ({ ...f, industry: e.target.value }))} className="input text-sm" />
                     </div>
                     <div>
-                      <label className="label">Budget mensuel ($)</label>
-                      <input type="number" value={editForm.monthly_budget} onChange={e => setEditForm(f => ({ ...f, monthly_budget: e.target.value }))} className="input text-sm" />
+                      <label className="label">Nombre de contenus / mois</label>
+                      <input type="number" min={0} step={1} value={editForm.monthly_budget} onChange={e => setEditForm(f => ({ ...f, monthly_budget: e.target.value }))} className="input text-sm" />
                     </div>
                   </div>
                   <div>
@@ -666,14 +632,6 @@ export default function ClientDetail({
                       ))}
                     </div>
                   </div>
-                  <div>
-                    <label className="label">Ton de marque</label>
-                    <textarea rows={2} value={editForm.brand_tone} onChange={e => setEditForm(f => ({ ...f, brand_tone: e.target.value }))} className="input text-sm resize-none" />
-                  </div>
-                  <div>
-                    <label className="label">Notes de marque</label>
-                    <textarea rows={3} value={editForm.brand_notes} onChange={e => setEditForm(f => ({ ...f, brand_notes: e.target.value }))} className="input text-sm resize-none" />
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -681,19 +639,7 @@ export default function ClientDetail({
                   <InfoRow label="Téléphone"   value={client.phone} />
                   <InfoRow label="Entreprise"  value={client.company} />
                   <InfoRow label="Secteur"     value={client.industry} />
-                  <InfoRow label="Budget"      value={client.monthly_budget ? formatCurrency(client.monthly_budget) : null} />
-                  {client.brand_tone && (
-                    <div>
-                      <p className="text-xs text-gray-400 font-medium mb-0.5">Ton de marque</p>
-                      <p className="text-sm text-gray-700">{client.brand_tone}</p>
-                    </div>
-                  )}
-                  {client.brand_notes && (
-                    <div>
-                      <p className="text-xs text-gray-400 font-medium mb-0.5">Notes de marque</p>
-                      <p className="text-sm text-gray-700 whitespace-pre-line">{client.brand_notes}</p>
-                    </div>
-                  )}
+                  <InfoRow label="Contenus / mois" value={client.monthly_budget ? String(client.monthly_budget) : null} />
                 </div>
               )}
             </div>
@@ -1018,27 +964,6 @@ export default function ClientDetail({
                 />
                 <p className="text-xs text-gray-400 mt-1.5">Sauvegarde automatique</p>
               </div>
-
-              <div className="card">
-                <h2 className="text-sm font-semibold text-gray-900 mb-3">Couleurs de marque</h2>
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg border border-gray-200 flex-shrink-0" style={{ background: client.brand_primary }} />
-                    <div>
-                      <p className="text-xs font-medium text-gray-700">Principale</p>
-                      <p className="text-xs text-gray-400 font-mono">{client.brand_primary}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg border border-gray-200 flex-shrink-0" style={{ background: client.brand_secondary }} />
-                    <div>
-                      <p className="text-xs font-medium text-gray-700">Secondaire</p>
-                      <p className="text-xs text-gray-400 font-mono">{client.brand_secondary}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400 pt-1">Modifiables via les pastilles dans le header</p>
-                </div>
-              </div>
             </div>
           )}
           </div>
@@ -1089,23 +1014,6 @@ export default function ClientDetail({
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function ColorPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="cursor-pointer" title={label}>
-      <div
-        className="w-6 h-6 rounded-md border-2 border-white shadow-sm hover:scale-110 transition-transform"
-        style={{ background: value }}
-      />
-      <input
-        type="color"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="sr-only"
-      />
-    </label>
-  )
-}
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null

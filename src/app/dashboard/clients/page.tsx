@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
 import { canCreateClients } from '@/lib/roles'
-import { formatCurrency } from '@/lib/utils'
 import { Plus, Users } from 'lucide-react'
 import Link from 'next/link'
 
@@ -103,7 +102,7 @@ export default async function ClientsPage() {
                   </div>
                 )}
                 <p className="text-sm text-gray-700 mt-2">
-                  {client.monthly_budget ? formatCurrency(client.monthly_budget) : 'Aucun budget mensuel'}
+                  {client.monthly_budget ? `${client.monthly_budget} contenu${client.monthly_budget > 1 ? 's' : ''} / mois` : 'Aucun objectif défini'}
                 </p>
               </Link>
             ))}
@@ -117,7 +116,7 @@ export default async function ClientsPage() {
                   <th>Client</th>
                   <th>Statut</th>
                   <th>Plateformes</th>
-                  <th>Budget mensuel</th>
+                  <th>Contenus / mois</th>
                   <th></th>
                 </tr>
               </thead>
@@ -147,7 +146,7 @@ export default async function ClientsPage() {
                       </div>
                     </td>
                     <td className="text-gray-700">
-                      {client.monthly_budget ? formatCurrency(client.monthly_budget) : '—'}
+                      {client.monthly_budget ? client.monthly_budget : '—'}
                     </td>
                     <td>
                       <Link

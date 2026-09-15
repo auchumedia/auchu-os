@@ -91,7 +91,12 @@ export interface Client {
   company: string | null
   industry: string | null
   status: 'actif' | 'inactif' | 'prospect'
+  // Colonne réutilisée pour "Nombre de contenus / mois" (champ numérique) —
+  // n'a plus rien à voir avec un budget, renommer nécessiterait une migration.
   monthly_budget: number | null
+  // Champs conservés en base pour compatibilité (anciens clients) mais plus
+  // exposés dans les formulaires de création/édition — "Identité de marque"
+  // a été retirée de l'UI.
   brand_tone: string | null
   brand_notes: string | null
   internal_notes: string | null
