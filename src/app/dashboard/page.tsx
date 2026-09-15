@@ -25,7 +25,7 @@ const PRIORITY_DOT: Record<TaskPriority, string> = {
 // l'org). clientIds === [...] : scopé à une équipe (chef_equipe/stratege/
 // monteur, via team_clients).
 async function fetchClientCards(supabase: SupabaseClient, ownerId: string, clientIds: string[] | null): Promise<ClientCard[]> {
-  let query = supabase.from('clients').select('id, name, logo_url, status').eq('user_id', ownerId).order('name')
+  let query = supabase.from('clients').select('id, name, logo_url, status').eq('user_id', ownerId).eq('status', 'actif').order('name')
   if (clientIds) query = query.in('id', clientIds.length > 0 ? clientIds : ['00000000-0000-0000-0000-000000000000'])
 
   const { data: clients } = await query
