@@ -7,6 +7,14 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Clients' }
 
+// Total de contenus/mois — calculé depuis les livrables définis dans la Vue
+// d'ensemble (vidéos + stories + ads), jamais depuis un champ séparé.
+function deliverablesTotal(client: any): number {
+  return (client.deliverables_video_organique ?? 0) +
+    (client.deliverables_story ?? 0) +
+    (client.deliverables_ad ?? 0)
+}
+
 export default async function ClientsPage() {
   const supabase = await createClient()
   const ctx = await getOrgContext()
@@ -102,7 +110,9 @@ export default async function ClientsPage() {
                   </div>
                 )}
                 <p className="text-sm text-gray-700 mt-2">
-                  {client.monthly_budget ? `${client.monthly_budget} contenu${client.monthly_budget > 1 ? 's' : ''} / mois` : 'Aucun objectif défini'}
+                  {deliverablesTotal(client) > 0
+                    ? `${deliverablesTotal(client)} contenu${deliverablesTotal(client) > 1 ? 's' : ''} / mois`
+                    : 'Aucun objectif défini'}
                 </p>
               </Link>
             ))}
@@ -146,7 +156,7 @@ export default async function ClientsPage() {
                       </div>
                     </td>
                     <td className="text-gray-700">
-                      {client.monthly_budget ? client.monthly_budget : '—'}
+                      {deliverablesTotal(client) > 0 ? deliverablesTotal(client) : '—'}
                     </td>
                     <td>
                       <Link

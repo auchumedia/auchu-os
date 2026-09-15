@@ -91,8 +91,11 @@ export interface Client {
   company: string | null
   industry: string | null
   status: 'actif' | 'inactif' | 'prospect'
-  // Colonne réutilisée pour "Nombre de contenus / mois" (champ numérique) —
-  // n'a plus rien à voir avec un budget, renommer nécessiterait une migration.
+  // Ancien "budget mensuel", puis "nombre de contenus/mois" — plus exposé
+  // dans aucun formulaire : le total de contenus/mois vient désormais
+  // uniquement des livrables (deliverables_video_organique/story/ad).
+  // Conservée en base pour compatibilité (anciens clients), jamais lue/écrite
+  // par l'UI actuelle.
   monthly_budget: number | null
   // Champs conservés en base pour compatibilité (anciens clients) mais plus
   // exposés dans les formulaires de création/édition — "Identité de marque"

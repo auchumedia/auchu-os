@@ -108,7 +108,6 @@ export default function ClientDetail({
     phone:          client.phone ?? '',
     company:        client.company ?? '',
     industry:       client.industry ?? '',
-    monthly_budget: client.monthly_budget?.toString() ?? '',
     status:         client.status,
     platforms:      client.platforms,
   })
@@ -222,7 +221,6 @@ export default function ClientDetail({
       phone:          editForm.phone || null,
       company:        editForm.company || null,
       industry:       editForm.industry || null,
-      monthly_budget: editForm.monthly_budget ? Number(editForm.monthly_budget) : null,
       status:         editForm.status,
       platforms:      editForm.platforms,
     })
@@ -441,9 +439,9 @@ export default function ClientDetail({
                   ))}
                 </div>
               )}
-              {client.monthly_budget && (
+              {deliverablesTotal > 0 && (
                 <p className="text-sm text-gray-500 mt-1.5">
-                  Contenus / mois : <span className="font-semibold text-gray-700">{client.monthly_budget}</span>
+                  Contenus / mois : <span className="font-semibold text-gray-700">{deliverablesTotal}</span>
                 </p>
               )}
             </div>
@@ -601,10 +599,6 @@ export default function ClientDetail({
                       <label className="label">Secteur</label>
                       <input type="text" value={editForm.industry} onChange={e => setEditForm(f => ({ ...f, industry: e.target.value }))} className="input text-sm" />
                     </div>
-                    <div>
-                      <label className="label">Nombre de contenus / mois</label>
-                      <input type="number" min={0} step={1} value={editForm.monthly_budget} onChange={e => setEditForm(f => ({ ...f, monthly_budget: e.target.value }))} className="input text-sm" />
-                    </div>
                   </div>
                   <div>
                     <label className="label">Plateformes</label>
@@ -639,7 +633,6 @@ export default function ClientDetail({
                   <InfoRow label="Téléphone"   value={client.phone} />
                   <InfoRow label="Entreprise"  value={client.company} />
                   <InfoRow label="Secteur"     value={client.industry} />
-                  <InfoRow label="Contenus / mois" value={client.monthly_budget ? String(client.monthly_budget) : null} />
                 </div>
               )}
             </div>
