@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Loader2, User, Mail, Phone, Building2,
-  Briefcase, FileText, CheckCircle2,
+  Briefcase, CheckCircle2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -43,7 +43,6 @@ export default function NouveauClientForm() {
     company: '',
     industry: '',
     status: 'prospect' as Statut,
-    monthly_budget: '',
     platforms: [] as string[],
   })
   const [saving, setSaving] = useState(false)
@@ -67,10 +66,7 @@ export default function NouveauClientForm() {
     const res = await fetch('/api/clients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        monthly_budget: form.monthly_budget ? Number(form.monthly_budget) : null,
-      }),
+      body: JSON.stringify(form),
     })
 
     const json = await res.json()
@@ -190,16 +186,14 @@ export default function NouveauClientForm() {
           </div>
         </section>
 
-        {/* ─── Statut & contenus ────────────────────────────────────────────── */}
+        {/* ─── Statut ──────────────────────────────────────────────────────── */}
         <section className="card space-y-4">
           <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-gray-400" />
-            Profil client
+            <CheckCircle2 className="w-4 h-4 text-gray-400" />
+            Statut
           </h2>
 
-          {/* Statut */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Statut</label>
             <div className="grid grid-cols-3 gap-2">
               {STATUTS.map(s => {
                 const active = form.status === s.value
@@ -240,22 +234,6 @@ export default function NouveauClientForm() {
                 )
               })}
             </div>
-          </div>
-
-          {/* Nombre de contenus / mois */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Nombre de contenus / mois
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={form.monthly_budget}
-              onChange={e => set('monthly_budget', e.target.value)}
-              placeholder="0"
-              className="input"
-            />
           </div>
         </section>
 
