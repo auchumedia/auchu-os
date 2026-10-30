@@ -9,8 +9,8 @@ export type NavSection = { key: 'principal' | 'equipe' | 'compte'; label: string
 // Structure exacte requise partout (sidebar desktop + bottom nav mobile) :
 //   Principal : Tableau de bord, Tâches, Clients
 //   ("Mon espace" a été fusionné dans le Tableau de bord — plus d'entrée dédiée.)
-//   Équipe    : Équipe (les 5 rôles — owner/director en gestion complète,
-//               chef_equipe sur sa propre équipe, stratege/monteur en lecture seule),
+//   Équipe    : Équipe (les 4 rôles — owner/director en gestion complète,
+//               stratege/monteur en lecture seule),
 //               Rapports temps (owner/director uniquement)
 //   Compte    : Paramètres
 export function buildNavSections(role: OrgRole): NavSection[] {

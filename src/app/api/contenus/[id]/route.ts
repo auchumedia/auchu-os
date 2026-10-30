@@ -14,7 +14,7 @@ export async function PATCH(
   const supabase = await createClient()
   const body = await req.json()
 
-  const allowed = ['title','type','platform','status','description','script','assigned_to','client_notes','scheduled_at','month_target','reference_links','position']
+  const allowed = ['title','type','platform','status','description','internal_notes','script','client_notes','scheduled_at','month_target','reference_links','position']
   const fields: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) fields[key] = body[key]
@@ -35,7 +35,7 @@ export async function PATCH(
   // fallback) et donc sujet à divergence avec la résolution faite par
   // Postgres lui-même. On délègue entièrement l'autorisation à la RLS
   // ("users own content" pour le owner, "content: org members update" pour
-  // director/chef_equipe/stratege/monteur via my_org_owner_ids()) — c'est
+  // director/stratege/monteur via my_org_owner_ids()) — c'est
   // elle qui doit décider, pas un recalcul dupliqué côté route.
   const { data, error, count } = await supabase
     .from('content_pieces')
@@ -84,8 +84,8 @@ export async function DELETE(
 
   // Pas de filtre .eq('user_id', ctx.dataOwnerId) ici — même raison que le
   // PATCH : on délègue l'autorisation à la RLS ("users own content" pour le
-  // owner, "content: org members delete" pour director/chef_equipe/stratege/
-  // monteur). count:'exact' permet de détecter un delete qui matche 0 ligne
+  // owner, "content: org members delete" pour director/stratege/monteur).
+  // count:'exact' permet de détecter un delete qui matche 0 ligne
   // (RLS qui bloque silencieusement) et de le traiter comme une erreur au
   // lieu de renvoyer success alors que rien n'a été supprimé.
   const { error, count } = await supabase

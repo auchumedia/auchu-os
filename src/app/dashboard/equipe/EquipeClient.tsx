@@ -8,9 +8,8 @@ import {
   Loader2, Clock, Link2, Trash2, ShieldCheck, Mail, CheckCircle2, RefreshCw,
   UsersRound, Settings2, PenSquare,
 } from 'lucide-react'
-import type { OrgRole, OrgPlan } from '@/types'
+import type { OrgRole } from '@/types'
 import { roleLabel, manageableRoles as getManageableRoles, canManageRole } from '@/lib/roles'
-import { PLAN_LIMITS } from '@/lib/plans'
 
 const APP_URL = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -28,15 +27,11 @@ interface Props {
   role:                   OrgRole
   currentUserId:          string
   canManageOrgStructure:  boolean
-  isTeamChef:             boolean
-  org:                    { id: string; name: string; plan: OrgPlan; max_members: number } | null
-  activeMemberCount:      number
   allMembers:             AllMemberRow[]
   teams:                  TeamData[]
   invitations:            InvitationRow[]
   unassignedMembers:      UnassignedMember[]
   unassignedClients:      { id: string; name: string }[]
-  chefCandidates:         UnassignedMember[]
   workload:               Record<string, number>
 }
 
@@ -45,9 +40,9 @@ function memberName(p: Profile | null) {
 }
 
 export default function EquipeClient({
-  role, currentUserId, canManageOrgStructure, isTeamChef, org, activeMemberCount, allMembers,
+  role, currentUserId, canManageOrgStructure, allMembers,
   teams: initialTeams, invitations: initialInv, unassignedMembers, unassignedClients,
-  chefCandidates, workload,
+  workload,
 }: Props) {
   const router = useRouter()
   const [teams,       setTeams]       = useState(initialTeams)
@@ -79,7 +74,6 @@ export default function EquipeClient({
       setInviteForm(f => ({ ...f, [k]: e.target.value }))
 
   const [teamName, setTeamName] = useState('')
-  const [teamChef, setTeamChef] = useState('')
 
   const copyText = useCallback((text: string, key: string) => {
     navigator.clipboard.writeText(text)
@@ -171,14 +165,14 @@ export default function EquipeClient({
   }
 
   const createTeam = async () => {
-    if (!teamName.trim() || !teamChef) return
+    if (!teamName.trim()) return
     setLoading('create-team')
     const res = await fetch('/api/teams', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: teamName.trim(), chef_id: teamChef }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: teamName.trim() }),
     })
     const json = await res.json()
     setLoading(null)
-    if (res.ok) { setShowCreate(false); setTeamName(''); setTeamChef(''); router.refresh() }
+    if (res.ok) { setShowCreate(false); setTeamName(''); router.refresh() }
     else alert(json.error)
   }
 
@@ -199,45 +193,12 @@ export default function EquipeClient({
     else alert('Erreur lors de la révocation')
   }
 
-  const plan = org ? (PLAN_LIMITS[org.plan] ?? PLAN_LIMITS.free) : null
-
   return (
     <div className="space-y-6">
 
-      {/* ── Plan bar — owner uniquement ───────────────────────────────────────── */}
-      {role === 'owner' && org && plan && (
-        <div className="card flex items-center justify-between gap-4 p-4">
-          <div className="flex items-center gap-3">
-            <span className={cn('px-2.5 py-1 rounded-lg text-sm font-semibold', {
-              'bg-gray-100   text-gray-600':   org.plan === 'free',
-              'bg-blue-100   text-blue-700':   org.plan === 'starter',
-              'bg-auchu-100  text-auchu-700':  org.plan === 'agence',
-              'bg-purple-100 text-purple-700': org.plan === 'pro',
-            })}>
-              {plan.label}
-            </span>
-            <div className="text-sm text-gray-600">
-              <span className="font-semibold">{activeMemberCount}</span>
-              <span className="text-gray-400"> / </span>
-              <span>{org.max_members === 999 ? '∞' : org.max_members}</span>
-              <span className="text-gray-400 ml-1">membres</span>
-            </div>
-            <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-auchu-500 rounded-full transition-all"
-                style={{ width: `${Math.min(100, (activeMemberCount / (org.max_members === 999 ? Math.max(activeMemberCount, 1) : org.max_members)) * 100)}%` }}
-              />
-            </div>
-          </div>
-          <a href="/settings" className="text-xs text-auchu-600 hover:text-auchu-700 font-medium hover:underline">
-            Gérer le plan →
-          </a>
-        </div>
-      )}
-
       {/* ── En-tête d'actions ─────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
-        {canManageOrgStructure && chefCandidates.length > 0 && (
+        {canManageOrgStructure && (
           <button onClick={() => setShowCreate(true)} className="btn-secondary text-sm gap-1.5 w-full sm:w-auto justify-center">
             <UsersRound className="w-3.5 h-3.5" /> Créer une équipe
           </button>
@@ -343,7 +304,7 @@ export default function EquipeClient({
       {/* ── Équipes ───────────────────────────────────────────────────────────── */}
       {teams.map(team => {
         const chef = team.members.find(m => m.user_id === team.chef_id)
-        const canEditThisTeam = canManageOrgStructure || (isTeamChef && team.chef_id === currentUserId)
+        const canEditThisTeam = canManageOrgStructure
         return (
           <div key={team.id} className="card p-0 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -510,7 +471,6 @@ export default function EquipeClient({
                   <div key={m.id} className="flex items-center gap-3 text-sm">
                     <span className="font-medium text-gray-800">{memberName(m.profile)}</span>
                     <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', roleCfg.cls)}>{roleCfg.label}</span>
-                    {m.role === 'chef_equipe' && <span className="text-xs text-gray-400">— créez une équipe pour ce membre</span>}
                   </div>
                 )
               })}
@@ -617,7 +577,7 @@ export default function EquipeClient({
           <h2 className="font-semibold text-gray-900">Permissions par rôle</h2>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {(['director', 'chef_equipe', 'stratege', 'monteur'] as const).map(r => {
+          {(['director', 'stratege', 'monteur'] as const).map(r => {
             const cfg = roleLabel(r)
             return (
               <div key={r} className="rounded-xl border border-gray-100 p-3 space-y-1.5">
@@ -646,17 +606,8 @@ export default function EquipeClient({
               <div>
                 <label className="label">Nom de l'équipe</label>
                 <input type="text" className="input" placeholder="Équipe 1" value={teamName} onChange={e => setTeamName(e.target.value)} autoFocus />
-              </div>
-              <div>
-                <label className="label">Chef d'équipe</label>
-                <select value={teamChef} onChange={e => setTeamChef(e.target.value)} className="input">
-                  <option value="">Sélectionner…</option>
-                  {chefCandidates.map(c => (
-                    <option key={c.user_id} value={c.user_id}>{memberName(c.profile)}</option>
-                  ))}
-                </select>
                 <p className="text-xs text-gray-400 mt-1">
-                  Seuls les membres ayant déjà le rôle « Chef d'équipe » et ne dirigeant pas encore d'équipe apparaissent ici.
+                  Vous ({role === 'owner' ? 'propriétaire' : 'directeur'}) dirigez cette équipe.
                 </p>
               </div>
             </div>
@@ -664,7 +615,7 @@ export default function EquipeClient({
               <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1">Annuler</button>
               <button
                 onClick={createTeam}
-                disabled={loading === 'create-team' || !teamName.trim() || !teamChef}
+                disabled={loading === 'create-team' || !teamName.trim()}
                 className="btn-primary flex-1 justify-center disabled:opacity-50"
               >
                 {loading === 'create-team' ? <Loader2 className="w-4 h-4 animate-spin" /> : <><PenSquare className="w-3.5 h-3.5" /> Créer</>}
@@ -712,9 +663,6 @@ export default function EquipeClient({
                     <option key={r} value={r}>{roleLabel(r).label} — {roleLabel(r).desc}</option>
                   ))}
                 </select>
-                {isTeamChef && (
-                  <p className="text-xs text-gray-400 mt-1">La personne invitée rejoindra automatiquement votre équipe.</p>
-                )}
               </div>
             </div>
 

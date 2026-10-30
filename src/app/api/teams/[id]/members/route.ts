@@ -2,16 +2,10 @@ import { createClient }  from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
 import { NextResponse }  from 'next/server'
 
-function canManageThisTeam(ctx: Awaited<ReturnType<typeof getOrgContext>>, teamId: string) {
-  if (!ctx) return false
-  if (ctx.canManageOrgStructure) return true
-  return ctx.isTeamChef && ctx.teamId === teamId
-}
-
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const ctx = await getOrgContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!ctx.org || !canManageThisTeam(ctx, params.id)) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+  if (!ctx.org || !ctx.canManageOrgStructure) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
 
   const { userId } = await req.json()
   if (!userId) return NextResponse.json({ error: 'userId requis' }, { status: 400 })
@@ -51,7 +45,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const ctx = await getOrgContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!ctx.org || !canManageThisTeam(ctx, params.id)) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+  if (!ctx.org || !ctx.canManageOrgStructure) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
   const userId = searchParams.get('userId')

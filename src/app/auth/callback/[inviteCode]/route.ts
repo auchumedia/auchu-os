@@ -5,8 +5,6 @@ import { NextResponse }                   from 'next/server'
 import type { NextRequest }               from 'next/server'
 import type { SupabaseClient }            from '@supabase/supabase-js'
 
-const OWNER_EMAIL = 'raphael@auchumedia.com'
-
 // Callback dédié aux invitations.
 // emailRedirectTo dans signUp = /auth/callback/[CODE]
 // → Supabase ajoute ?code=xxx → /auth/callback/U6VP3B?code=xxx
@@ -61,7 +59,7 @@ export async function GET(
   console.log('[invite-cb] user:', user.id, '|', user.email)
 
   // ── 4. Rejoindre l'organisation ────────────────────────────────────────────
-  const joined = await joinOrgByCode(supabase, inviteCode, user.id, user.email ?? '')
+  const joined = await joinOrgByCode(supabase, inviteCode, user.id)
 
   if (joined) {
     console.log('[invite-cb] ✓ membre ajouté → /dashboard')
@@ -80,7 +78,6 @@ async function joinOrgByCode(
   supabase: SupabaseClient,
   code: string,
   userId: string,
-  userEmail: string,
 ): Promise<boolean> {
   const now = new Date().toISOString()
 
@@ -124,7 +121,7 @@ async function joinOrgByCode(
   )
   const { data: org, error: orgErr } = await anon
     .from('organizations')
-    .select('id, name, max_members, plan')
+    .select('id, name')
     .eq('id', inv.org_id)
     .maybeSingle()
 
@@ -133,22 +130,6 @@ async function joinOrgByCode(
 
   if (!org) {
     console.warn('[invite-cb/join] org introuvable — migration 016 appliquée ?')
-    return false
-  }
-
-  // ── d. Vérifier la limite de membres ──────────────────────────────────────
-  const effectiveMax = userEmail === OWNER_EMAIL ? 999 : org.max_members
-  const { count, error: countErr } = await supabase
-    .from('org_members')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', inv.org_id)
-    .eq('status', 'actif')
-
-  console.log('[invite-cb/join] membres actifs →',
-    countErr ? `ERREUR: ${countErr.message}` : `${count} / ${effectiveMax}`)
-
-  if ((count ?? 0) >= effectiveMax) {
-    console.warn('[invite-cb/join] limite de membres atteinte')
     return false
   }
 

@@ -114,9 +114,8 @@ export default function ClientDetail({
 
   // Livrables du mois
   const [deliverables, setDeliverables] = useState({
-    video_organique: client.deliverables_video_organique,
-    story:           client.deliverables_story,
-    ad:              client.deliverables_ad,
+    short_form: client.deliverables_short_form,
+    long_form:  client.deliverables_long_form,
   })
   const [savingDeliverables, setSavingDeliverables] = useState(false)
   const deliverablesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -230,7 +229,7 @@ export default function ClientDetail({
 
   // ─── Livrables du mois ───────────────────────────────────────────────────────
 
-  const handleDeliverableChange = (field: 'video_organique' | 'story' | 'ad', value: number) => {
+  const handleDeliverableChange = (field: 'short_form' | 'long_form', value: number) => {
     const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0
     setDeliverables(prev => {
       const next = { ...prev, [field]: safeValue }
@@ -238,9 +237,8 @@ export default function ClientDetail({
       deliverablesTimeout.current = setTimeout(async () => {
         setSavingDeliverables(true)
         await patch({
-          deliverables_video_organique: next.video_organique,
-          deliverables_story:           next.story,
-          deliverables_ad:              next.ad,
+          deliverables_short_form: next.short_form,
+          deliverables_long_form:  next.long_form,
         })
         setSavingDeliverables(false)
       }, 700)
@@ -248,7 +246,7 @@ export default function ClientDetail({
     })
   }
 
-  const deliverablesTotal = deliverables.video_organique + deliverables.story + deliverables.ad
+  const deliverablesTotal = deliverables.short_form + deliverables.long_form
 
   // ─── Liens plateformes ───────────────────────────────────────────────────────
 
@@ -644,40 +642,30 @@ export default function ClientDetail({
                 {savingDeliverables && <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />}
               </div>
               {canManageSensitive ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="label">Vidéo organique</label>
+                    <label className="label">Total de contenu — Short form</label>
                     <input
                       type="number" min={0}
-                      value={deliverables.video_organique}
-                      onChange={e => handleDeliverableChange('video_organique', Number(e.target.value))}
+                      value={deliverables.short_form}
+                      onChange={e => handleDeliverableChange('short_form', Number(e.target.value))}
                       className="input text-sm"
                     />
                   </div>
                   <div>
-                    <label className="label">Story</label>
+                    <label className="label">Total de contenu — Long form</label>
                     <input
                       type="number" min={0}
-                      value={deliverables.story}
-                      onChange={e => handleDeliverableChange('story', Number(e.target.value))}
-                      className="input text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Ad</label>
-                    <input
-                      type="number" min={0}
-                      value={deliverables.ad}
-                      onChange={e => handleDeliverableChange('ad', Number(e.target.value))}
+                      value={deliverables.long_form}
+                      onChange={e => handleDeliverableChange('long_form', Number(e.target.value))}
                       className="input text-sm"
                     />
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <InfoRow label="Vidéo organique" value={String(deliverables.video_organique)} />
-                  <InfoRow label="Story"           value={String(deliverables.story)} />
-                  <InfoRow label="Ad"              value={String(deliverables.ad)} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <InfoRow label="Short form" value={String(deliverables.short_form)} />
+                  <InfoRow label="Long form"  value={String(deliverables.long_form)} />
                 </div>
               )}
               <p className="text-sm text-gray-500 mt-3">
@@ -969,7 +957,6 @@ export default function ClientDetail({
           initialContent={content}
           initialEvents={events}
           clientId={client.id}
-          teamMembers={teamMembers}
           deliverablesTotal={deliverablesTotal}
         />
       )}

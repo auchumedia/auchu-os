@@ -4,7 +4,7 @@ import { canManageRole } from '@/lib/roles'
 import { NextResponse }  from 'next/server'
 import type { OrgRole }  from '@/types'
 
-const VALID_ROLES: OrgRole[] = ['director', 'chef_equipe', 'stratege', 'monteur']
+const VALID_ROLES: OrgRole[] = ['director', 'stratege', 'monteur']
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const ctx = await getOrgContext()
@@ -29,28 +29,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (body.role && VALID_ROLES.includes(body.role)) {
     if (!canManageRole(ctx.role, member.role as OrgRole) || !canManageRole(ctx.role, body.role)) {
       return NextResponse.json({ error: 'Rôle invalide pour votre niveau d\'accès' }, { status: 403 })
-    }
-    if (ctx.isTeamChef) {
-      const { data: inTeam } = await supabase
-        .from('team_memberships')
-        .select('id')
-        .eq('team_id', ctx.teamId ?? '')
-        .eq('user_id', member.user_id)
-        .maybeSingle()
-      if (!inTeam) return NextResponse.json({ error: 'Ce membre n\'appartient pas à votre équipe' }, { status: 403 })
-    }
-    if (member.role === 'chef_equipe' && body.role !== 'chef_equipe') {
-      const { data: leadsTeam } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('chef_id', member.user_id)
-        .maybeSingle()
-      if (leadsTeam) {
-        return NextResponse.json(
-          { error: 'Ce membre dirige une équipe — réassignez ou supprimez l\'équipe avant de changer son rôle' },
-          { status: 409 }
-        )
-      }
     }
     allowed.role = body.role
   }
@@ -89,8 +67,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (allowed.role === 'stratege' || allowed.role === 'monteur') {
       await supabase.from('team_memberships').update({ role: allowed.role }).eq('user_id', member.user_id)
     } else {
-      // director, ou chef_equipe fraîchement promu (pas encore d'équipe à lui) :
-      // ne doit plus figurer comme stratège/monteur d'une équipe.
+      // promu director : ne doit plus figurer comme stratège/monteur d'une équipe.
       await supabase.from('team_memberships').delete().eq('user_id', member.user_id)
     }
   }
@@ -115,14 +92,12 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   if (!member) return NextResponse.json({ error: 'Membre introuvable' }, { status: 404 })
   if (member.role === 'owner') return NextResponse.json({ error: 'Impossible de retirer le propriétaire' }, { status: 403 })
 
-  if (member.role === 'chef_equipe') {
-    const { data: leadsTeam } = await supabase.from('teams').select('id').eq('chef_id', member.user_id).maybeSingle()
-    if (leadsTeam) {
-      return NextResponse.json(
-        { error: 'Ce membre dirige une équipe — réassignez ou supprimez l\'équipe avant de le supprimer' },
-        { status: 409 }
-      )
-    }
+  const { data: leadsTeam } = await supabase.from('teams').select('id').eq('chef_id', member.user_id).maybeSingle()
+  if (leadsTeam) {
+    return NextResponse.json(
+      { error: 'Ce membre dirige une équipe — réassignez ou supprimez l\'équipe avant de le supprimer' },
+      { status: 409 }
+    )
   }
 
   const { error } = await supabase

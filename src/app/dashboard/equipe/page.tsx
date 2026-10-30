@@ -97,9 +97,7 @@ export default async function EquipePage() {
 
   invitesQuery = ctx.canManageOrgStructure
     ? invitesQuery.eq('org_id', ctx.org.id)
-    : ctx.isTeamChef
-      ? invitesQuery.eq('team_id', ctx.teamId ?? '00000000-0000-0000-0000-000000000000')
-      : invitesQuery.eq('id', '00000000-0000-0000-0000-000000000000') // stratege/monteur : pas d'invitations
+    : invitesQuery.eq('id', '00000000-0000-0000-0000-000000000000') // stratege/monteur : pas d'invitations
 
   const { data: invitesData } = await invitesQuery
 
@@ -127,7 +125,7 @@ export default async function EquipePage() {
     ])
 
     unassignedMembers = (orgMembersAll ?? []).filter(
-      m => ['chef_equipe', 'stratege', 'monteur'].includes(m.role) && !teamUserIds.has(m.user_id)
+      m => ['stratege', 'monteur'].includes(m.role) && !teamUserIds.has(m.user_id)
     )
     unassignedClients = (clientsRes.data ?? []).filter(c => !teamClientIds.has(c.id))
 
@@ -135,10 +133,6 @@ export default async function EquipePage() {
       if (c.assigned_user_id) workload[c.assigned_user_id] = (workload[c.assigned_user_id] ?? 0) + 1
     }
   }
-
-  // ── Candidats chef_equipe pour la création d'équipe : ont déjà le rôle mais
-  //    ne dirigent pas encore d'équipe ────────────────────────────────────────
-  const chefCandidates = (unassignedMembers ?? []).filter(m => m.role === 'chef_equipe')
 
   return (
     <div className="space-y-6">
@@ -150,15 +144,11 @@ export default async function EquipePage() {
         role={ctx.role}
         currentUserId={ctx.userId}
         canManageOrgStructure={ctx.canManageOrgStructure}
-        isTeamChef={ctx.isTeamChef}
-        org={ctx.org}
-        activeMemberCount={(orgMembersAll ?? []).length}
         allMembers={ctx.canManageOrgStructure ? ((orgMembersAll ?? []) as any) : []}
         teams={teams as any}
         invitations={(invitesData ?? []) as any}
         unassignedMembers={(unassignedMembers ?? []) as any}
         unassignedClients={unassignedClients}
-        chefCandidates={chefCandidates as any}
         workload={workload}
       />
     </div>

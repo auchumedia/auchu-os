@@ -54,9 +54,8 @@ export async function PATCH(
 
   // Approuver (passage à 'approuve') : jamais en auto-approbation (créateur
   // ET assigné = soi-même) ; sinon réservé à owner/director (toute tâche)
-  // ou au créateur de la tâche (un chef_equipe n'approuve donc que ce qu'il
-  // a lui-même créé — même règle imposée par le trigger SQL
-  // tasks_enforce_role_update, migration 037, défense en profondeur).
+  // ou au créateur de la tâche — même règle imposée par le trigger SQL
+  // tasks_enforce_role_update (migration 037, défense en profondeur).
   if (fields.status === 'approuve' && existing.status !== 'approuve') {
     const isSelfAssigned = existing.assigned_by === ctx.userId && existing.assigned_to === ctx.userId
     const canApprove = !isSelfAssigned && (ctx.isOwner || ctx.isDirector || existing.assigned_by === ctx.userId)

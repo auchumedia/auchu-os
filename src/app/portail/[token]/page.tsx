@@ -50,9 +50,13 @@ export default async function PortailPage({
       .order('created_at', { ascending: false })
       .limit(10),
 
+    // Colonnes explicites — ne JAMAIS passer à select('*') : ce résultat est
+    // sérialisé dans les props du composant client <PortalContent>, donc
+    // envoyé au navigateur du client. internal_notes (bloc-notes interne à
+    // l'agence) ne doit jamais y figurer.
     supabase
       .from('content_pieces')
-      .select('*')
+      .select('id, client_id, user_id, project_id, title, type, platform, status, body, description, script, client_notes, reference_links, position, scheduled_at, month_target, published_at, ai_generated, created_at, updated_at')
       .eq('client_id', client.id)
       .order('position', { ascending: true })
       .order('created_at', { ascending: false }),
@@ -78,16 +82,15 @@ export default async function PortailPage({
     .reduce((s, i) => s + i.total, 0)
 
   // Contenu du mois — Y est la cible mensuelle définie dans la fiche client
-  // (vidéos + stories + ads). Même logique que l'onglet Projets côté agence :
+  // (short form + long form). Même logique que l'onglet Projets côté agence :
   // seuls les contenus déjà PUBLIÉS ce mois-ci comptent comme "livrés", donc
   // le compteur affiché est Y moins les publications du mois — pas Y brut.
   // Le mois est celui du calendrier réel (pas de sélecteur ici), donc ce
   // compteur repart naturellement à zéro à chaque 1er janvier ; l'historique
   // des mois/années passés reste consultable via le calendrier plus bas.
   const deliverablesTotal =
-    (client.deliverables_video_organique ?? 0) +
-    (client.deliverables_story ?? 0) +
-    (client.deliverables_ad ?? 0)
+    (client.deliverables_short_form ?? 0) +
+    (client.deliverables_long_form ?? 0)
 
   const now         = new Date()
   const currentYear  = now.getFullYear()

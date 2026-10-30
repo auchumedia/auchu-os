@@ -2,8 +2,6 @@ import { createClient }     from '@/lib/supabase/server'
 import { createAnonClient }  from '@/lib/supabase/anon'
 import { NextResponse }      from 'next/server'
 
-const OWNER_EMAIL = 'raphael@auchumedia.com'
-
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -36,7 +34,7 @@ export async function POST(req: Request) {
   const anon = createAnonClient()
   const { data: org, error: orgErr } = await anon
     .from('organizations')
-    .select('id, name, max_members, plan')
+    .select('id, name')
     .eq('id', inv.org_id)
     .maybeSingle()
 
@@ -59,23 +57,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, org_name: org.name })
   }
 
-  // ── 4. Vérifier la limite de membres ─────────────────────────────────────────────────
-  const effectiveMax = user.email === OWNER_EMAIL ? 999 : org.max_members
-  const { count } = await supabase
-    .from('org_members')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', inv.org_id)
-    .eq('status', 'actif')
-
-  console.log('[join] membres actifs:', count, '| limite:', effectiveMax)
-
-  if ((count ?? 0) >= effectiveMax) {
-    return NextResponse.json(
-      { error: `Cette équipe a atteint sa limite de membres (plan ${org.plan})` },
-      { status: 403 }
-    )
-  }
-
   // ── 5. Rejoindre l'org ────────────────────────────────────────────────────────────────
   const { error: joinErr } = await supabase.from('org_members').insert({
     org_id: inv.org_id, user_id: user.id, role: inv.role, status: 'actif',
@@ -85,9 +66,7 @@ export async function POST(req: Request) {
 
   if (joinErr) return NextResponse.json({ error: joinErr.message }, { status: 500 })
 
-  // ── 5b. Rejoindre l'équipe si l'invitation en ciblait une (chef_equipe qui
-  //         invite un stratege/monteur — le nouveau membre rejoint son équipe
-  //         automatiquement, sans étape manuelle) ──────────────────────────────
+  // ── 5b. Rejoindre l'équipe si l'invitation en ciblait une ────────────────────
   if (inv.team_id) {
     const { error: teamJoinErr } = await supabase.from('team_memberships').insert({
       team_id: inv.team_id, user_id: user.id, role: inv.role,

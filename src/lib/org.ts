@@ -1,27 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
-import { PLAN_LIMITS } from '@/lib/plans'
-import type { OrgRole, OrgPlan } from '@/types'
+import type { OrgRole } from '@/types'
 
-export type { OrgRole, OrgPlan }
-export { PLAN_LIMITS }
+export type { OrgRole }
 
 export interface OrgContext {
   userId:      string
   userName:    string
   userEmail:   string
-  org:         { id: string; name: string; plan: OrgPlan; max_members: number; owner_id: string; created_at?: string; updated_at?: string } | null
+  org:         { id: string; name: string; owner_id: string; created_at?: string; updated_at?: string } | null
   role:        OrgRole
   isOwner:     boolean
   isDirector:  boolean
-  isTeamChef:  boolean
   canManageTeamRoles:    boolean
   canManageOrgStructure: boolean
   dataOwnerId: string
   teamId:      string | null
   memberCount: number
 }
-
-const OWNER_EMAIL = 'raphael@auchumedia.com'
 
 export async function getOrgContext(): Promise<OrgContext | null> {
   const supabase = await createClient()
@@ -36,7 +31,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   // on utilise ce contexte même s'il possède aussi sa propre org.
   const { data: membership, error: memberErr } = await supabase
     .from('org_members')
-    .select('role, status, org_id, org:organizations(id, name, plan, max_members, owner_id)')
+    .select('role, status, org_id, org:organizations(id, name, owner_id)')
     .eq('user_id', user.id)
     .eq('status', 'actif')
     .neq('role', 'owner')
@@ -62,7 +57,6 @@ export async function getOrgContext(): Promise<OrgContext | null> {
     const role    = membership.role as OrgRole
     let orgData = membership.org as unknown as OrgContext['org']
     const isDirector = role === 'director'
-    const isTeamChef = role === 'chef_equipe'
 
     // L'embed PostgREST org:organizations(...) ci-dessus dépend de la policy
     // RLS "org: member read" (id in my_org_ids()) pour résoudre la relation.
@@ -91,7 +85,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
     if (!orgData && rpcOwnerId) {
       const { data: directOrg } = await supabase
         .from('organizations')
-        .select('id, name, plan, max_members, owner_id')
+        .select('id, name, owner_id')
         .eq('id', membership.org_id)
         .maybeSingle()
       if (directOrg) orgData = directOrg as OrgContext['org']
@@ -109,7 +103,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
     // référencent que auth.users) — PostgREST ne peut pas l'embarquer dans
     // la requête ci-dessus, d'où ce second aller-retour ciblé.
     let teamId: string | null = null
-    if (role === 'chef_equipe' || role === 'stratege' || role === 'monteur') {
+    if (role === 'stratege' || role === 'monteur') {
       const { data: teamMembership } = await supabase
         .from('team_memberships')
         .select('team_id')
@@ -121,8 +115,8 @@ export async function getOrgContext(): Promise<OrgContext | null> {
     return {
       userId: user.id, userName, userEmail,
       org: orgData,
-      role, isOwner: false, isDirector, isTeamChef,
-      canManageTeamRoles:    isDirector || isTeamChef,
+      role, isOwner: false, isDirector,
+      canManageTeamRoles:    isDirector,
       canManageOrgStructure: isDirector,
       dataOwnerId,
       teamId,
@@ -134,7 +128,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   // Seulement si pas de membership non-owner trouvé.
   const { data: ownedOrg, error: orgErr } = await supabase
     .from('organizations')
-    .select('id, name, plan, max_members, owner_id')
+    .select('id, name, owner_id')
     .eq('owner_id', user.id)
     .maybeSingle()   // était .single() — PGRST116 si 0 ou 2+ orgs
 
@@ -149,14 +143,10 @@ export async function getOrgContext(): Promise<OrgContext | null> {
       .eq('org_id', ownedOrg.id)
       .eq('status', 'actif')
 
-    const effectiveOrg = userEmail === OWNER_EMAIL
-      ? { ...ownedOrg, plan: 'pro' as OrgPlan, max_members: 999 }
-      : ownedOrg as OrgContext['org']
-
     return {
       userId: user.id, userName, userEmail,
-      org: effectiveOrg,
-      role: 'owner', isOwner: true, isDirector: false, isTeamChef: false,
+      org: ownedOrg as OrgContext['org'],
+      role: 'owner', isOwner: true, isDirector: false,
       canManageTeamRoles: true, canManageOrgStructure: true,
       dataOwnerId: user.id,
       teamId: null,
@@ -167,7 +157,7 @@ export async function getOrgContext(): Promise<OrgContext | null> {
   // ── 3. Utilisateur solo (pas encore d'org, pas de membership) ─────────────
   return {
     userId: user.id, userName, userEmail,
-    org: null, role: 'owner', isOwner: true, isDirector: false, isTeamChef: false,
+    org: null, role: 'owner', isOwner: true, isDirector: false,
     canManageTeamRoles: true, canManageOrgStructure: true,
     dataOwnerId: user.id, teamId: null, memberCount: 1,
   }

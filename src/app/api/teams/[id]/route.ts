@@ -20,6 +20,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!team) return NextResponse.json({ error: 'Équipe introuvable' }, { status: 404 })
 
   if (chef_id) {
+    // Le nouveau chef doit être owner ou director — seuls ces rôles dirigent
+    // une équipe (cf. choix produit : "director auto-leads" à la création).
     const { data: candidate } = await supabase
       .from('org_members')
       .select('user_id, role')
@@ -28,8 +30,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       .eq('status', 'actif')
       .maybeSingle()
 
-    if (!candidate || candidate.role !== 'chef_equipe') {
-      return NextResponse.json({ error: 'Ce membre doit d\'abord avoir le rôle chef_equipe' }, { status: 400 })
+    if (!candidate || candidate.role !== 'director') {
+      return NextResponse.json({ error: 'Ce membre doit avoir le rôle directeur' }, { status: 400 })
     }
 
     const { error: rpcError } = await supabase.rpc('reassign_team_chef', { p_team_id: params.id, p_new_chef_id: chef_id })

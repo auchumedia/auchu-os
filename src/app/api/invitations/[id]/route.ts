@@ -10,8 +10,8 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   const supabase = await createClient()
 
   // Supprimer seulement si l'invitation appartient à l'org et n'est pas encore
-  // utilisée — la policy "invitations: hierarchy delete" (owner/director org-
-  // wide, chef_equipe sur sa propre équipe) fait le vrai contrôle d'accès.
+  // utilisée — la policy "invitations: hierarchy delete" (owner/director
+  // org-wide) fait le vrai contrôle d'accès.
   const { error } = await supabase
     .from('invitations')
     .delete()

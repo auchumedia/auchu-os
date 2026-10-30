@@ -97,9 +97,9 @@ export default async function ClientPage({ params }: { params: { id: string } })
   }
 
   // ── Temps passé par l'équipe sur ce client ce mois — owner/director
-  //    uniquement (mêmes lecteurs que "Rapports temps") : un chef_equipe/
-  //    stratege/monteur n'a en RLS accès qu'à ses propres time_entries,
-  //    donc un total "équipe" serait trompeur pour ces rôles. ────────────────
+  //    uniquement (mêmes lecteurs que "Rapports temps") : un stratege/
+  //    monteur n'a en RLS accès qu'à ses propres time_entries, donc un
+  //    total "équipe" serait trompeur pour ces rôles. ────────────────────────
   let clientTimeThisMonth: { totalSeconds: number; byMember: { name: string; seconds: number }[] } | null = null
   if (canManageSensitive) {
     const now = new Date()

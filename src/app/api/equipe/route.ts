@@ -24,27 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Prénom, nom et email sont requis' }, { status: 400 })
   }
 
-  // Un chef_equipe invite forcément dans sa propre équipe.
-  let teamId: string | null = null
-  if (ctx.isTeamChef) {
-    if (!ctx.teamId) return NextResponse.json({ error: 'Vous ne dirigez aucune équipe' }, { status: 403 })
-    teamId = ctx.teamId
-  }
-
   const supabase = await createClient()
-
-  const { count } = await supabase
-    .from('org_members')
-    .select('*', { count: 'exact', head: true })
-    .eq('org_id', ctx.org.id)
-    .eq('status', 'actif')
-
-  if ((count ?? 0) >= ctx.org.max_members) {
-    return NextResponse.json(
-      { error: `Limite atteinte pour le plan ${ctx.org.plan} (${ctx.org.max_members} membres max)` },
-      { status: 403 }
-    )
-  }
 
   // Générer un code unique
   let code = generateCode()
@@ -64,7 +44,6 @@ export async function POST(req: Request) {
       org_id:        ctx.org.id,
       code,
       role,
-      team_id:       teamId,
       invited_by:    ctx.userId,
       expires_at:    expiresAt,
       invited_name,

@@ -29,6 +29,7 @@ export async function POST(req: Request) {
   const {
     name, email, phone, company, industry,
     status, monthly_budget, brand_tone, brand_notes, platforms,
+    deliverables_short_form, deliverables_long_form,
   } = body
 
   if (!name?.trim()) {
@@ -50,6 +51,8 @@ export async function POST(req: Request) {
       brand_tone: brand_tone?.trim() || null,
       brand_notes: brand_notes?.trim() || null,
       platforms: platforms || [],
+      deliverables_short_form: deliverables_short_form ? Number(deliverables_short_form) : 0,
+      deliverables_long_form:  deliverables_long_form  ? Number(deliverables_long_form)  : 0,
     })
     .select()
     .single()

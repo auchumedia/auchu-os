@@ -43,44 +43,18 @@ export default async function TachesPage() {
 
     const { data: clientRows } = await supabase.from('clients').select('id, name').eq('user_id', ownerId).order('name')
     clients = clientRows ?? []
-  } else if (ctx.isTeamChef) {
-    if (ctx.teamId) {
-      const { data: memberships } = await supabase
-        .from('team_memberships')
-        .select('user_id')
-        .eq('team_id', ctx.teamId)
-
-      const memberIds = (memberships ?? []).map(m => m.user_id)
-      const { data: profiles } = memberIds.length > 0
-        ? await supabase.from('profiles').select('id, full_name, email').in('id', memberIds)
-        : { data: [] as { id: string; full_name: string | null; email: string | null }[] }
-
-      members = (profiles ?? [])
-        .map(p => ({ id: p.id, name: p.full_name || p.email || 'Membre' }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-
-      const { data: teamClientRows } = await supabase
-        .from('team_clients')
-        .select('client:clients(id, name)')
-        .eq('team_id', ctx.teamId)
-
-      clients = (teamClientRows ?? [])
-        .map((r: any) => r.client)
-        .filter(Boolean)
-        .sort((a: any, b: any) => a.name.localeCompare(b.name))
-    }
   }
 
   // ── Tâches visibles — la RLS (migration 034) filtre déjà par rôle/équipe/
   //    assignation ; ce .eq('user_id', ownerId) documente juste le tenant. ────
   let tasksQuery = supabase.from('tasks').select(TASK_SELECT).eq('user_id', ownerId)
-  if (!ctx.isOwner && !ctx.isDirector && !ctx.isTeamChef) {
+  if (!ctx.isOwner && !ctx.isDirector) {
     // stratege/monteur : uniquement leurs tâches assignées
     tasksQuery = tasksQuery.eq('assigned_to', ctx.userId)
   }
   const { data: tasks } = await tasksQuery.order('deadline', { ascending: true, nullsFirst: false })
 
-  const view = ctx.isOwner || ctx.isDirector ? 'org' : ctx.isTeamChef ? 'team' : 'perso'
+  const view = ctx.isOwner || ctx.isDirector ? 'org' : 'perso'
 
   // ── Time tracking : totaux accumulés (par tâche) + chrono actif de l'utilisateur ──
   const taskIds = (tasks ?? []).map(t => t.id)

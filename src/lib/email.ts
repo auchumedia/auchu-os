@@ -18,22 +18,16 @@ const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const ROLE_LABELS: Record<string, string> = {
-  director:    'Directeur',
-  chef_equipe: 'Chef d\'équipe',
-  stratege:    'Stratège',
-  monteur:     'Monteur',
+  director: 'Directeur',
+  stratege: 'Stratège',
+  monteur:  'Monteur',
 }
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   director: [
     'Vue globale de toute l\'agence',
-    'Gère les rôles chef d\'équipe, stratège et monteur',
+    'Gère les rôles stratège et monteur',
     'Aucun accès à la facturation',
-  ],
-  chef_equipe: [
-    'Gère son équipe et ses clients assignés',
-    'Assigne les rôles stratège et monteur',
-    'Consulte le calendrier de son équipe',
   ],
   stratege: [
     'Accès aux clients assignés à son équipe',

@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   const { data: org, error } = await supabase
     .from('organizations')
-    .insert({ name: name.trim(), owner_id: user.id, plan: 'free', max_members: 1 })
+    .insert({ name: name.trim(), owner_id: user.id })
     .select()
     .single()
 

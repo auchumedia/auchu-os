@@ -8,11 +8,10 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Clients' }
 
 // Total de contenus/mois — calculé depuis les livrables définis dans la Vue
-// d'ensemble (vidéos + stories + ads), jamais depuis un champ séparé.
+// d'ensemble (short form + long form), jamais depuis un champ séparé.
 function deliverablesTotal(client: any): number {
-  return (client.deliverables_video_organique ?? 0) +
-    (client.deliverables_story ?? 0) +
-    (client.deliverables_ad ?? 0)
+  return (client.deliverables_short_form ?? 0) +
+    (client.deliverables_long_form ?? 0)
 }
 
 export default async function ClientsPage() {

@@ -2,14 +2,13 @@ import type { OrgRole } from '@/types'
 export type { OrgRole }
 
 // Rôles que chaque acteur peut attribuer/modifier — miroir exact de
-// can_manage_role() dans supabase/migrations/021_teams_schema.sql.
+// can_manage_role() dans supabase/migrations/045_remove_chef_equipe_refs.sql.
 // Les deux copies doivent rester synchronisées manuellement.
 export const MANAGEABLE_ROLES: Record<OrgRole, OrgRole[]> = {
-  owner:       ['director', 'chef_equipe', 'stratege', 'monteur'],
-  director:    ['chef_equipe', 'stratege', 'monteur'],
-  chef_equipe: ['stratege', 'monteur'],
-  stratege:    [],
-  monteur:     [],
+  owner:    ['director', 'stratege', 'monteur'],
+  director: ['stratege', 'monteur'],
+  stratege: [],
+  monteur:  [],
 }
 
 // role vient de la DB (colonne text, pas un enum Postgres) — sa valeur
@@ -26,11 +25,10 @@ export function canManageRole(actor: string, target: string): boolean {
 }
 
 export const ROLE_LABELS: Record<OrgRole, { label: string; cls: string; desc: string }> = {
-  owner:       { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700',  desc: 'Accès complet, facturation, suppression de comptes' },
-  director:    { label: 'Directeur',    cls: 'bg-purple-100 text-purple-700', desc: 'Vue globale de l\'agence, gère les rôles en dessous' },
-  chef_equipe: { label: 'Chef d\'équipe', cls: 'bg-blue-100   text-blue-700',   desc: 'Gère son équipe et ses clients assignés' },
-  stratege:    { label: 'Stratège',     cls: 'bg-orange-100 text-orange-700', desc: 'Clients assignés et membres de son équipe' },
-  monteur:     { label: 'Monteur',      cls: 'bg-green-100  text-green-700',  desc: 'Projets vidéo assignés et membres de son équipe' },
+  owner:    { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700',  desc: 'Accès complet, facturation, suppression de comptes' },
+  director: { label: 'Directeur',    cls: 'bg-purple-100 text-purple-700', desc: 'Vue globale de l\'agence, gère les rôles en dessous' },
+  stratege: { label: 'Stratège',     cls: 'bg-orange-100 text-orange-700', desc: 'Clients assignés et membres de son équipe' },
+  monteur:  { label: 'Monteur',      cls: 'bg-green-100  text-green-700',  desc: 'Projets vidéo assignés et membres de son équipe' },
 }
 
 const UNKNOWN_ROLE_LABEL = { label: 'Rôle inconnu', cls: 'bg-gray-100 text-gray-600', desc: '' }
@@ -43,27 +41,25 @@ export function roleLabel(role: string) {
 // listes de membres (owner en premier, puis director, etc.). Un rôle
 // legacy/inconnu (migration pas encore appliquée) est relégué en dernier
 // plutôt que de planter le tri.
-const ROLE_ORDER: OrgRole[] = ['owner', 'director', 'chef_equipe', 'stratege', 'monteur']
+const ROLE_ORDER: OrgRole[] = ['owner', 'director', 'stratege', 'monteur']
 
 export function roleSortIndex(role: string): number {
   const i = ROLE_ORDER.indexOf(role as OrgRole)
   return i === -1 ? ROLE_ORDER.length : i
 }
 
-// Qui peut créer un nouveau client — owner/director uniquement. chef_equipe
-// voit/édite les clients de son équipe (RLS "clients: team read") mais n'en
-// crée pas ; stratege/monteur restent en lecture seule.
+// Qui peut créer un nouveau client — owner/director uniquement. stratege/
+// monteur restent en lecture seule.
 const CLIENT_CREATOR_ROLES: OrgRole[] = ['owner', 'director']
 
 export function canCreateClients(role: string): boolean {
   return CLIENT_CREATOR_ROLES.includes(role as OrgRole)
 }
 
-// Qui peut créer/assigner des tâches — owner/director (n'importe quel membre
-// de l'org) et chef_equipe (membres de sa propre équipe uniquement, imposé
-// côté RLS — cf. migration 034). stratege/monteur voient leurs tâches et en
-// changent le statut, mais n'en créent jamais.
-const TASK_CREATOR_ROLES: OrgRole[] = ['owner', 'director', 'chef_equipe']
+// Qui peut créer/assigner des tâches — owner/director uniquement.
+// stratege/monteur voient leurs tâches et en changent le statut, mais n'en
+// créent jamais.
+const TASK_CREATOR_ROLES: OrgRole[] = ['owner', 'director']
 
 export function canCreateTasks(role: string): boolean {
   return TASK_CREATOR_ROLES.includes(role as OrgRole)

@@ -6,6 +6,10 @@ import { ContentPiece, CalendarEvent, ReferenceLink } from '@/types'
 import { cn, formatDate } from '@/lib/utils'
 import RichTextEditor from '@/components/RichTextEditor'
 
+// Jamais internal_notes (bloc-notes interne à l'agence) — ce composant est
+// rendu dans le portail client, internal_notes ne doit jamais y transiter.
+type PortalContentPiece = Omit<ContentPiece, 'internal_notes' | 'variants'>
+
 // ─── Reference helpers ────────────────────────────────────────────────────────
 
 const REF_PLATFORMS: Record<string, { label: string; bg: string; color: string; emoji: string }> = {
@@ -52,8 +56,8 @@ function RefCard({ link }: { link: ReferenceLink }) {
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const TYPE_LABELS: Record<string, string> = {
-  video_organique: 'Vidéo organique',
-  post: 'Post', reel: 'Reel', story: 'Story', script_video: 'Script vidéo', ad: 'Ad',
+  short_form: 'Short form',
+  long_form:  'Long form',
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -73,13 +77,12 @@ const PLATFORM_COLORS: Record<string, string> = {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
-  idee:         { label: 'Idée',         cls: 'bg-gray-100   text-gray-600'   },
-  en_redaction: { label: 'En rédaction', cls: 'bg-blue-100   text-blue-700'   },
-  pret:         { label: 'Prêt',         cls: 'bg-amber-100  text-amber-700'  },
-  approuve:     { label: 'Approuvé ✓',   cls: 'bg-green-100  text-green-700'  },
-  refuse:       { label: 'Refusé',       cls: 'bg-red-100    text-red-700'    },
-  filme:        { label: 'Filmé',        cls: 'bg-purple-100 text-purple-700' },
-  publie:       { label: 'Publié',       cls: 'bg-gray-200 text-gray-700' },
+  idee:     { label: 'Idée',       cls: 'bg-gray-100   text-gray-600'   },
+  pret:     { label: 'Prêt',       cls: 'bg-amber-100  text-amber-700'  },
+  approuve: { label: 'Approuvé ✓', cls: 'bg-green-100  text-green-700'  },
+  refuse:   { label: 'Refusé',     cls: 'bg-red-100    text-red-700'    },
+  filme:    { label: 'Filmé',      cls: 'bg-purple-100 text-purple-700' },
+  publie:   { label: 'Publié',     cls: 'bg-gray-200 text-gray-700' },
 }
 
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
@@ -88,7 +91,7 @@ const DAYS_FR   = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  content:  ContentPiece[]
+  content:  PortalContentPiece[]
   events:   CalendarEvent[]
   token:    string
   primary:  string
@@ -98,8 +101,8 @@ interface Props {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PortalContent({ content: initial, events, token, primary, secondary }: Props) {
-  const [items, setItems]       = useState<ContentPiece[]>(initial)
-  const [selected, setSelected] = useState<ContentPiece | null>(null)
+  const [items, setItems]       = useState<PortalContentPiece[]>(initial)
+  const [selected, setSelected] = useState<PortalContentPiece | null>(null)
   const [notes, setNotes]       = useState('')
   const [saving, setSaving]     = useState<string | null>(null)
 
@@ -120,7 +123,7 @@ export default function PortalContent({ content: initial, events, token, primary
     }
     const json = await res.json()
     console.log('[portail] items received:', json.data?.length ?? 0, '| count:', json.count)
-    const fresh: ContentPiece[] = json.data ?? []
+    const fresh: PortalContentPiece[] = json.data ?? []
     setItems(fresh)
     // Sync the open panel: functional update avoids capturing `selected` in closure
     setSelected(prev => {
@@ -135,7 +138,7 @@ export default function PortalContent({ content: initial, events, token, primary
     return () => clearInterval(interval)
   }, [fetchContent])
 
-  const openItem = (item: ContentPiece) => {
+  const openItem = (item: PortalContentPiece) => {
     setSelected(item)
     setNotes(item.client_notes ?? '')
   }
@@ -208,7 +211,7 @@ export default function PortalContent({ content: initial, events, token, primary
     eventsByDay[day].push(e)
   })
 
-  const contentByDay: Record<number, ContentPiece[]> = {}
+  const contentByDay: Record<number, PortalContentPiece[]> = {}
   monthContent.forEach(c => {
     const day = new Date(c.scheduled_at!).getDate()
     if (!contentByDay[day]) contentByDay[day] = []
@@ -370,7 +373,7 @@ export default function PortalContent({ content: initial, events, token, primary
 function PortalConceptView({
   item, notes, onNotesChange, onSaveNotes, saving, onApprove, onRefuse, onClose, primary, secondary,
 }: {
-  item: ContentPiece
+  item: PortalContentPiece
   notes: string
   onNotesChange: (v: string) => void
   onSaveNotes: () => void
@@ -418,7 +421,7 @@ function PortalConceptView({
           {(item.script || item.body) && (
             <section>
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                {item.type === 'script_video' ? 'Script vidéo' : 'Texte / Script'}
+                Texte / Script
               </h3>
               <RichTextEditor content={item.script ?? item.body ?? ''} editable={false} />
             </section>

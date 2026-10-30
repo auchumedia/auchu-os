@@ -17,13 +17,10 @@ import RichTextEditor from '@/components/RichTextEditor'
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const TYPE_LABELS: Record<string, string> = {
-  video_organique: 'Vidéo organique',
-  post: 'Post', reel: 'Reel', story: 'Story', script_video: 'Script vidéo', ad: 'Ad',
-  caption: 'Caption', script: 'Script', email: 'Email',
+  short_form: 'Short form',
+  long_form:  'Long form',
 }
-// Options du formulaire de création — les autres valeurs restent affichables
-// (TYPE_LABELS) pour les contenus existants créés avant ce changement.
-const TYPES = ['video_organique','story','ad']
+const TYPES = ['short_form','long_form']
 
 const PLATFORM_LABELS: Record<string, string> = {
   toutes: 'Toutes les plateformes',
@@ -45,15 +42,14 @@ const PLATFORM_COLORS: Record<string, string> = {
 
 // Workflow complet — l'ordre reflète la progression attendue d'une idée.
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
-  idee:         { label: 'Idée',         cls: 'bg-gray-100   text-gray-600'   },
-  en_redaction: { label: 'En rédaction', cls: 'bg-blue-100   text-blue-700'   },
-  pret:         { label: 'Prêt',         cls: 'bg-amber-100  text-amber-700'  },
-  approuve:     { label: 'Approuvé',     cls: 'bg-green-100  text-green-700'  },
-  refuse:       { label: 'Refusé',       cls: 'bg-red-100    text-red-700'    },
-  filme:        { label: 'Filmé',        cls: 'bg-purple-100 text-purple-700' },
-  publie:       { label: 'Publié',       cls: 'bg-gray-200 text-gray-700' },
+  idee:     { label: 'Idée',     cls: 'bg-gray-100   text-gray-600'   },
+  pret:     { label: 'Prêt',     cls: 'bg-amber-100  text-amber-700'  },
+  approuve: { label: 'Approuvé', cls: 'bg-green-100  text-green-700'  },
+  refuse:   { label: 'Refusé',   cls: 'bg-red-100    text-red-700'    },
+  filme:    { label: 'Filmé',    cls: 'bg-purple-100 text-purple-700' },
+  publie:   { label: 'Publié',   cls: 'bg-gray-200 text-gray-700' },
 }
-const STATUSES: ContentStatus[] = ['idee','en_redaction','pret','approuve','refuse','filme','publie']
+const STATUSES: ContentStatus[] = ['idee','pret','approuve','refuse','filme','publie']
 // Statuts qui comptent comme "livrable complété" pour le compteur du mois.
 const DONE_STATUSES: ContentStatus[] = ['filme','publie']
 // Statuts affichés dans le calendrier de publication (contenu confirmé).
@@ -174,13 +170,12 @@ interface Props {
   initialContent: ContentPiece[]
   initialEvents:  CalendarEvent[]
   clientId: string
-  teamMembers: { id: string; name: string }[]
   deliverablesTotal: number
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ProjetsTab({ initialContent, initialEvents, clientId, teamMembers, deliverablesTotal }: Props) {
+export default function ProjetsTab({ initialContent, initialEvents, clientId, deliverablesTotal }: Props) {
   const [items, setItems]       = useState<ContentPiece[]>(initialContent)
   const [events, setEvents]     = useState<CalendarEvent[]>(initialEvents)
   const [selected, setSelected] = useState<ContentPiece | null>(null)
@@ -393,7 +388,6 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, te
                       <th>Type</th>
                       <th>Plateforme</th>
                       <th>Statut</th>
-                      <th>Assigné à</th>
                       <th>Planifié</th>
                       <th />
                     </tr>
@@ -529,7 +523,6 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, te
         <ContentPanel
           key={selected.id}
           item={selected}
-          teamMembers={teamMembers}
           onPatch={(fields) => patchItem(selected.id, fields)}
           onClose={closePanel}
           onDelete={() => deleteItem(selected.id)}
@@ -546,7 +539,7 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, te
           onCreated={item => {
             setItems(prev => [...prev, item])
             setShowAdd(false)
-            setSelected(item) // ouvre directement la vue plein écran pour écrire description/script
+            setSelected(item) // ouvre directement la vue plein écran pour écrire le bloc-notes/script
           }}
         />
       )}
@@ -615,7 +608,6 @@ function SortableRow({
         </span>
       </td>
       <td><span className={cn('badge text-xs', sc.cls)}>{sc.label}</span></td>
-      <td className="text-xs text-gray-500">{item.assigned_to ?? '—'}</td>
       <td className="text-xs text-gray-400">{item.scheduled_at ? formatDateOnly(item.scheduled_at) : '—'}</td>
       <td onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-1">
@@ -635,34 +627,31 @@ function SortableRow({
 // ─── Content panel (vue plein écran) ─────────────────────────────────────────────
 
 function ContentPanel({
-  item, teamMembers, onPatch, onClose, onDelete,
+  item, onPatch, onClose, onDelete,
 }: {
   item: ContentPiece
-  teamMembers: { id: string; name: string }[]
   onPatch: (fields: Partial<ContentPiece>) => Promise<boolean>
   onClose: () => void
   onDelete: () => void
 }) {
   const [title,       setTitle]       = useState(item.title)
-  const [description, setDescription] = useState(item.description ?? '')
+  const [notes,        setNotes]       = useState(item.internal_notes ?? '')
   const [script,      setScript]      = useState(item.script ?? '')
   const [status,      setStatus]      = useState(item.status)
   const [statusError, setStatusError] = useState<string | null>(null)
   const [refs,        setRefs]        = useState<ReferenceLink[]>(item.reference_links ?? [])
 
-  // Date de publication et assignation — édition immédiate (pas de debounce,
-  // ce sont des sélections ponctuelles, pas de la saisie continue).
+  // Date de publication — édition immédiate (pas de debounce, c'est une
+  // sélection ponctuelle, pas de la saisie continue).
   const [scheduledAt,     setScheduledAt]     = useState(item.scheduled_at?.slice(0, 10) ?? '')
-  const [assignedTo,      setAssignedTo]      = useState(item.assigned_to ?? '')
   const [scheduleStatus,  setScheduleStatus]  = useState<SaveStatus>('idle')
-  const [assignStatus,    setAssignStatus]    = useState<SaveStatus>('idle')
 
-  const titleStatus = useAutoSave(title,       v => onPatch({ title: v }))
-  const descStatus  = useAutoSave(description, v => onPatch({ description: v || null }))
+  const titleStatus = useAutoSave(title, v => onPatch({ title: v }))
+  const notesStatus  = useAutoSave(notes, v => onPatch({ internal_notes: v || null }))
   const scriptStatus = useAutoSave(script,     v => onPatch({ script: v || null, body: v || '' }))
 
   // Any field saving indicator
-  const anyStatus = [titleStatus, descStatus, scriptStatus, scheduleStatus, assignStatus].find(s => s !== 'idle') ?? 'idle'
+  const anyStatus = [titleStatus, notesStatus, scriptStatus, scheduleStatus].find(s => s !== 'idle') ?? 'idle'
 
   const changeScheduledAt = async (v: string) => {
     setScheduledAt(v)
@@ -670,14 +659,6 @@ function ContentPanel({
     const ok = await onPatch({ scheduled_at: v || null })
     setScheduleStatus(ok ? 'saved' : 'error')
     if (ok) setTimeout(() => setScheduleStatus('idle'), 2000)
-  }
-
-  const changeAssignedTo = async (v: string) => {
-    setAssignedTo(v)
-    setAssignStatus('saving')
-    const ok = await onPatch({ assigned_to: v || null })
-    setAssignStatus(ok ? 'saved' : 'error')
-    if (ok) setTimeout(() => setAssignStatus('idle'), 2000)
   }
 
   const changeStatus = async (s: string) => {
@@ -707,7 +688,6 @@ function ContentPanel({
             {PLATFORM_LABELS[item.platform] ?? item.platform}
           </span>
           <span className="text-xs text-gray-400">{TYPE_LABELS[item.type] ?? item.type}</span>
-          {item.assigned_to && <span className="text-xs text-gray-400">· {item.assigned_to}</span>}
           <span className={cn(
             'text-xs transition-all',
             anyStatus === 'saved'  ? 'text-green-500' :
@@ -769,9 +749,9 @@ function ContentPanel({
             className="text-3xl sm:text-4xl font-bold text-gray-900 w-full bg-transparent border-b border-transparent hover:border-gray-200 focus:border-auchu-400 focus:outline-none py-1 transition-colors"
           />
 
-          {/* Date de publication + Assigné à */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+          {/* Date de publication */}
+          <section>
+            <div className="max-w-xs">
               <SaveLabel label="Date de publication" status={scheduleStatus} />
               <input
                 type="date"
@@ -780,35 +760,21 @@ function ContentPanel({
                 className="input text-sm"
               />
             </div>
-            <div>
-              <SaveLabel label="Assigné à" status={assignStatus} />
-              <select
-                value={assignedTo}
-                onChange={e => changeAssignedTo(e.target.value)}
-                className="select text-sm"
-              >
-                <option value="">Personne</option>
-                {teamMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-              </select>
-            </div>
           </section>
 
-          {/* Description */}
+          {/* Bloc-notes — agence uniquement, jamais visible dans le portail client */}
           <section>
-            <SaveLabel label="Description" status={descStatus} />
+            <SaveLabel label="Bloc-notes" status={notesStatus} />
             <RichTextEditor
-              content={description}
-              onChange={setDescription}
-              placeholder="Contexte, objectifs, brief…"
+              content={notes}
+              onChange={setNotes}
+              placeholder="Notes pour aider à écrire le script…"
             />
           </section>
 
           {/* Script */}
           <section>
-            <SaveLabel
-              label={item.type === 'script_video' ? 'Script vidéo' : 'Texte / Script'}
-              status={scriptStatus}
-            />
+            <SaveLabel label="Texte / Script" status={scriptStatus} />
             <RichTextEditor
               content={script}
               onChange={setScript}
@@ -1032,7 +998,7 @@ function AddContentModal({
   onCreated: (item: ContentPiece) => void
 }) {
   const [form, setForm] = useState({
-    title: '', type: 'video_organique', platform: 'toutes', status: 'idee',
+    title: '', type: 'short_form', platform: 'toutes', status: 'idee',
   })
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
@@ -1101,7 +1067,7 @@ function AddContentModal({
             </div>
           </div>
           <p className="text-xs text-gray-400">
-            Rattaché à {MONTHS_FR[selectedMonth]} {selectedYear}. La date de publication et la personne assignée se règlent après création, dans la fiche du concept.
+            Rattaché à {MONTHS_FR[selectedMonth]} {selectedYear}. La date de publication se règle après création, dans la fiche du concept.
           </p>
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">

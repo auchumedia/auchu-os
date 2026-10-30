@@ -10,15 +10,12 @@ export interface User {
 }
 
 // ─── Organisation & équipe ────────────────────────────────────────────────────
-export type OrgPlan = 'free' | 'starter' | 'agence' | 'pro'
-export type OrgRole = 'owner' | 'director' | 'chef_equipe' | 'stratege' | 'monteur'
+export type OrgRole = 'owner' | 'director' | 'stratege' | 'monteur'
 
 export interface Organization {
   id: string
   name: string
   owner_id: string
-  plan: OrgPlan
-  max_members: number
   created_at: string
   updated_at: string
 }
@@ -62,7 +59,7 @@ export interface TeamMembership {
   id:        string
   team_id:   string
   user_id:   string
-  role:      Extract<OrgRole, 'chef_equipe' | 'stratege' | 'monteur'>
+  role:      Extract<OrgRole, 'stratege' | 'monteur'>
   joined_at: string
 }
 
@@ -93,7 +90,7 @@ export interface Client {
   status: 'actif' | 'inactif' | 'prospect'
   // Ancien "budget mensuel", puis "nombre de contenus/mois" — plus exposé
   // dans aucun formulaire : le total de contenus/mois vient désormais
-  // uniquement des livrables (deliverables_video_organique/story/ad).
+  // uniquement des livrables (deliverables_short_form/long_form).
   // Conservée en base pour compatibilité (anciens clients), jamais lue/écrite
   // par l'UI actuelle.
   monthly_budget: number | null
@@ -110,9 +107,8 @@ export interface Client {
   portal_token: string | null
   portal_enabled: boolean
   assigned_partner: string | null
-  deliverables_video_organique: number
-  deliverables_story: number
-  deliverables_ad: number
+  deliverables_short_form: number
+  deliverables_long_form: number
   link_instagram: string | null
   link_facebook: string | null
   link_tiktok: string | null
@@ -169,8 +165,8 @@ export interface Project {
 }
 
 // ─── Contenu ──────────────────────────────────────────────────────────────────
-export type ContentType = 'post' | 'reel' | 'story' | 'script_video' | 'ad' | 'caption' | 'script' | 'email' | 'video_organique'
-export type ContentStatus = 'idee' | 'en_redaction' | 'pret' | 'approuve' | 'refuse' | 'filme' | 'publie'
+export type ContentType = 'short_form' | 'long_form'
+export type ContentStatus = 'idee' | 'pret' | 'approuve' | 'refuse' | 'filme' | 'publie'
 export type Platform = 'instagram' | 'facebook' | 'tiktok' | 'linkedin' | 'google' | 'meta' | 'toutes'
 
 export interface ContentPiece {
@@ -184,8 +180,11 @@ export interface ContentPiece {
   status: ContentStatus
   body: string | null
   description: string | null
+  // Bloc-notes — visible et modifiable uniquement par les membres de
+  // l'agence. Ne JAMAIS l'exposer au portail client (ni dans la liste de
+  // colonnes de /api/portail/[token]/contenu, ni dans PortalContent.tsx).
+  internal_notes: string | null
   script: string | null
-  assigned_to: string | null
   client_notes:    string | null
   reference_links: ReferenceLink[]
   variants:        ContentVariant[]

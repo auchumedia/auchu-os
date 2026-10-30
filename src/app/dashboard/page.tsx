@@ -22,8 +22,8 @@ const PRIORITY_DOT: Record<TaskPriority, string> = {
 }
 
 // clientIds === null : pas de filtrage (owner/director, tous les clients de
-// l'org). clientIds === [...] : scopé à une équipe (chef_equipe/stratege/
-// monteur, via team_clients).
+// l'org). clientIds === [...] : scopé à une équipe (stratege/monteur, via
+// team_clients).
 async function fetchClientCards(supabase: SupabaseClient, ownerId: string, clientIds: string[] | null): Promise<ClientCard[]> {
   let query = supabase.from('clients').select('id, name, logo_url, status').eq('user_id', ownerId).eq('status', 'actif').order('name')
   if (clientIds) query = query.in('id', clientIds.length > 0 ? clientIds : ['00000000-0000-0000-0000-000000000000'])
@@ -225,11 +225,10 @@ async function OrgDashboard(
                     piece.status === 'approuve' ? 'badge-green' :
                     piece.status === 'pret'     ? 'badge-amber' : 'badge-gray'
                   )}>
-                    {piece.status === 'publie'       ? 'Publié'    :
-                     piece.status === 'filme'        ? 'Filmé'     :
-                     piece.status === 'approuve'     ? 'Approuvé'  :
-                     piece.status === 'pret'         ? 'Prêt'      :
-                     piece.status === 'en_redaction' ? 'En cours'  : piece.status}
+                    {piece.status === 'publie'   ? 'Publié'   :
+                     piece.status === 'filme'    ? 'Filmé'    :
+                     piece.status === 'approuve' ? 'Approuvé' :
+                     piece.status === 'pret'     ? 'Prêt'     : piece.status}
                   </span>
                 </div>
               ))}
@@ -241,7 +240,7 @@ async function OrgDashboard(
   )
 }
 
-// ─── Vue chef_equipe / stratège / monteur ────────────────────────────────────
+// ─── Vue stratège / monteur ───────────────────────────────────────────────────
 
 async function TeamDashboard(
   supabase: SupabaseClient,

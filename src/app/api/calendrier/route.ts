@@ -12,25 +12,11 @@ export async function GET(req: Request) {
   const start  = searchParams.get('start') ?? ''
   const end    = searchParams.get('end')   ?? ''
   const team   = searchParams.get('team') === '1'
-  const scope  = searchParams.get('scope') // 'own-team' — chef_equipe uniquement
   const member = searchParams.get('member')
 
   const supabase = await createClient()
 
   const orgWide = team && (ctx.isOwner || ctx.isDirector)
-  const ownTeam = scope === 'own-team' && ctx.isTeamChef && !!ctx.teamId
-
-  // ── Équipe du chef : clients + membres, pour filtrer calendar_events/content ─
-  let teamClientIds: string[] = []
-  let teamMemberIds: string[] = []
-  if (ownTeam) {
-    const [teamClientsRes, teamMembersRes] = await Promise.all([
-      supabase.from('team_clients').select('client_id').eq('team_id', ctx.teamId as string),
-      supabase.from('team_memberships').select('user_id').eq('team_id', ctx.teamId as string),
-    ])
-    teamClientIds = (teamClientsRes.data ?? []).map(c => c.client_id)
-    teamMemberIds = [...(teamMembersRes.data ?? []).map(m => m.user_id), ctx.userId]
-  }
 
   // ── calendar_events ───────────────────────────────────────────────────────
   let eventsQuery = supabase
@@ -43,9 +29,6 @@ export async function GET(req: Request) {
   if (orgWide) {
     // owner/director : pas de filtre user_id (les policies couvrent toute l'org)
     if (member) eventsQuery = eventsQuery.eq('user_id', member)
-  } else if (ownTeam) {
-    const clientFilter = teamClientIds.length > 0 ? `client_id.in.(${teamClientIds.join(',')}),` : ''
-    eventsQuery = eventsQuery.or(`${clientFilter}user_id.in.(${teamMemberIds.join(',')})`)
   } else {
     // Vue personnelle : les événements appartiennent à l'utilisateur courant
     // (créés avec user_id = ctx.userId), pas au owner du workspace.
@@ -63,10 +46,7 @@ export async function GET(req: Request) {
     .gte('scheduled_at', start)
     .lte('scheduled_at', end + 'T23:59:59')
 
-  if (ownTeam) {
-    // Calendrier de contenu de toute l'équipe, non filtré par assignation perso.
-    contentsQuery = contentsQuery.in('client_id', teamClientIds.length > 0 ? teamClientIds : ['00000000-0000-0000-0000-000000000000'])
-  } else if (!orgWide) {
+  if (!orgWide) {
     // Vue personnelle : uniquement le contenu assigné à l'utilisateur courant
     contentsQuery = contentsQuery.eq('assigned_user_id', ctx.userId)
   }

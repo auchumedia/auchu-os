@@ -19,7 +19,7 @@ type HistoryEntry = Pick<TimeEntry, 'id' | 'task_id' | 'user_id' | 'started_at' 
 const EMPTY_ADD_TIME_FORM = { date: new Date().toISOString().split('T')[0], hours: '', minutes: '', note: '' }
 
 interface TachesBoardProps {
-  view: 'org' | 'team' | 'perso'
+  view: 'org' | 'perso'
   currentUserId: string
   canCreate: boolean
   initialTasks: Task[]
@@ -325,10 +325,8 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
   // réservée au créateur (assigned_by) ou owner/director (cf. migration 035).
   // Changer le statut : créateur, owner/director, OU la personne assignée.
   // Supprimer : édition complète OU (tâche approuvée ET on est l'assigné —
-  // migration 036). Approuver : owner/director (toute tâche) OU le créateur
-  // (un chef_equipe n'approuve donc que ce qu'il a lui-même créé — pas
-  // "toute l'équipe") — mais jamais en auto-approbation, même pour
-  // owner/director (migration 037).
+  // migration 036). Approuver : owner/director (toute tâche) OU le créateur —
+  // mais jamais en auto-approbation, même pour owner/director (migration 037).
   const isOwnerOrDirector = view === 'org'
   const canEditTask         = (task: Task) => isOwnerOrDirector || task.assigned_by === currentUserId
   const canChangeStatusTask = (task: Task) => canEditTask(task) || task.assigned_to === currentUserId
@@ -340,7 +338,7 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
     return isOwnerOrDirector || task.assigned_by === currentUserId
   }
 
-  const title = view === 'org' ? 'Tâches' : view === 'team' ? 'Tâches de l\'équipe' : 'Mes tâches'
+  const title = view === 'org' ? 'Tâches' : 'Mes tâches'
 
   return (
     <>

@@ -44,6 +44,8 @@ export default function NouveauClientForm() {
     industry: '',
     status: 'prospect' as Statut,
     platforms: [] as string[],
+    deliverables_short_form: 0,
+    deliverables_long_form: 0,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -274,6 +276,37 @@ export default function NouveauClientForm() {
               {form.platforms.length} plateforme{form.platforms.length > 1 ? 's' : ''} sélectionnée{form.platforms.length > 1 ? 's' : ''}
             </p>
           )}
+        </section>
+
+        {/* ─── Livrables du mois ───────────────────────────────────────────── */}
+        <section className="card space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Livrables du mois</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Affiché dans le portail client comme "Contenu du mois"</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Total de contenu — Short form</label>
+              <input
+                type="number"
+                min={0}
+                value={form.deliverables_short_form}
+                onChange={e => set('deliverables_short_form', Math.max(0, Number(e.target.value)))}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Total de contenu — Long form</label>
+              <input
+                type="number"
+                min={0}
+                value={form.deliverables_long_form}
+                onChange={e => set('deliverables_long_form', Math.max(0, Number(e.target.value)))}
+                className="input"
+              />
+            </div>
+          </div>
         </section>
 
         {/* ─── Error ───────────────────────────────────────────────────────── */}

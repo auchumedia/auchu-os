@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!canCreateTasks(ctx.role)) {
     return NextResponse.json(
-      { error: 'Accès refusé — seuls owner, director et chef d\'équipe peuvent créer une tâche' },
+      { error: 'Accès refusé — seuls owner et director peuvent créer une tâche' },
       { status: 403 }
     )
   }
@@ -41,24 +41,8 @@ export async function POST(req: Request) {
 
   // ── Validation de la cible d'assignation selon le rôle ────────────────────
   // owner/director : n'importe quel membre actif de l'org (ou eux-mêmes).
-  // chef_equipe : seulement les membres de sa propre équipe (RLS l'impose
-  // aussi — migration 034 — mais un message d'erreur clair vaut mieux qu'un
-  // 500 opaque de Postgres).
   if (assigned_to) {
-    if (ctx.role === 'chef_equipe') {
-      const { data: teammate } = await supabase
-        .from('team_memberships')
-        .select('user_id')
-        .eq('team_id', ctx.teamId ?? '00000000-0000-0000-0000-000000000000')
-        .eq('user_id', assigned_to)
-        .maybeSingle()
-      if (!teammate) {
-        return NextResponse.json(
-          { error: 'Vous ne pouvez assigner une tâche qu\'aux membres de votre équipe' },
-          { status: 403 }
-        )
-      }
-    } else if (ctx.org && assigned_to !== ctx.org.owner_id) {
+    if (ctx.org && assigned_to !== ctx.org.owner_id) {
       const { data: member } = await supabase
         .from('org_members')
         .select('user_id')
