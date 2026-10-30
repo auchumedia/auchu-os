@@ -644,7 +644,7 @@ export default function ClientDetail({
               {canManageSensitive ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="label">Total de contenu — Short form</label>
+                    <label className="label">Short form</label>
                     <input
                       type="number" min={0}
                       value={deliverables.short_form}
@@ -653,7 +653,7 @@ export default function ClientDetail({
                     />
                   </div>
                   <div>
-                    <label className="label">Total de contenu — Long form</label>
+                    <label className="label">Long form</label>
                     <input
                       type="number" min={0}
                       value={deliverables.long_form}

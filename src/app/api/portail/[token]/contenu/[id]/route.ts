@@ -30,12 +30,15 @@ export async function PATCH(
     return NextResponse.json({ error: 'Aucun champ valide' }, { status: 400 })
   }
 
+  // Colonnes explicites — jamais select() nu : la réponse est renvoyée au
+  // navigateur du client, internal_notes et assigned_to ne doivent jamais y
+  // figurer (cf. /api/portail/[token]/contenu/route.ts).
   const { data, error } = await supabase
     .from('content_pieces')
     .update(fields)
     .eq('id', params.id)
     .eq('client_id', client.id)
-    .select()
+    .select('id, client_id, user_id, project_id, title, type, platform, status, body, description, script, client_notes, reference_links, position, scheduled_at, month_target, published_at, ai_generated, created_at, updated_at')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

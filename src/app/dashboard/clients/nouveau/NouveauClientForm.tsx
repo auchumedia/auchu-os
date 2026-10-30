@@ -287,7 +287,7 @@ export default function NouveauClientForm() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Total de contenu — Short form</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Short form</label>
               <input
                 type="number"
                 min={0}
@@ -297,7 +297,7 @@ export default function NouveauClientForm() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Total de contenu — Long form</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Long form</label>
               <input
                 type="number"
                 min={0}
