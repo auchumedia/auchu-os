@@ -27,7 +27,6 @@ const PLATFORM_LABELS: Record<string, string> = {
   instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok',
   linkedin: 'LinkedIn', google: 'Google Ads', meta: 'Meta Ads',
 }
-const PLATFORMS = ['toutes','instagram','facebook','tiktok','linkedin','meta']
 const CALENDAR_PLATFORMS = ['instagram','facebook','tiktok','linkedin','google','meta']
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -536,10 +535,16 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, de
           selectedYear={year}
           selectedMonth={month}
           onClose={() => setShowAdd(false)}
-          onCreated={item => {
+          onCreated={(item, targetYear, targetMonth) => {
             setItems(prev => [...prev, item])
             setShowAdd(false)
             setSelected(item) // ouvre directement la vue plein écran pour écrire le bloc-notes/script
+            // Le contenu vit dans le mois choisi à la création — si ce n'est
+            // pas le mois actuellement affiché, on bascule la vue dessus pour
+            // qu'il apparaisse immédiatement dans la liste au retour.
+            if (targetYear !== year || targetMonth !== month) {
+              setViewDate(new Date(targetYear, targetMonth, 1))
+            }
           }}
         />
       )}
@@ -995,10 +1000,10 @@ function AddContentModal({
   selectedYear: number
   selectedMonth: number
   onClose: () => void
-  onCreated: (item: ContentPiece) => void
+  onCreated: (item: ContentPiece, targetYear: number, targetMonth: number) => void
 }) {
   const [form, setForm] = useState({
-    title: '', type: 'short_form', platform: 'toutes', status: 'idee',
+    title: '', type: 'short_form', month: selectedMonth, year: selectedYear,
   })
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
@@ -1011,12 +1016,15 @@ function AddContentModal({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...form,
+        title: form.title,
+        type:  form.type,
         client_id: clientId,
-        // Aucune date précisée à la création — l'idée est toujours rattachée
-        // explicitement au mois de l'onglet actif (celui affiché à l'écran),
-        // pas au mois courant du calendrier.
-        month_target: monthStartISO(selectedYear, selectedMonth),
+        // Statut et plateforme ne se demandent plus à la création — l'idée
+        // démarre toujours au statut initial, sur toutes les plateformes ;
+        // ces champs restent modifiables ensuite dans la fiche du concept.
+        status:   'idee',
+        platform: 'toutes',
+        month_target: monthStartISO(form.year, form.month),
       }),
     })
     const json = await res.json().catch(() => null)
@@ -1026,7 +1034,7 @@ function AddContentModal({
       setSaving(false)
       return
     }
-    onCreated(json.data)
+    onCreated(json.data, form.year, form.month)
   }
 
   return (
@@ -1046,7 +1054,7 @@ function AddContentModal({
             <label className="label">Titre *</label>
             <input type="text" required autoFocus value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="input text-sm" placeholder="Titre du contenu" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="label">Type</label>
               <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="select text-sm">
@@ -1054,21 +1062,18 @@ function AddContentModal({
               </select>
             </div>
             <div>
-              <label className="label">Plateforme</label>
-              <select value={form.platform} onChange={e => setForm(f => ({ ...f, platform: e.target.value }))} className="select text-sm">
-                {PLATFORMS.map(p => <option key={p} value={p}>{PLATFORM_LABELS[p]}</option>)}
+              <label className="label">Mois</label>
+              <select value={form.month} onChange={e => setForm(f => ({ ...f, month: Number(e.target.value) }))} className="select text-sm">
+                {MONTHS_FR.map((m, i) => <option key={m} value={i}>{m}</option>)}
               </select>
             </div>
             <div>
-              <label className="label">Statut</label>
-              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="select text-sm">
-                {STATUSES.map(s => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
+              <label className="label">Année</label>
+              <select value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))} className="select text-sm">
+                {[selectedYear - 1, selectedYear, selectedYear + 1].map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
           </div>
-          <p className="text-xs text-gray-400">
-            Rattaché à {MONTHS_FR[selectedMonth]} {selectedYear}. La date de publication se règle après création, dans la fiche du concept.
-          </p>
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">Annuler</button>
