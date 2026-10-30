@@ -1003,7 +1003,7 @@ function AddContentModal({
   onCreated: (item: ContentPiece, targetYear: number, targetMonth: number) => void
 }) {
   const [form, setForm] = useState({
-    title: '', type: 'short_form', month: selectedMonth, year: selectedYear,
+    title: '', type: 'short_form', month: selectedMonth,
   })
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
@@ -1024,7 +1024,9 @@ function AddContentModal({
         // ces champs restent modifiables ensuite dans la fiche du concept.
         status:   'idee',
         platform: 'toutes',
-        month_target: monthStartISO(form.year, form.month),
+        // L'année suit toujours celle du mois affiché à l'écran — pas de
+        // sélecteur dédié, seul le mois se choisit.
+        month_target: monthStartISO(selectedYear, form.month),
       }),
     })
     const json = await res.json().catch(() => null)
@@ -1034,7 +1036,7 @@ function AddContentModal({
       setSaving(false)
       return
     }
-    onCreated(json.data, form.year, form.month)
+    onCreated(json.data, selectedYear, form.month)
   }
 
   return (
@@ -1054,7 +1056,7 @@ function AddContentModal({
             <label className="label">Titre *</label>
             <input type="text" required autoFocus value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="input text-sm" placeholder="Titre du contenu" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Type</label>
               <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="select text-sm">
@@ -1065,12 +1067,6 @@ function AddContentModal({
               <label className="label">Mois</label>
               <select value={form.month} onChange={e => setForm(f => ({ ...f, month: Number(e.target.value) }))} className="select text-sm">
                 {MONTHS_FR.map((m, i) => <option key={m} value={i}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Année</label>
-              <select value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))} className="select text-sm">
-                {[selectedYear - 1, selectedYear, selectedYear + 1].map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
           </div>
