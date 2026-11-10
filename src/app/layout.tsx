@@ -1,5 +1,22 @@
 import type { Metadata, Viewport } from 'next'
+import { Bebas_Neue, DM_Sans } from 'next/font/google'
 import '../styles/globals.css'
+
+// Polices du site vitrine AuchuMedia (Nav.js / Home.js) : titres condensés
+// majuscules en Bebas Neue, texte courant en DM Sans.
+const bebasNeue = Bebas_Neue({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-bebas',
+  display: 'swap',
+})
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '700'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: {
@@ -25,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="fr">
+    <html lang="fr" className={`${bebasNeue.variable} ${dmSans.variable}`}>
       <body>{children}</body>
     </html>
   )

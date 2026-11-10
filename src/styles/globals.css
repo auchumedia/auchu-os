@@ -2,46 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    @apply font-sans text-ink;
+    background-color: #F6F7FB;
+    background-image:
+      radial-gradient(ellipse 1200px 600px at 10% -10%, rgba(0,61,165,0.07), transparent),
+      radial-gradient(ellipse 1000px 500px at 100% 0%, rgba(0,61,165,0.05), transparent);
+    background-attachment: fixed;
+  }
+
+  /* Titres de page — police condensée majuscule du site vitrine (Bebas Neue).
+     Appliquée explicitement via .page-title / .font-display, pas à tous les
+     h1-h3 (les petits en-têtes de section restent en DM Sans, plus lisibles). */
+  .font-display {
+    font-family: var(--font-bebas), system-ui, sans-serif;
+    letter-spacing: 0.01em;
+  }
+}
+
 @layer components {
+  /* ─── Titres de page ─────────────────────────────────────────────────────── */
+  .page-title {
+    @apply font-display uppercase text-ink text-2xl md:text-3xl leading-tight;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-gray-500 mt-1;
+  }
+
   /* ─── Cards ─────────────────────────────────────────────────────────────── */
   .card {
-    @apply bg-white border border-gray-100 rounded-xl p-6;
+    @apply bg-white border border-border-soft rounded-2xl shadow-sm p-6;
   }
 
   .card-sm {
-    @apply bg-white border border-gray-100 rounded-xl p-3;
+    @apply bg-white border border-border-soft rounded-2xl shadow-sm p-3;
   }
 
   /* ─── Buttons ────────────────────────────────────────────────────────────── */
   .btn-primary {
     @apply inline-flex items-center gap-2 bg-auchu-500 hover:bg-auchu-600 active:bg-auchu-700
-           text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer
-           min-h-[44px];
+           text-white text-sm font-medium px-4 py-2 rounded-full transition-colors cursor-pointer
+           min-h-[44px] shadow-sm;
   }
 
   .btn-secondary {
     @apply inline-flex items-center gap-2 bg-white hover:bg-gray-50 active:bg-gray-100
-           text-gray-700 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200
+           text-gray-700 text-sm font-medium px-4 py-2 rounded-full border border-gray-200
            transition-colors cursor-pointer min-h-[44px];
   }
 
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 text-gray-500 hover:text-gray-700
-           hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors
+           hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-full transition-colors
            cursor-pointer min-h-[44px];
   }
 
-  /* ─── Badges ─────────────────────────────────────────────────────────────── */
+  /* ─── Badges (statuts — pilule) ──────────────────────────────────────────── */
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium;
   }
 
-  .badge-blue   { @apply bg-blue-50   text-blue-700;  }
+  .badge-blue   { @apply bg-auchu-50  text-auchu-700; }
   .badge-green  { @apply bg-green-50  text-green-700; }
   .badge-amber  { @apply bg-amber-50  text-amber-700; }
   .badge-gray   { @apply bg-gray-100  text-gray-600;  }
   .badge-red    { @apply bg-red-50    text-red-700;   }
   .badge-purple { @apply bg-purple-50 text-purple-700; }
+
+  /* ─── Onglets / filtres (pilule) ─────────────────────────────────────────── */
+  .tab-pill {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium
+           border border-transparent text-gray-500 hover:text-ink hover:bg-gray-100
+           transition-colors cursor-pointer;
+  }
+
+  .tab-pill.active {
+    @apply bg-ink text-white hover:bg-ink hover:text-white;
+  }
+
+  .tab-pill.active-blue {
+    @apply bg-auchu-500 text-white hover:bg-auchu-500 hover:text-white;
+  }
 
   /* ─── Labels (form) ──────────────────────────────────────────────────────── */
   .label {
@@ -50,7 +93,7 @@
 
   /* ─── Table ──────────────────────────────────────────────────────────────── */
   .table-wrapper {
-    @apply border border-gray-100 rounded-xl overflow-x-auto;
+    @apply border border-border-soft rounded-2xl overflow-x-auto bg-white shadow-sm;
   }
 
   .table {
@@ -58,15 +101,15 @@
   }
 
   .table thead tr {
-    @apply bg-gray-50 border-b border-gray-200;
+    @apply bg-gray-50/70 border-b border-border-soft;
   }
 
   .table th {
-    @apply text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-4 py-3;
+    @apply text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-4 py-3.5;
   }
 
   .table td {
-    @apply px-4 py-3 text-gray-600 border-b border-gray-100;
+    @apply px-4 py-4 text-gray-600 border-b border-gray-50;
   }
 
   .table tbody tr:last-child td {
@@ -74,7 +117,7 @@
   }
 
   .table tbody tr:hover {
-    @apply bg-gray-50/60;
+    @apply bg-auchu-50/40;
   }
 
   /* ─── Sidebar (fond noir) ────────────────────────────────────────────────── */
@@ -89,19 +132,19 @@
 
   /* ─── Form inputs ─────────────────────────────────────────────────────────── */
   .input {
-    @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+    @apply w-full border border-gray-200 rounded-xl px-3 py-2 text-sm
            focus:outline-none focus:ring-2 focus:ring-auchu-500 focus:border-transparent
            placeholder:text-gray-400 min-h-[44px];
   }
 
   .select {
-    @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white
+    @apply w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white
            focus:outline-none focus:ring-2 focus:ring-auchu-500 focus:border-transparent
            min-h-[44px];
   }
 
   .textarea {
-    @apply w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+    @apply w-full border border-gray-200 rounded-xl px-3 py-2 text-sm
            focus:outline-none focus:ring-2 focus:ring-auchu-500 focus:border-transparent
            placeholder:text-gray-400 resize-none;
   }

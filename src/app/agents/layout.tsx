@@ -14,7 +14,7 @@ export default async function AgentsLayout({ children }: { children: React.React
         agencyName={user.user_metadata?.agency_name}
         userName={user.user_metadata?.full_name}
       />
-      <main className="flex-1 overflow-auto" style={{ marginLeft: 'var(--sidebar-width, 240px)' }}>
+      <main className="flex-1 overflow-auto" style={{ marginLeft: 'var(--sidebar-width, 108px)' }}>
         <div className="max-w-4xl mx-auto px-6 py-8">
           {children}
         </div>

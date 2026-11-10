@@ -46,7 +46,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           userName={ctx?.userName || user.email || ''}
           role={ctx?.role || 'owner'}
         />
-        <main className="flex-1 overflow-auto md:ml-[240px]">
+        <main className="flex-1 overflow-auto md:ml-[108px]">
           <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8 pb-24 md:pb-8">
             <ActiveTimerBanner />
             {children}

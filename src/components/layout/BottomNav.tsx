@@ -35,18 +35,18 @@ export default function BottomNav({ role = 'owner' }: Props) {
 
   return (
     <>
-      {/* Bottom bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 flex md:hidden bg-white border-t border-gray-100 safe-area-inset-bottom">
+      {/* Bottom bar — pilule noire flottante, même esprit que la sidebar desktop */}
+      <nav className="fixed bottom-3 left-3 right-3 z-40 flex md:hidden bg-ink rounded-3xl shadow-xl px-1.5 py-1.5 safe-area-inset-bottom">
         {barItems.map(({ href, icon: Icon, label }) => (
           <Link
             key={href}
             href={href}
             className={cn(
-              'flex-1 flex flex-col items-center justify-center gap-1 py-2 min-h-[56px] text-[10px] font-medium transition-colors',
-              isActive(href) ? 'text-auchu-600' : 'text-gray-400'
+              'flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[52px] rounded-2xl text-[10px] font-medium transition-colors',
+              isActive(href) ? 'bg-auchu-500 text-white' : 'text-gray-400'
             )}
           >
-            <Icon className={cn('w-5 h-5', isActive(href) ? 'text-auchu-600' : 'text-gray-400')} />
+            <Icon className="w-5 h-5" />
             <span className="text-center leading-tight px-0.5">{label}</span>
           </Link>
         ))}
@@ -56,8 +56,8 @@ export default function BottomNav({ role = 'owner' }: Props) {
           <button
             onClick={() => setOpen(true)}
             className={cn(
-              'flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors min-h-[56px]',
-              open ? 'text-auchu-600' : 'text-gray-400'
+              'flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors min-h-[52px] rounded-2xl',
+              open ? 'bg-auchu-500 text-white' : 'text-gray-400'
             )}
           >
             <MoreHorizontal className="w-5 h-5" />
