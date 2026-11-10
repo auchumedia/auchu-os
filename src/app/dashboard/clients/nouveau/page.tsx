@@ -4,7 +4,7 @@ import { redirect }         from 'next/navigation'
 import NouveauClientForm    from './NouveauClientForm'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Nouveau client' }
+export const metadata = { title: 'Nouveau contact' }
 
 export default async function NouveauClientPage() {
   const ctx = await getOrgContext()

@@ -139,9 +139,40 @@ export function getInitials(name: string) {
     .slice(0, 2)
 }
 
+// Couleur de fond du placeholder (logo manquant) générée depuis le nom —
+// stable pour un même contact (pas de random), simple hash de caractères.
+const AVATAR_COLORS = [
+  'bg-rose-100 text-rose-700', 'bg-orange-100 text-orange-700', 'bg-amber-100 text-amber-700',
+  'bg-lime-100 text-lime-700', 'bg-teal-100 text-teal-700', 'bg-cyan-100 text-cyan-700',
+  'bg-blue-100 text-blue-700', 'bg-gray-200 text-gray-700', 'bg-violet-100 text-violet-700',
+  'bg-fuchsia-100 text-fuchsia-700',
+]
+
+export function avatarColorFromName(name: string) {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length]
+}
+
 // ─── ID generation ────────────────────────────────────────────────────────────
 export function generateId() {
   return Math.random().toString(36).substring(2, 11)
+}
+
+// ─── Livrables mensuels ─────────────────────────────────────────────────────────
+// Objectif du mois = somme des livrables courts/longs définis sur le contact —
+// même calcul que la Vue d'ensemble de la fiche contact (jamais un champ séparé).
+export function deliverablesTarget(client: { deliverables_short_form?: number | null; deliverables_long_form?: number | null }) {
+  return (client.deliverables_short_form ?? 0) + (client.deliverables_long_form ?? 0)
+}
+
+// [startISO, endISO) du mois contenant `date` — utilisé pour filtrer les
+// contenus dont month_target tombe "ce mois-ci" (liste Contacts, tableau de
+// bord "Livrables du mois").
+export function monthBounds(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1)
+  const end   = new Date(date.getFullYear(), date.getMonth() + 1, 1)
+  return { startISO: start.toISOString().split('T')[0], endISO: end.toISOString().split('T')[0] }
 }
 
 // ─── Durée (time tracking) ────────────────────────────────────────────────────

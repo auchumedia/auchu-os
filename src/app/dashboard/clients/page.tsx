@@ -1,18 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
 import { canCreateClients } from '@/lib/roles'
+import { deliverablesTarget, monthBounds } from '@/lib/utils'
 import { Plus, Users } from 'lucide-react'
 import Link from 'next/link'
+import ContactsTable, { type ContactRow } from './ContactsTable'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Clients' }
-
-// Total de contenus/mois — calculé depuis les livrables définis dans la Vue
-// d'ensemble (short form + long form), jamais depuis un champ séparé.
-function deliverablesTotal(client: any): number {
-  return (client.deliverables_short_form ?? 0) +
-    (client.deliverables_long_form ?? 0)
-}
+export const metadata = { title: 'Contacts' }
 
 export default async function ClientsPage() {
   const supabase = await createClient()
@@ -31,21 +26,81 @@ export default async function ClientsPage() {
     console.error('[clients] Supabase error:', error.message, '| code:', error.code, '| user:', ctx?.userId)
   }
 
-  const isTeamScoped   = !!ctx && !ctx.isOwner && ctx.role !== 'director'
-  const notYetOnTeam   = isTeamScoped && !ctx?.teamId
-  const canCreate      = canCreateClients(ctx?.role ?? '')
+  const isTeamScoped = !!ctx && !ctx.isOwner && ctx.role !== 'director'
+  const notYetOnTeam = isTeamScoped && !ctx?.teamId
+  const canCreate     = canCreateClients(ctx?.role ?? '')
+
+  const clientIds = (clients ?? []).map(c => c.id)
+  const now = new Date()
+  const { startISO, endISO } = monthBounds(now)
+
+  // ── Contenus du mois (X) + dernier contenu par contact ─────────────────────
+  // month_target = mois ciblé par le livrable, indépendant de quand la ligne a
+  // été modifiée — c'est le champ utilisé partout ailleurs (ProjetsTab,
+  // portail) pour "le contenu du mois".
+  const deliveredThisMonth = new Map<string, number>()
+  const lastContentByClient = new Map<string, { title: string; date: string }>()
+
+  if (clientIds.length > 0) {
+    const { data: pieces } = await supabase
+      .from('content_pieces')
+      .select('client_id, title, status, month_target, updated_at')
+      .eq('user_id', ctx?.dataOwnerId ?? '')
+      .in('client_id', clientIds)
+      .order('updated_at', { ascending: false })
+
+    for (const p of pieces ?? []) {
+      if (!p.client_id) continue
+      if (!lastContentByClient.has(p.client_id)) {
+        lastContentByClient.set(p.client_id, { title: p.title, date: p.updated_at })
+      }
+      if (
+        (p.status === 'filme' || p.status === 'publie') &&
+        p.month_target && p.month_target >= startISO && p.month_target < endISO
+      ) {
+        deliveredThisMonth.set(p.client_id, (deliveredThisMonth.get(p.client_id) ?? 0) + 1)
+      }
+    }
+  }
+
+  const rows: ContactRow[] = (clients ?? []).map(c => ({
+    id: c.id,
+    name: c.name,
+    company: c.company,
+    email: c.email,
+    phone: c.phone,
+    logo_url: c.logo_url,
+    status: c.status,
+    target: deliverablesTarget(c),
+    delivered: deliveredThisMonth.get(c.id) ?? 0,
+    lastContent: lastContentByClient.get(c.id) ?? null,
+    createdAt: c.created_at,
+    portalUrl: c.portal_enabled && c.portal_token ? `/portail/${c.portal_token}` : null,
+  }))
+
+  const totalContacts    = rows.length
+  const actifsCount      = rows.filter(r => r.status === 'actif').length
+  const livrablesDuMois  = rows.filter(r => r.status === 'actif').reduce((s, r) => s + r.target, 0)
+  const livresDuMois     = rows.reduce((s, r) => s + r.delivered, 0)
+
+  const stats = [
+    { label: 'Total de contacts',          value: totalContacts },
+    { label: 'Actifs',                     value: actifsCount },
+    { label: 'Livrables du mois (total)',  value: livrablesDuMois },
+    { label: 'Filmés / publiés ce mois',   value: livresDuMois },
+  ]
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="page-title">Clients</h1>
-          <p className="page-subtitle">{clients?.length ?? 0} clients enregistrés</p>
+          <h1 className="page-title">Contacts</h1>
+          <p className="page-subtitle">{totalContacts} contact{totalContacts !== 1 ? 's' : ''} enregistré{totalContacts !== 1 ? 's' : ''}</p>
         </div>
         {canCreate && (
           <Link href="/dashboard/clients/nouveau" className="btn-primary">
             <Plus className="w-4 h-4" />
-            Nouveau client
+            Nouveau contact
           </Link>
         )}
       </div>
@@ -62,115 +117,24 @@ export default async function ClientsPage() {
         <div className="card text-center py-16">
           <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <h3 className="text-sm font-medium text-gray-700 mb-1">
-            {notYetOnTeam ? 'Pas encore assigné à une équipe' : 'Aucun client'}
+            {notYetOnTeam ? 'Pas encore assigné à une équipe' : 'Aucun contact'}
           </h3>
           <p className="text-xs text-gray-400 mb-4">
             {notYetOnTeam
-              ? 'Un owner ou director doit vous placer dans une équipe pour voir des clients.'
+              ? 'Un owner ou director doit vous placer dans une équipe pour voir des contacts.'
               : !canCreate
-                ? 'Aucun client n\'est encore assigné à votre équipe.'
-                : 'Ajoute ton premier client pour commencer'}
+                ? 'Aucun contact n\'est encore assigné à votre équipe.'
+                : 'Ajoute ton premier contact pour commencer'}
           </p>
           {canCreate && (
             <Link href="/dashboard/clients/nouveau" className="btn-primary inline-flex">
               <Plus className="w-4 h-4" />
-              Ajouter un client
+              Ajouter un contact
             </Link>
           )}
         </div>
       ) : (
-        <>
-          {/* Mobile : cartes empilées, chaque carte entièrement cliquable */}
-          <div className="md:hidden space-y-2">
-            {(clients ?? []).map((client: any) => (
-              <Link
-                key={client.id}
-                href={`/dashboard/clients/${client.id}`}
-                className="card block p-4 active:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900 truncate">{client.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{client.email}</p>
-                  </div>
-                  <span className={`badge flex-shrink-0 ${
-                    client.status === 'actif' ? 'badge-green' :
-                    client.status === 'prospect' ? 'badge-blue' : 'badge-gray'
-                  }`}>
-                    {client.status === 'actif' ? 'Actif' :
-                     client.status === 'prospect' ? 'Prospect' : 'Inactif'}
-                  </span>
-                </div>
-                {(client.platforms ?? []).length > 0 && (
-                  <div className="flex gap-1 flex-wrap mt-2">
-                    {client.platforms.map((p: string) => (
-                      <span key={p} className="badge badge-gray text-xs capitalize">{p}</span>
-                    ))}
-                  </div>
-                )}
-                <p className="text-sm text-gray-700 mt-2">
-                  {deliverablesTotal(client) > 0
-                    ? `${deliverablesTotal(client)} contenu${deliverablesTotal(client) > 1 ? 's' : ''} / mois`
-                    : 'Aucun objectif défini'}
-                </p>
-              </Link>
-            ))}
-          </div>
-
-          {/* Desktop : tableau */}
-          <div className="table-wrapper hidden md:block">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Client</th>
-                  <th>Statut</th>
-                  <th>Plateformes</th>
-                  <th>Contenus / mois</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(clients ?? []).map((client: any) => (
-                  <tr key={client.id}>
-                    <td>
-                      <div>
-                        <p className="font-medium text-gray-900">{client.name}</p>
-                        <p className="text-xs text-gray-400">{client.email}</p>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${
-                        client.status === 'actif' ? 'badge-green' :
-                        client.status === 'prospect' ? 'badge-blue' : 'badge-gray'
-                      }`}>
-                        {client.status === 'actif' ? 'Actif' :
-                         client.status === 'prospect' ? 'Prospect' : 'Inactif'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="flex gap-1 flex-wrap">
-                        {(client.platforms || []).map((p: string) => (
-                          <span key={p} className="badge badge-gray text-xs capitalize">{p}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="text-gray-700">
-                      {deliverablesTotal(client) > 0 ? deliverablesTotal(client) : '—'}
-                    </td>
-                    <td>
-                      <Link
-                        href={`/dashboard/clients/${client.id}`}
-                        className="text-xs text-auchu-600 hover:underline"
-                      >
-                        Voir →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <ContactsTable rows={rows} stats={stats} />
       )}
     </div>
   )

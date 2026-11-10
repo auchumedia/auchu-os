@@ -31,7 +31,7 @@ export async function POST(
   }
   if (!existing) {
     console.error('[portal POST] client introuvable —', 'client_id:', params.id, '| user:', ctx.userId, '| role:', ctx.role, '| dataOwnerId:', ctx.dataOwnerId)
-    return NextResponse.json({ error: 'Client introuvable' }, { status: 404 })
+    return NextResponse.json({ error: 'Contact introuvable' }, { status: 404 })
   }
 
   // Reuse existing token or generate a new one

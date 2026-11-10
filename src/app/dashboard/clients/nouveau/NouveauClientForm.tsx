@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 const STATUTS = [
   { value: 'prospect', label: 'Prospect',  description: 'En cours de conversion', color: 'blue'  },
-  { value: 'actif',    label: 'Actif',     description: 'Client actuel',           color: 'green' },
+  { value: 'actif',    label: 'Actif',     description: 'Contact actuel',          color: 'green' },
   { value: 'inactif',  label: 'Inactif',   description: 'Relation en pause',       color: 'gray'  },
 ] as const
 
@@ -61,7 +61,7 @@ export default function NouveauClientForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name.trim()) { setError('Le nom du client est requis.'); return }
+    if (!form.name.trim()) { setError('Le nom du contact est requis.'); return }
     setError(null)
     setSaving(true)
 
@@ -94,8 +94,8 @@ export default function NouveauClientForm() {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="page-title">Nouveau client</h1>
-          <p className="page-subtitle">Ajoute un client à ton portefeuille</p>
+          <h1 className="page-title">Nouveau contact</h1>
+          <p className="page-subtitle">Ajoute un contact à ton portefeuille</p>
         </div>
       </div>
 
@@ -116,7 +116,7 @@ export default function NouveauClientForm() {
                 type="text"
                 value={form.name}
                 onChange={e => set('name', e.target.value)}
-                placeholder="Nom du client ou de l'agence"
+                placeholder="Nom du contact ou de l'agence"
                 className="input"
                 required
                 autoFocus
@@ -243,7 +243,7 @@ export default function NouveauClientForm() {
         <section className="card space-y-4">
           <div>
             <h2 className="text-sm font-semibold text-gray-900">Plateformes actives</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Sélectionne les plateformes sur lesquelles ce client est présent</p>
+            <p className="text-xs text-gray-400 mt-0.5">Sélectionne les plateformes sur lesquelles ce contact est présent</p>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
@@ -330,7 +330,7 @@ export default function NouveauClientForm() {
             {saving
               ? <Loader2 className="w-4 h-4 animate-spin" />
               : <User className="w-4 h-4" />}
-            {saving ? 'Enregistrement...' : 'Créer le client'}
+            {saving ? 'Enregistrement...' : 'Créer le contact'}
           </button>
         </div>
       </form>

@@ -27,7 +27,7 @@ export function canManageRole(actor: string, target: string): boolean {
 export const ROLE_LABELS: Record<OrgRole, { label: string; cls: string; desc: string }> = {
   owner:    { label: 'Propriétaire', cls: 'bg-auchu-100  text-auchu-700',  desc: 'Accès complet, facturation, suppression de comptes' },
   director: { label: 'Directeur',    cls: 'bg-purple-100 text-purple-700', desc: 'Vue globale de l\'agence, gère les rôles en dessous' },
-  stratege: { label: 'Stratège',     cls: 'bg-orange-100 text-orange-700', desc: 'Clients assignés et membres de son équipe' },
+  stratege: { label: 'Stratège',     cls: 'bg-orange-100 text-orange-700', desc: 'Contacts assignés et membres de son équipe' },
   monteur:  { label: 'Monteur',      cls: 'bg-green-100  text-green-700',  desc: 'Projets vidéo assignés et membres de son équipe' },
 }
 
@@ -63,4 +63,14 @@ const TASK_CREATOR_ROLES: OrgRole[] = ['owner', 'director']
 
 export function canCreateTasks(role: string): boolean {
   return TASK_CREATOR_ROLES.includes(role as OrgRole)
+}
+
+// Qui voit/gère les finances (revenus, dépenses) — owner/director
+// uniquement. Mirroir des policies RLS "revenues/expenses: director *"
+// (supabase/migrations/047_finance_entries.sql) ; stratege/monteur n'ont
+// aucun accès, ni API ni UI.
+const FINANCE_ROLES: OrgRole[] = ['owner', 'director']
+
+export function canViewFinance(role: string): boolean {
+  return FINANCE_ROLES.includes(role as OrgRole)
 }

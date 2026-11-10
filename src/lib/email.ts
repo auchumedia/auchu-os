@@ -30,7 +30,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'Aucun accès à la facturation',
   ],
   stratege: [
-    'Accès aux clients assignés à son équipe',
+    'Accès aux contacts assignés à son équipe',
     'Gère le calendrier de contenu',
     'Consulte les membres de son équipe',
   ],

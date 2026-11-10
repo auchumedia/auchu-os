@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getInitials, cn } from '@/lib/utils'
+import { getInitials, avatarColorFromName, cn } from '@/lib/utils'
 
 export interface ClientCard {
   id: string
@@ -15,32 +15,17 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   inactif:  { label: 'Inactif',  cls: 'bg-gray-100  text-gray-500'  },
 }
 
-// Couleur de fond du placeholder générée depuis le nom — stable pour un
-// même client (pas de random), simple hash de caractères.
-const PLACEHOLDER_COLORS = [
-  'bg-rose-100 text-rose-700', 'bg-orange-100 text-orange-700', 'bg-amber-100 text-amber-700',
-  'bg-lime-100 text-lime-700', 'bg-teal-100 text-teal-700', 'bg-cyan-100 text-cyan-700',
-  'bg-blue-100 text-blue-700', 'bg-gray-200 text-gray-700', 'bg-violet-100 text-violet-700',
-  'bg-fuchsia-100 text-fuchsia-700',
-]
-
-function colorFromName(name: string) {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
-  return PLACEHOLDER_COLORS[hash % PLACEHOLDER_COLORS.length]
-}
-
 export default function ClientGallery({ title, clients }: { title: string; clients: ClientCard[] }) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-4">
         <h2 className="font-semibold text-gray-900">{title}</h2>
-        <span className="text-xs text-gray-400 ml-auto">{clients.length} client{clients.length !== 1 ? 's' : ''}</span>
+        <span className="text-xs text-gray-400 ml-auto">{clients.length} contact{clients.length !== 1 ? 's' : ''}</span>
       </div>
 
       {clients.length === 0 ? (
         <div className="card text-center py-10">
-          <p className="text-sm text-gray-400">Aucun client assigné pour l'instant</p>
+          <p className="text-sm text-gray-400">Aucun contact assigné pour l'instant</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -61,7 +46,7 @@ export default function ClientGallery({ title, clients }: { title: string; clien
                   />
                 ) : (
                   <div
-                    className={cn('w-full flex items-center justify-center text-3xl font-semibold', colorFromName(c.name))}
+                    className={cn('w-full flex items-center justify-center text-3xl font-semibold', avatarColorFromName(c.name))}
                     style={{ height: 180 }}
                   >
                     {getInitials(c.name)}

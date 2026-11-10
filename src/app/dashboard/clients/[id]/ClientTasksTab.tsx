@@ -132,7 +132,7 @@ export default function ClientTasksTab({ clientId, initialTasks, teamMembers, ca
       {tasks.length === 0 ? (
         <div className="card text-center py-14">
           <ListTodo className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-          <p className="text-sm text-gray-400">Aucune tâche liée à ce client pour l'instant.</p>
+          <p className="text-sm text-gray-400">Aucune tâche liée à ce contact pour l'instant.</p>
         </div>
       ) : (
         <div className="space-y-6">

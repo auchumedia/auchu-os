@@ -502,7 +502,7 @@ export default function ClientDetail({
         <div className="px-6 pb-3">
           <Link href="/dashboard/clients" className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Retour aux clients
+            Retour aux contacts
           </Link>
         </div>
 

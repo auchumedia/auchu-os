@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation'
 import ClientDetail from './ClientDetail'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Fiche client' }
+export const metadata = { title: 'Fiche contact' }
 
 export default async function ClientPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()

@@ -7,7 +7,8 @@ export type NavItem = { href: string; icon: React.ElementType; label: string }
 export type NavSection = { key: 'principal' | 'equipe' | 'compte'; label: string; items: NavItem[] }
 
 // Structure exacte requise partout (sidebar desktop + bottom nav mobile) :
-//   Principal : Tableau de bord, Tâches, Clients
+//   Principal : Tableau de bord, Tâches, Contacts (route /dashboard/clients —
+//               renommé "Contacts" à l'affichage seulement, table "clients" inchangée)
 //   ("Mon espace" a été fusionné dans le Tableau de bord — plus d'entrée dédiée.)
 //   Équipe    : Équipe (les 4 rôles — owner/director en gestion complète,
 //               stratege/monteur en lecture seule),
@@ -20,7 +21,7 @@ export function buildNavSections(role: OrgRole): NavSection[] {
   const principal: NavItem[] = [
     { href: '/dashboard',         icon: LayoutDashboard, label: 'Tableau de bord' },
     { href: '/dashboard/taches',  icon: ListTodo,         label: 'Tâches'          },
-    { href: '/dashboard/clients', icon: Users,            label: 'Clients'         },
+    { href: '/dashboard/clients', icon: Users,            label: 'Contacts'        },
   ]
 
   const equipe: NavItem[] = [

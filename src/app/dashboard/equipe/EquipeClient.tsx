@@ -177,7 +177,7 @@ export default function EquipeClient({
   }
 
   const deleteTeam = async (teamId: string) => {
-    if (!confirm('Supprimer cette équipe ? Ses membres et clients redeviendront non assignés.')) return
+    if (!confirm('Supprimer cette équipe ? Ses membres et contacts redeviendront non assignés.')) return
     setLoading(`delete-team-${teamId}`)
     const res = await fetch(`/api/teams/${teamId}`, { method: 'DELETE' })
     setLoading(null)
@@ -417,12 +417,12 @@ export default function EquipeClient({
             {/* Clients */}
             <div className="px-5 py-4 border-t border-gray-100">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2.5">
-                Clients ({team.clients.length})
+                Contacts ({team.clients.length})
               </p>
               <div className="flex flex-wrap gap-2">
                 {team.clients.map(tc => (
                   <span key={tc.id} className="inline-flex items-center gap-1.5 text-xs font-medium bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full">
-                    {tc.client?.name ?? 'Client'}
+                    {tc.client?.name ?? 'Contact'}
                     {canManageOrgStructure && (
                       <button onClick={() => unassignClient(team.id, tc.client_id)} className="hover:text-red-500">
                         <X className="w-3 h-3" />
@@ -430,7 +430,7 @@ export default function EquipeClient({
                     )}
                   </span>
                 ))}
-                {team.clients.length === 0 && <span className="text-xs text-gray-400">Aucun client assigné</span>}
+                {team.clients.length === 0 && <span className="text-xs text-gray-400">Aucun contact assigné</span>}
               </div>
               {canManageOrgStructure && unassignedClients.length > 0 && (
                 <select
@@ -438,7 +438,7 @@ export default function EquipeClient({
                   onChange={e => e.target.value && assignClient(team.id, e.target.value)}
                   className="mt-3 text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600"
                 >
-                  <option value="">+ Assigner un client…</option>
+                  <option value="">+ Assigner un contact…</option>
                   {unassignedClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               )}
@@ -478,7 +478,7 @@ export default function EquipeClient({
           )}
           {unassignedClients.length > 0 && (
             <p className="text-xs text-gray-400">
-              {unassignedClients.length} client{unassignedClients.length !== 1 ? 's' : ''} sans équipe — assignez-les depuis une équipe ci-dessus.
+              {unassignedClients.length} contact{unassignedClients.length !== 1 ? 's' : ''} sans équipe — assignez-les depuis une équipe ci-dessus.
             </p>
           )}
         </div>

@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const ctx = await getOrgContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!canCreateClients(ctx.role)) {
-    return NextResponse.json({ error: 'Accès refusé — seuls owner et director peuvent créer un client' }, { status: 403 })
+    return NextResponse.json({ error: 'Accès refusé — seuls owner et director peuvent créer un contact' }, { status: 403 })
   }
 
   const body = await req.json()

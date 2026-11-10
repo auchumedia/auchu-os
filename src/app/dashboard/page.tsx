@@ -4,11 +4,12 @@ import { redirect }      from 'next/navigation'
 import Link              from 'next/link'
 import {
   ListChecks, AlertTriangle,
-  CalendarDays, Clock, Film, Send, Wallet, Video,
+  CalendarDays, Clock, Film, Send, Video, Target,
 } from 'lucide-react'
 import ClientGallery, { type ClientCard } from '@/components/dashboard/ClientGallery'
 import TasksTodayList from './TasksTodayList'
-import { cn, formatDate, getInitials, PRIORITY_LABELS } from '@/lib/utils'
+import FinanceSection from './FinanceSection'
+import { cn, formatDate, getInitials, avatarColorFromName, deliverablesTarget, monthBounds, PRIORITY_LABELS } from '@/lib/utils'
 import type { TaskPriority } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -80,6 +81,58 @@ async function fetchUpcomingEvents(supabase: SupabaseClient, ownerId: string, cl
 
   const { data } = await query
   return (data ?? []) as { id: string; type: string; title: string; date: string; client: { name: string } | { name: string }[] | null }[]
+}
+
+// Progression des livrables du mois, par contact actif — X = contenus
+// filmés/publiés dont month_target tombe ce mois-ci, Y = objectif
+// (deliverables_short_form + deliverables_long_form). clientIds === null :
+// org entière (owner/director) ; sinon scopé à l'équipe (même convention que
+// fetchClientCards/fetchUpcomingEvents).
+async function fetchDeliverablesProgress(supabase: SupabaseClient, ownerId: string, clientIds: string[] | null, now: Date) {
+  let query = supabase
+    .from('clients')
+    .select('id, name, logo_url, deliverables_short_form, deliverables_long_form')
+    .eq('user_id', ownerId)
+    .eq('status', 'actif')
+    .order('name')
+  if (clientIds) query = query.in('id', clientIds.length > 0 ? clientIds : ['00000000-0000-0000-0000-000000000000'])
+
+  const { data: clients } = await query
+  const activeClients = (clients ?? []).filter(c => deliverablesTarget(c) > 0)
+  if (activeClients.length === 0) return []
+
+  const { startISO, endISO } = monthBounds(now)
+  const ids = activeClients.map(c => c.id)
+  const { data: pieces } = await supabase
+    .from('content_pieces')
+    .select('client_id')
+    .eq('user_id', ownerId)
+    .in('client_id', ids)
+    .in('status', ['filme', 'publie'])
+    .gte('month_target', startISO)
+    .lt('month_target', endISO)
+
+  const delivered = new Map<string, number>()
+  for (const p of pieces ?? []) {
+    if (p.client_id) delivered.set(p.client_id, (delivered.get(p.client_id) ?? 0) + 1)
+  }
+
+  const dayOfMonth   = now.getDate()
+  const daysInMonth  = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const paceExpected = dayOfMonth / daysInMonth
+
+  return activeClients.map(c => {
+    const target = deliverablesTarget(c)
+    const done   = delivered.get(c.id) ?? 0
+    const complete = done >= target
+    const expected  = Math.ceil(target * paceExpected)
+    const behind    = !complete && done < expected
+    return {
+      id: c.id, name: c.name, logo_url: c.logo_url,
+      target, delivered: done, remaining: Math.max(0, target - done),
+      status: complete ? 'complete' as const : behind ? 'behind' as const : 'ontrack' as const,
+    }
+  })
 }
 
 function buildWeekDays(now: Date, events: { date: string }[]) {
@@ -214,6 +267,55 @@ function UpcomingColumn({ now, events }: { now: Date; events: Awaited<ReturnType
   )
 }
 
+// ─── Carte "Livrables du mois" — une ligne par contact actif, partagée entre
+//     les deux vues (données scopées par rôle via fetchDeliverablesProgress) ──
+function DeliverablesCard({ rows }: { rows: Awaited<ReturnType<typeof fetchDeliverablesProgress>> }) {
+  if (rows.length === 0) return null
+
+  return (
+    <section>
+      <div className="flex items-center gap-2 mb-4">
+        <Target className="w-4 h-4 text-auchu-500" />
+        <h2 className="font-semibold text-gray-900">Livrables du mois</h2>
+      </div>
+      <div className="bg-white rounded-2xl border border-border-soft shadow-sm divide-y divide-gray-50">
+        {rows.map(r => {
+          const pct = r.target > 0 ? Math.min(100, Math.round((r.delivered / r.target) * 100)) : 0
+          const barColor =
+            r.status === 'complete' ? 'bg-green-500' :
+            r.status === 'behind'   ? 'bg-amber-500' : 'bg-auchu-500'
+          const textColor =
+            r.status === 'complete' ? 'text-green-600' :
+            r.status === 'behind'   ? 'text-amber-600' : 'text-gray-500'
+          return (
+            <div key={r.id} className="flex items-center gap-3 px-4 py-3.5">
+              {r.logo_url ? (
+                <img src={r.logo_url} alt={r.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+              ) : (
+                <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0', avatarColorFromName(r.name))}>
+                  {getInitials(r.name)}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-sm font-medium text-gray-900 truncate">{r.name}</p>
+                  <span className="text-xs text-gray-400 flex-shrink-0">{r.delivered} / {r.target}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                  <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+              <span className={cn('text-xs font-medium flex-shrink-0 w-24 text-right', textColor)}>
+                {r.status === 'complete' ? 'Complété' : `Reste ${r.remaining} à produire`}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 // ─── Vue owner / director ────────────────────────────────────────────────────
 
 async function OrgDashboard(
@@ -234,6 +336,7 @@ async function OrgDashboard(
     clientCards, urgentTasksRes,
     filmedCountRes, publishedCountRes,
     orgTasksForHoursRes, upcomingEvents,
+    deliverables,
   ] = await Promise.all([
     supabase.from('clients').select('id, status').eq('user_id', ownerId),
     supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('user_id', ownerId).eq('status', 'en_cours'),
@@ -252,6 +355,7 @@ async function OrgDashboard(
       .gte('published_at', monthStartISO).lt('published_at', monthEndISO),
     supabase.from('tasks').select('id').eq('user_id', ownerId),
     fetchUpcomingEvents(supabase, ownerId, null, todayISO),
+    fetchDeliverablesProgress(supabase, ownerId, null, now),
   ])
 
   const clientsActifs = (clientsRes.data ?? []).filter(c => c.status === 'actif').length
@@ -292,7 +396,7 @@ async function OrgDashboard(
   return (
     <>
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {stats.map(s => {
           const Icon = s.icon
           return (
@@ -305,15 +409,12 @@ async function OrgDashboard(
             </div>
           )
         })}
-        {/* Emplacement réservé — revenus & factures QuickBooks (à venir) */}
-        <div className="rounded-2xl border border-dashed border-gray-200 p-5 flex flex-col items-center justify-center text-center gap-2">
-          <Wallet className="w-5 h-5 text-gray-300" />
-          <p className="text-[11px] text-gray-400 leading-tight">Revenus &amp; factures<br />bientôt disponibles</p>
-        </div>
       </div>
 
       {/* Galerie clients */}
-      <ClientGallery title="Clients actifs" clients={clientCards} />
+      <ClientGallery title="Contacts actifs" clients={clientCards} />
+
+      <DeliverablesCard rows={deliverables} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Mes tâches (urgentes, toute l'org) */}
@@ -360,6 +461,13 @@ async function OrgDashboard(
 
         <UpcomingColumn now={now} events={upcomingEvents} />
       </div>
+
+      {/* Finances — owner/director uniquement. OrgDashboard() n'est appelé
+          que pour ces deux rôles (cf. isOrgView dans DashboardPage), et
+          FinanceSection re-vérifie elle-même via l'API (403 sinon) : la
+          donnée financière n'est jamais récupérée ni rendue pour les autres
+          rôles, ni côté serveur ni côté client. */}
+      {(ctx.isOwner || ctx.isDirector) && <FinanceSection />}
     </>
   )
 }
@@ -380,7 +488,7 @@ async function TeamDashboard(
     teamClientIds = (tc ?? []).map(c => c.client_id)
   }
 
-  const [clientCards, myTasksRes, upcomingEvents] = await Promise.all([
+  const [clientCards, myTasksRes, upcomingEvents, deliverables] = await Promise.all([
     fetchClientCards(supabase, ownerId, teamClientIds),
     supabase.from('tasks')
       .select('id, title, status, priority, deadline, client:clients(name)')
@@ -389,6 +497,7 @@ async function TeamDashboard(
       .not('status', 'in', '(termine,approuve)')
       .order('deadline', { ascending: true, nullsFirst: false }),
     fetchUpcomingEvents(supabase, ownerId, teamClientIds, todayISO),
+    fetchDeliverablesProgress(supabase, ownerId, teamClientIds, now),
   ])
 
   const myTasks = ((myTasksRes.data ?? []) as any[])
@@ -406,9 +515,11 @@ async function TeamDashboard(
         <TasksTodayList initialTasks={myTasks as any} />
       </section>
 
+      <DeliverablesCard rows={deliverables} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <ClientGallery title="Mes clients" clients={clientCards} />
+          <ClientGallery title="Mes contacts" clients={clientCards} />
         </div>
 
         <UpcomingColumn now={now} events={upcomingEvents} />

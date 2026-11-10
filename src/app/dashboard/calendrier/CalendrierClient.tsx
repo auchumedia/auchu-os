@@ -441,7 +441,7 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
                   value={formTitle}
                   onChange={e => setFormTitle(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                  placeholder="Ex : Tournage client X"
+                  placeholder="Ex : Tournage contact X"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-auchu-400"
                 />
               </div>
@@ -473,13 +473,13 @@ export default function CalendrierClient({ userId, canManageTeam, initialClients
               {/* Client */}
               {initialClients.length > 0 && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Client (optionnel)</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Contact (optionnel)</label>
                   <select
                     value={formClientId}
                     onChange={e => setFormClientId(e.target.value)}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-auchu-400"
                   >
-                    <option value="">Aucun client</option>
+                    <option value="">Aucun contact</option>
                     {initialClients.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}

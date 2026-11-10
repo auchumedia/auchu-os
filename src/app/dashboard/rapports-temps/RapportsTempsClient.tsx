@@ -139,12 +139,12 @@ export default function RapportsTempsClient({ entries, members, clients }: Props
       ['Membre', 'Heures'],
       ...byMember.map(r => [r.name, secondsToHours(r.seconds)]),
       [],
-      ['Temps par client'],
-      ['Client', 'Heures'],
+      ['Temps par contact'],
+      ['Contact', 'Heures'],
       ...byClient.map(r => [r.name, secondsToHours(r.seconds)]),
       [],
       ['Temps par tâche'],
-      ['Tâche', 'Client', 'Membre(s)', 'Heures'],
+      ['Tâche', 'Contact', 'Membre(s)', 'Heures'],
       ...byTask.map(r => [r.title, r.client_name, r.members, secondsToHours(r.seconds)]),
     ]
     downloadCsv(`rapport-temps-${period}.csv`, rows)
@@ -182,9 +182,9 @@ export default function RapportsTempsClient({ entries, members, clients }: Props
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Client</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Contact</label>
             <select value={clientFilter} onChange={e => setClientFilter(e.target.value)} className="select text-sm py-1.5">
-              <option value="tous">Tous les clients</option>
+              <option value="tous">Tous les contacts</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -211,12 +211,12 @@ export default function RapportsTempsClient({ entries, members, clients }: Props
         empty="Aucun temps enregistré pour cette sélection"
       />
 
-      {/* Par client */}
+      {/* Par contact */}
       <ReportTable
-        title="Temps par client"
+        title="Temps par contact"
         icon={Briefcase}
         rows={byClient.map(r => [r.name, formatDuration(r.seconds)])}
-        headers={['Client', 'Heures']}
+        headers={['Contact', 'Heures']}
         empty="Aucun temps enregistré pour cette sélection"
       />
 
@@ -225,7 +225,7 @@ export default function RapportsTempsClient({ entries, members, clients }: Props
         title="Temps par tâche"
         icon={ListTodo}
         rows={byTask.map(r => [r.title, r.client_name, r.members, formatDuration(r.seconds)])}
-        headers={['Tâche', 'Client', 'Membre(s)', 'Heures']}
+        headers={['Tâche', 'Contact', 'Membre(s)', 'Heures']}
         empty="Aucun temps enregistré pour cette sélection"
       />
     </div>

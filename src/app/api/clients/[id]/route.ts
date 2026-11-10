@@ -22,7 +22,7 @@ export async function GET(
     .maybeSingle()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!data) return NextResponse.json({ error: 'Client introuvable' }, { status: 404 })
+  if (!data) return NextResponse.json({ error: 'Contact introuvable' }, { status: 404 })
   return NextResponse.json({ data })
 }
 
@@ -76,7 +76,7 @@ export async function PATCH(
       '[api/clients PATCH] 0 ligne affectée —',
       'client_id:', params.id, '| user:', ctx.userId, '| role:', ctx.role, '| dataOwnerId:', ctx.dataOwnerId,
     )
-    return NextResponse.json({ error: 'Client introuvable ou accès refusé' }, { status: 404 })
+    return NextResponse.json({ error: 'Contact introuvable ou accès refusé' }, { status: 404 })
   }
   return NextResponse.json({ data })
 }

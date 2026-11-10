@@ -374,13 +374,13 @@ export default function KanbanBoard({ initialProjects, clients }: KanbanBoardPro
               {/* Client + Status */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Client</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Contact</label>
                   <select
                     value={form.client_id}
                     onChange={e => setForm(f => ({ ...f, client_id: e.target.value }))}
                     className="select"
                   >
-                    <option value="">Aucun client</option>
+                    <option value="">Aucun contact</option>
                     {clients.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}

@@ -33,7 +33,7 @@ export default function AgentContenuPage() {
 
   async function generate() {
     if (!clientName.trim() || !brief.trim()) {
-      setError('Remplis le nom du client et le brief.')
+      setError('Remplis le nom du contact et le brief.')
       return
     }
     setError(null)
@@ -71,7 +71,7 @@ export default function AgentContenuPage() {
           </div>
           <h1 className="page-title">Agent contenu</h1>
         </div>
-        <p className="text-sm text-gray-500">Génère du contenu professionnel pour tes clients en secondes</p>
+        <p className="text-sm text-gray-500">Génère du contenu professionnel pour tes contacts en secondes</p>
       </div>
 
       <div className="grid grid-cols-3 gap-6">
@@ -101,7 +101,7 @@ export default function AgentContenuPage() {
           {/* Champs */}
           <div className="card space-y-4">
             <div>
-              <label className="label">Client / marque</label>
+              <label className="label">Contact / marque</label>
               <input
                 className="input"
                 placeholder="ex: Café Nouveau, Restaurant Bella..."

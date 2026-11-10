@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     default: 'AuchuOS — Plateforme agence tout-en-un',
     template: '%s | AuchuOS',
   },
-  description: 'Gérez vos clients, projets, contenu et équipe avec des agents IA intégrés.',
+  description: 'Gérez vos contacts, projets, contenu et équipe avec des agents IA intégrés.',
   icons: { icon: '/favicon.ico' },
 }
 

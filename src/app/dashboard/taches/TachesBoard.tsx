@@ -546,13 +546,13 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Client lié</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Contact lié</label>
                   <select
                     value={form.client_id}
                     onChange={e => setForm(f => ({ ...f, client_id: e.target.value }))}
                     className="select"
                   >
-                    <option value="">Aucun client</option>
+                    <option value="">Aucun contact</option>
                     {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
