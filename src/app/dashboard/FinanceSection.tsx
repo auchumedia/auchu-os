@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Wallet, TrendingUp, TrendingDown, Plus, X, Loader2, Trash2 } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, Plus, X, Loader2, Trash2, AlertTriangle, CheckCircle2, Link2Off } from 'lucide-react'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '@/lib/finance'
 
@@ -34,6 +34,9 @@ function currentMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+type QboStatus = 'loading' | 'disconnected' | 'reconnect_required' | 'connected'
+interface QboState { status: QboStatus; companyName: string | null }
+
 export default function FinanceSection() {
   const [month, setMonth]       = useState(currentMonth())
   const [revenues, setRevenues] = useState<Revenue[]>([])
@@ -42,6 +45,22 @@ export default function FinanceSection() {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState<'revenue' | 'expense' | null>(null)
+  const [qbo, setQbo]           = useState<QboState>({ status: 'loading', companyName: null })
+
+  async function refreshQboStatus() {
+    try {
+      const res = await fetch('/api/quickbooks/status')
+      const json = await res.json()
+      if (!res.ok) { setQbo({ status: 'disconnected', companyName: null }); return }
+      setQbo({ status: json.status ?? 'disconnected', companyName: json.companyName ?? null })
+    } catch {
+      // Panne réseau / route indisponible — jamais planter la section
+      // Finances pour ça, on retombe simplement sur "déconnecté".
+      setQbo({ status: 'disconnected', companyName: null })
+    }
+  }
+
+  useEffect(() => { refreshQboStatus() }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -112,11 +131,11 @@ export default function FinanceSection() {
             onChange={e => setMonth(e.target.value)}
             className="text-sm border border-gray-200 rounded-full px-3 py-1.5 text-gray-700"
           />
-          <button disabled title="Bientôt disponible" className="btn-secondary text-xs py-1.5 px-3 opacity-50 cursor-not-allowed">
-            Connecter QuickBooks
-          </button>
+          <QuickBooksControl qbo={qbo} onChange={refreshQboStatus} />
         </div>
       </div>
+
+      {qbo.status === 'reconnect_required' && <QuickBooksReconnectBanner />}
 
       {error && (
         <div className="card border-red-200 bg-red-50 text-red-700 text-sm p-4">{error}</div>
@@ -319,6 +338,77 @@ function EntryForm({
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+// Contrôle compact dans l'en-tête — connecter / déconnecter / reconnecter.
+// La connexion (consentement Intuit) exige une vraie navigation de page
+// (pas un fetch) : <a href="/api/quickbooks/connect"> suit la redirection
+// vers l'écran de consentement QuickBooks.
+function QuickBooksControl({ qbo, onChange }: { qbo: QboState; onChange: () => void }) {
+  const [disconnecting, setDisconnecting] = useState(false)
+
+  async function disconnect() {
+    if (!confirm('Déconnecter QuickBooks ? Le jeton sera révoqué chez Intuit.')) return
+    setDisconnecting(true)
+    try {
+      await fetch('/api/quickbooks/disconnect', { method: 'POST' })
+    } catch {
+      // Le nettoyage local côté serveur a lieu même si la révocation réseau
+      // échoue (cf. api/quickbooks/disconnect/route.ts) — on rafraîchit le
+      // statut dans tous les cas plutôt que de bloquer l'UI.
+    } finally {
+      setDisconnecting(false)
+      onChange()
+    }
+  }
+
+  if (qbo.status === 'loading') {
+    return <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
+  }
+
+  if (qbo.status === 'connected') {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-full px-3 py-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          {qbo.companyName ? `Connecté à ${qbo.companyName}` : 'QuickBooks connecté'}
+        </span>
+        <button
+          onClick={disconnect}
+          disabled={disconnecting}
+          title="Déconnecter QuickBooks"
+          className="p-1.5 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2Off className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+    )
+  }
+
+  // 'disconnected' ou 'reconnect_required' (ce dernier a déjà la bannière
+  // pleine largeur ci-dessous — ici on garde juste le bouton d'action).
+  return (
+    <a href="/api/quickbooks/connect" className="btn-secondary text-xs py-1.5 px-3">
+      {qbo.status === 'reconnect_required' ? 'Reconnecter QuickBooks' : 'Connecter QuickBooks'}
+    </a>
+  )
+}
+
+// Bannière pleine largeur — affichée uniquement quand le refresh token est
+// expiré/révoqué (invalid_grant) : message clair + bouton Reconnecter,
+// jamais une erreur brute ni une page cassée (point 4 du questionnaire).
+function QuickBooksReconnectBanner() {
+  return (
+    <div className="card border-amber-200 bg-amber-50 flex items-center gap-3 py-3 px-4">
+      <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+      <p className="text-sm text-amber-800 flex-1">
+        QuickBooks doit être reconnecté — la connexion a expiré ou a été révoquée côté Intuit.
+      </p>
+      <a href="/api/quickbooks/connect" className="btn-primary text-xs py-1.5 px-3 flex-shrink-0">
+        Reconnecter
+      </a>
     </div>
   )
 }
