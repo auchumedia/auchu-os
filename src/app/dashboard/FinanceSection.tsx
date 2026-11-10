@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Wallet, TrendingUp, TrendingDown, Plus, X, Loader2, Trash2, AlertTriangle, CheckCircle2, Link2Off, RefreshCw } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, Plus, X, Loader2, Trash2, AlertTriangle, CheckCircle2, Link2Off, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn, formatCurrency, formatDate, formatDatetime } from '@/lib/utils'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '@/lib/finance'
 
@@ -31,9 +31,20 @@ const BUBBLE_COLORS = [
   'bg-rose-500', 'bg-indigo-500', 'bg-lime-500', 'bg-slate-500',
 ]
 
-function currentMonth() {
+// Toujours le 1er du mois — jamais une saisie libre, donc jamais de valeur
+// partielle/invalide (cf. toMonthParam, strictement YYYY-MM).
+function currentMonthDate() {
   const d = new Date()
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+
+function toMonthParam(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthLabel(d: Date) {
+  const label = d.toLocaleDateString('fr-CA', { month: 'long', year: 'numeric' })
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 type QboStatus = 'loading' | 'disconnected' | 'reconnect_required' | 'connected'
@@ -48,7 +59,8 @@ interface QboState {
 const AUTO_SYNC_AFTER_MS = 60 * 60 * 1000 // 1h
 
 export default function FinanceSection({ isOwner }: { isOwner: boolean }) {
-  const [month, setMonth]       = useState(currentMonth())
+  const [monthDate, setMonthDate] = useState(currentMonthDate())
+  const monthParam = toMonthParam(monthDate)
   const [revenues, setRevenues] = useState<Revenue[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [contacts, setContacts] = useState<ContactOption[]>([])
@@ -63,8 +75,8 @@ export default function FinanceSection({ isOwner }: { isOwner: boolean }) {
     setLoading(true)
     setError(null)
     return Promise.all([
-      fetch(`/api/finance/revenus?month=${month}`).then(r => r.json()),
-      fetch(`/api/finance/depenses?month=${month}`).then(r => r.json()),
+      fetch(`/api/finance/revenus?month=${monthParam}`).then(r => r.json()),
+      fetch(`/api/finance/depenses?month=${monthParam}`).then(r => r.json()),
     ]).then(([rev, exp]) => {
       if (rev.error || exp.error) { setError(rev.error || exp.error); return }
       setRevenues(rev.data ?? [])
@@ -124,7 +136,11 @@ export default function FinanceSection({ isOwner }: { isOwner: boolean }) {
     fetchMonthData().then(() => { if (cancelled) return })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month])
+  }, [monthParam])
+
+  function shiftMonth(delta: number) {
+    setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + delta, 1))
+  }
 
   useEffect(() => {
     fetch('/api/clients').then(r => r.json()).then(j => setContacts(j.data ?? [])).catch(() => {})
@@ -178,12 +194,23 @@ export default function FinanceSection({ isOwner }: { isOwner: boolean }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <input
-            type="month"
-            value={month}
-            onChange={e => setMonth(e.target.value)}
-            className="text-sm border border-gray-200 rounded-full px-3 py-1.5 text-gray-700"
-          />
+          <div className="flex items-center gap-0.5 border border-gray-200 rounded-full px-1 py-1">
+            <button
+              onClick={() => shiftMonth(-1)}
+              aria-label="Mois précédent"
+              className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm text-gray-700 font-medium w-28 text-center">{monthLabel(monthDate)}</span>
+            <button
+              onClick={() => shiftMonth(1)}
+              aria-label="Mois suivant"
+              className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
           <QuickBooksControl qbo={qbo} isOwner={isOwner} syncing={syncing} onChange={refreshQboStatus} onSync={runSync} />
         </div>
       </div>
