@@ -211,7 +211,11 @@ export default function FinanceSection({ isOwner }: { isOwner: boolean }) {
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-          <QuickBooksControl qbo={qbo} isOwner={isOwner} syncing={syncing} onChange={refreshQboStatus} onSync={runSync} />
+          <QuickBooksControl
+            qbo={qbo} isOwner={isOwner} syncing={syncing}
+            onSync={runSync}
+            onDisconnected={() => { refreshQboStatus(); fetchMonthData() }}
+          />
         </div>
       </div>
 
@@ -445,28 +449,36 @@ function EntryForm({
 // sont réservés au propriétaire (isOwner) — director voit le statut et peut
 // synchroniser, mais ne gère pas la connexion elle-même.
 function QuickBooksControl({
-  qbo, isOwner, syncing, onChange, onSync,
+  qbo, isOwner, syncing, onSync, onDisconnected,
 }: {
   qbo: QboState
   isOwner: boolean
   syncing: boolean
-  onChange: () => void
   onSync: () => void
+  onDisconnected: () => void
 }) {
   const [disconnecting, setDisconnecting] = useState(false)
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false)
 
-  async function disconnect() {
-    if (!confirm('Déconnecter QuickBooks ? Le jeton sera révoqué chez Intuit.')) return
+  async function disconnect(deleteImportedData: boolean) {
+    setShowDisconnectModal(false)
     setDisconnecting(true)
     try {
-      await fetch('/api/quickbooks/disconnect', { method: 'POST' })
+      await fetch('/api/quickbooks/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteImportedData }),
+      })
     } catch {
       // Le nettoyage local côté serveur a lieu même si la révocation réseau
       // échoue (cf. api/quickbooks/disconnect/route.ts) — on rafraîchit le
       // statut dans tous les cas plutôt que de bloquer l'UI.
     } finally {
       setDisconnecting(false)
-      onChange()
+      // Rafraîchit le statut QuickBooks ET l'affichage financier (chiffres,
+      // bulles, entrées récentes) — la déconnexion a pu supprimer des
+      // entrées importées.
+      onDisconnected()
     }
   }
 
@@ -503,13 +515,19 @@ function QuickBooksControl({
         </button>
         {isOwner && (
           <button
-            onClick={disconnect}
+            onClick={() => setShowDisconnectModal(true)}
             disabled={disconnecting}
             title="Déconnecter QuickBooks"
             className="p-1.5 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
           >
             {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2Off className="w-3.5 h-3.5" />}
           </button>
+        )}
+        {showDisconnectModal && (
+          <DisconnectConfirmModal
+            onCancel={() => setShowDisconnectModal(false)}
+            onConfirm={disconnect}
+          />
         )}
       </div>
     )
@@ -532,6 +550,56 @@ function QuickBooksControl({
     <a href="/api/quickbooks/connect" className="btn-secondary text-xs py-1.5 px-3">
       {qbo.status === 'reconnect_required' ? 'Reconnecter QuickBooks' : 'Connecter QuickBooks'}
     </a>
+  )
+}
+
+// Confirmation de déconnexion — case "supprimer les données importées"
+// cochée par défaut. Les entrées manuelles ne sont jamais supprimées,
+// qu'elle soit cochée ou non (cf. api/quickbooks/disconnect/route.ts, qui
+// filtre toujours source = 'quickbooks').
+function DisconnectConfirmModal({
+  onCancel, onConfirm,
+}: {
+  onCancel: () => void
+  onConfirm: (deleteImportedData: boolean) => void
+}) {
+  const [deleteImportedData, setDeleteImportedData] = useState(true)
+
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-gray-900">Déconnecter QuickBooks ?</h3>
+          <button onClick={onCancel} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">
+          Le jeton sera révoqué chez Intuit. Les entrées saisies à la main ne sont jamais supprimées.
+        </p>
+        <label className="flex items-start gap-2.5 mb-5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={deleteImportedData}
+            onChange={e => setDeleteImportedData(e.target.checked)}
+            className="mt-0.5 w-4 h-4 rounded border-gray-300 text-auchu-600 focus:ring-auchu-500"
+          />
+          <span className="text-sm text-gray-700">
+            Supprimer aussi les données importées de QuickBooks (revenus et dépenses)
+          </span>
+        </label>
+        <div className="flex gap-2">
+          <button type="button" onClick={onCancel} className="btn-secondary flex-1">Annuler</button>
+          <button
+            type="button"
+            onClick={() => onConfirm(deleteImportedData)}
+            className="flex-1 justify-center inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-full transition-colors"
+          >
+            Déconnecter
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

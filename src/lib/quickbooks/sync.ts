@@ -1,4 +1,5 @@
 import { qboFetch } from './client'
+import { getConnection } from './connection'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '@/lib/finance'
 import type { createClient } from '@/lib/supabase/server'
 
@@ -90,6 +91,37 @@ async function buildClientNameMap(supabase: SupabaseClient, ownerId: string): Pr
   return map
 }
 
+// external_id embarque le realm_id ("inv_{realmId}_{Id}", etc.) — un realm_id
+// identifie de façon unique une entreprise QuickBooks dans un environnement
+// donné (sandbox et production n'ont jamais le même realm_id), donc comparer
+// le realm_id suffit à détecter un changement d'entreprise OU d'environnement.
+function realmIdFromExternalId(externalId: string): string | null {
+  const parts = externalId.split('_')
+  return parts.length >= 3 ? parts[1] : null
+}
+
+// Supprime les lignes importées d'un ancien realm_id (changement
+// d'entreprise ou d'environnement sandbox↔production) avant de synchroniser
+// — ne touche jamais les entrées manuelles (filtrées par source='quickbooks').
+async function purgeStaleRealmData(supabase: SupabaseClient, ownerId: string, currentRealmId: string) {
+  for (const table of ['finance_revenues', 'finance_expenses'] as const) {
+    const { data } = await supabase
+      .from(table)
+      .select('id, external_id')
+      .eq('user_id', ownerId)
+      .eq('source', 'quickbooks')
+
+    const staleIds = (data ?? [])
+      .filter(row => row.external_id && realmIdFromExternalId(row.external_id) !== currentRealmId)
+      .map(row => row.id)
+
+    if (staleIds.length > 0) {
+      const { error } = await supabase.from(table).delete().in('id', staleIds)
+      if (error) throw new Error(`[quickbooks/sync] purge ${table} (changement d'entreprise/environnement) échouée — ${error.message}`)
+    }
+  }
+}
+
 // Met à jour une ligne déjà importée (même user_id/source/external_id) ou en
 // insère une nouvelle — ne touche JAMAIS une entrée manuelle : le filtre
 // `source = 'quickbooks'` l'exclut par construction (les entrées manuelles
@@ -124,6 +156,13 @@ export interface QuickBooksSyncResult {
 // owner/director, migration 047) : jamais le client admin ici,
 // finance_revenues/finance_expenses n'ont pas besoin de service_role.
 export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: string): Promise<QuickBooksSyncResult> {
+  // Résout le realm_id courant pour (a) détecter un changement d'entreprise/
+  // environnement et purger les données de l'ancien realm avant de
+  // synchroniser, et (b) l'embarquer dans chaque external_id généré ci-dessous.
+  const connection = await getConnection(ownerId)
+  const realmId = connection?.realmId ?? null
+  if (realmId) await purgeStaleRealmData(supabase, ownerId, realmId)
+
   const where = `TxnDate >= '${twelveMonthsAgoISO()}' AND TxnDate <= '${todayISO()}'`
   const clientByName = await buildClientNameMap(supabase, ownerId)
 
@@ -131,7 +170,7 @@ export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: stri
   for (const inv of invoices) {
     const customerName = inv.CustomerRef?.name?.toLowerCase().trim()
     const clientId = customerName ? clientByName.get(customerName) ?? null : null
-    await upsertSyncedEntry(supabase, 'finance_revenues', ownerId, `inv_${inv.Id}`, {
+    await upsertSyncedEntry(supabase, 'finance_revenues', ownerId, `inv_${realmId}_${inv.Id}`, {
       amount: inv.TotalAmt,
       entry_date: inv.TxnDate,
       description: inv.DocNumber ? `Facture ${inv.DocNumber}` : `Facture QuickBooks ${inv.Id}`,
@@ -142,7 +181,7 @@ export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: stri
   const purchases = await queryAll<QboPurchase>(ownerId, 'Purchase', where)
   for (const p of purchases) {
     const accountName = p.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
-    await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `pur_${p.Id}`, {
+    await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `pur_${realmId}_${p.Id}`, {
       amount: p.TotalAmt,
       entry_date: p.TxnDate,
       category: mapExpenseCategory(accountName),
@@ -153,7 +192,7 @@ export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: stri
   const bills = await queryAll<QboBill>(ownerId, 'Bill', where)
   for (const b of bills) {
     const accountName = b.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
-    await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `bill_${b.Id}`, {
+    await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `bill_${realmId}_${b.Id}`, {
       amount: b.TotalAmt,
       entry_date: b.TxnDate,
       category: mapExpenseCategory(accountName),
