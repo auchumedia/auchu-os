@@ -29,6 +29,8 @@ export async function middleware(request: NextRequest) {
 
   const isAuthRoute   = request.nextUrl.pathname.startsWith('/auth')
   const isPublicRoute = request.nextUrl.pathname === '/'
+    || request.nextUrl.pathname === '/confidentialite'
+    || request.nextUrl.pathname === '/conditions'
   // Les routes API consommées anonymement par ces pages publiques doivent être
   // exemptées elles aussi — sinon le middleware les redirige vers /auth/login
   // (307) au lieu de laisser passer la requête, cassant silencieusement le

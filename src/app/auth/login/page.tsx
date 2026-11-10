@@ -86,6 +86,12 @@ function LoginForm() {
           </Link>
         </p>
       </div>
+
+      <p className="text-xs text-gray-400 text-center mt-5">
+        <Link href="/confidentialite" className="hover:text-auchu-600 hover:underline">Confidentialité</Link>
+        {' · '}
+        <Link href="/conditions" className="hover:text-auchu-600 hover:underline">Conditions</Link>
+      </p>
     </div>
   )
 }
