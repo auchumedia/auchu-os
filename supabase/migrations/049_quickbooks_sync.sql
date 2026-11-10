@@ -11,13 +11,16 @@
 -- mais on la retire quand même ici pour ne pas donner une fausse impression
 -- de sécurité "ceinture ET bretelles" qui masquerait un oubli de grant.
 --
--- Part 2 — Index uniques partiels sur revenues/expenses pour que la synchro
--- QuickBooks (src/lib/quickbooks/sync.ts) puisse mettre à jour une ligne déjà
--- importée sans jamais en créer de doublon. external_id est NULL pour toute
--- entrée manuelle — le index étant partiel (WHERE external_id is not null),
--- les entrées manuelles n'y sont jamais soumises et ne sont donc jamais
--- touchées par la synchro (qui filtre explicitement source = 'quickbooks'
--- dans son code applicatif, en plus de cette contrainte).
+-- Part 2 — Index uniques partiels sur finance_revenues/finance_expenses
+-- (migration 047 — renommées depuis revenues/expenses pour éviter le
+-- conflit avec l'ancienne table "expenses" de 002_finance.sql) pour que la
+-- synchro QuickBooks (src/lib/quickbooks/sync.ts) puisse mettre à jour une
+-- ligne déjà importée sans jamais en créer de doublon. external_id est NULL
+-- pour toute entrée manuelle — le index étant partiel (WHERE external_id is
+-- not null), les entrées manuelles n'y sont jamais soumises et ne sont donc
+-- jamais touchées par la synchro (qui filtre explicitement
+-- source = 'quickbooks' dans son code applicatif, en plus de cette
+-- contrainte).
 --
 -- Part 3 — Colonnes de suivi de synchro sur quickbooks_connections.
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -50,12 +53,12 @@ alter table public.quickbooks_connections
 
 -- ── Part 2 : dédoublonnage des entrées importées ────────────────────────────────
 
-create unique index if not exists revenues_user_source_external_uniq
-  on public.revenues (user_id, source, external_id)
+create unique index if not exists finance_revenues_user_source_external_uniq
+  on public.finance_revenues (user_id, source, external_id)
   where external_id is not null;
 
-create unique index if not exists expenses_user_source_external_uniq
-  on public.expenses (user_id, source, external_id)
+create unique index if not exists finance_expenses_user_source_external_uniq
+  on public.finance_expenses (user_id, source, external_id)
   where external_id is not null;
 
 commit;

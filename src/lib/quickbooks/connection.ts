@@ -57,7 +57,7 @@ function fromRow(row: DbRow): QuickBooksConnection {
 }
 
 // user_id = toujours ownerId (ctx.dataOwnerId), jamais l'id du membre qui
-// clique "Connecter" — même convention que revenues/expenses (migration 047).
+// clique "Connecter" — même convention que finance_revenues/finance_expenses (migration 047).
 export async function getConnection(ownerId: string): Promise<QuickBooksConnection | null> {
   const supabase = createAdminClient()
   const { data, error } = await supabase

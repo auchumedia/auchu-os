@@ -66,7 +66,7 @@ export function canCreateTasks(role: string): boolean {
 }
 
 // Qui voit/gère les finances (revenus, dépenses) — owner/director
-// uniquement. Mirroir des policies RLS "revenues/expenses: director *"
+// uniquement. Mirroir des policies RLS "finance_revenues/finance_expenses: director *"
 // (supabase/migrations/047_finance_entries.sql) ; stratege/monteur n'ont
 // aucun accès, ni API ni UI.
 const FINANCE_ROLES: OrgRole[] = ['owner', 'director']

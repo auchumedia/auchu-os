@@ -95,7 +95,7 @@ async function buildClientNameMap(supabase: SupabaseClient, ownerId: string): Pr
 // `source = 'quickbooks'` l'exclut par construction (les entrées manuelles
 // ont source = 'manual' et external_id = null).
 async function upsertSyncedEntry(
-  supabase: SupabaseClient, table: 'revenues' | 'expenses', ownerId: string, externalId: string, row: Record<string, unknown>,
+  supabase: SupabaseClient, table: 'finance_revenues' | 'finance_expenses', ownerId: string, externalId: string, row: Record<string, unknown>,
 ) {
   const { data: existing } = await supabase
     .from(table)
@@ -119,10 +119,10 @@ export interface QuickBooksSyncResult {
   expensesSynced: number
 }
 
-// Synchronise les 12 derniers mois — Invoice → revenues, Purchase + Bill →
-// expenses. supabase est le client lié à la session (RLS owner/director,
-// migration 047) : jamais le client admin ici, revenues/expenses n'ont pas
-// besoin de service_role.
+// Synchronise les 12 derniers mois — Invoice → finance_revenues, Purchase +
+// Bill → finance_expenses. supabase est le client lié à la session (RLS
+// owner/director, migration 047) : jamais le client admin ici,
+// finance_revenues/finance_expenses n'ont pas besoin de service_role.
 export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: string): Promise<QuickBooksSyncResult> {
   const where = `TxnDate >= '${twelveMonthsAgoISO()}' AND TxnDate <= '${todayISO()}'`
   const clientByName = await buildClientNameMap(supabase, ownerId)
@@ -131,7 +131,7 @@ export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: stri
   for (const inv of invoices) {
     const customerName = inv.CustomerRef?.name?.toLowerCase().trim()
     const clientId = customerName ? clientByName.get(customerName) ?? null : null
-    await upsertSyncedEntry(supabase, 'revenues', ownerId, `inv_${inv.Id}`, {
+    await upsertSyncedEntry(supabase, 'finance_revenues', ownerId, `inv_${inv.Id}`, {
       amount: inv.TotalAmt,
       entry_date: inv.TxnDate,
       description: inv.DocNumber ? `Facture ${inv.DocNumber}` : `Facture QuickBooks ${inv.Id}`,
@@ -142,7 +142,7 @@ export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: stri
   const purchases = await queryAll<QboPurchase>(ownerId, 'Purchase', where)
   for (const p of purchases) {
     const accountName = p.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
-    await upsertSyncedEntry(supabase, 'expenses', ownerId, `pur_${p.Id}`, {
+    await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `pur_${p.Id}`, {
       amount: p.TotalAmt,
       entry_date: p.TxnDate,
       category: mapExpenseCategory(accountName),
@@ -153,7 +153,7 @@ export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: stri
   const bills = await queryAll<QboBill>(ownerId, 'Bill', where)
   for (const b of bills) {
     const accountName = b.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
-    await upsertSyncedEntry(supabase, 'expenses', ownerId, `bill_${b.Id}`, {
+    await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `bill_${b.Id}`, {
       amount: b.TotalAmt,
       entry_date: b.TxnDate,
       category: mapExpenseCategory(accountName),

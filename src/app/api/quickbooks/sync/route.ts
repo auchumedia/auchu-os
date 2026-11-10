@@ -12,7 +12,7 @@ export async function POST() {
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!canViewFinance(ctx.role)) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
 
-  // Client lié à la session (RLS owner/director sur revenues/expenses,
+  // Client lié à la session (RLS owner/director sur finance_revenues/finance_expenses,
   // migration 047) — pas le client admin, celui-ci n'est utilisé que pour
   // quickbooks_connections (lib/quickbooks/connection.ts).
   const supabase = await createClient()

@@ -5,7 +5,7 @@ import { EXPENSE_CATEGORIES } from '@/lib/finance'
 import { NextResponse } from 'next/server'
 
 // Section Finances — owner/director uniquement (cf. src/lib/roles.ts
-// canViewFinance + RLS "expenses: director *", migration 047). stratege et
+// canViewFinance + RLS "finance_expenses: director *", migration 047). stratege et
 // monteur reçoivent un 403 sans jamais toucher la table.
 function canManage(ctx: { role: string }) {
   return canViewFinance(ctx.role)
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('expenses')
+    .from('finance_expenses')
     .select('id, category, amount, entry_date, description, source, created_at')
     .eq('user_id', ctx.dataOwnerId)
     .gte('entry_date', startISO)
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
 
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('expenses')
+    .from('finance_expenses')
     .insert({
       user_id: ctx.dataOwnerId,
       category,
@@ -85,7 +85,7 @@ export async function DELETE(req: Request) {
 
   const supabase = await createClient()
   const { error } = await supabase
-    .from('expenses')
+    .from('finance_expenses')
     .delete()
     .eq('id', id)
     .eq('user_id', ctx.dataOwnerId)
