@@ -376,7 +376,7 @@ export default function ClientDetail({
 
       {/* ─── Header card ─────────────────────────────────────────────────────── */}
       <div
-        className="rounded-2xl border border-gray-200 overflow-hidden mb-6"
+        className="rounded-3xl border border-border-soft shadow-sm overflow-hidden mb-6"
         style={{ background: headerBg }}
       >
         <div className="px-6 py-5">
@@ -420,7 +420,7 @@ export default function ClientDetail({
             {/* Identity */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-gray-900">{client.name}</h1>
+                <h1 className="font-display uppercase text-xl text-ink">{client.name}</h1>
                 <span className={cn('badge', {
                   actif:    'badge-green',
                   inactif:  'badge-gray',
@@ -507,18 +507,13 @@ export default function ClientDetail({
         </div>
 
         {/* Tab nav */}
-        <div className="border-t border-white/60 bg-white/40 px-6 overflow-x-auto scrollbar-hide">
-          <nav className="flex gap-1 -mb-px min-w-max">
+        <div className="border-t border-white/60 bg-white/40 px-6 py-3 overflow-x-auto scrollbar-hide">
+          <nav className="flex gap-1.5 min-w-max">
             {tabs.map(t => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
-                  tab === t.id
-                    ? 'border-auchu-500 text-auchu-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                )}
+                className={cn('tab-pill', tab === t.id && 'active-blue')}
               >
                 <t.icon className="w-3.5 h-3.5" />
                 {t.label}

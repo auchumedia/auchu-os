@@ -39,8 +39,8 @@ export default async function ClientsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Clients</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{clients?.length ?? 0} clients enregistrés</p>
+          <h1 className="page-title">Clients</h1>
+          <p className="page-subtitle">{clients?.length ?? 0} clients enregistrés</p>
         </div>
         {canCreate && (
           <Link href="/dashboard/clients/nouveau" className="btn-primary">

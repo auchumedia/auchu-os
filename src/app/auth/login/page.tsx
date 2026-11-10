@@ -38,7 +38,7 @@ function LoginForm() {
     <div className="w-full max-w-sm">
       <div className="card">
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-gray-900 mb-1">Connexion</h1>
+          <h1 className="font-display uppercase text-2xl text-ink mb-1">Connexion</h1>
           <p className="text-sm text-gray-500">Accède à ton espace AuchuOS</p>
         </div>
 

@@ -142,8 +142,8 @@ export default function NouvelleFactureMembre({ config, hourlyEntries, fixedDeli
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Générer une facture</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="page-title">Générer une facture</h1>
+          <p className="page-subtitle">
             {config.billing_mode === 'hourly'
               ? `Taux horaire : ${formatCurrency(rate, config.currency)}/h`
               : `Montant fixe : ${formatCurrency(rate, config.currency)}/livrable`}

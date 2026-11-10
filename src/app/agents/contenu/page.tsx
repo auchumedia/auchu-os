@@ -69,7 +69,7 @@ export default function AgentContenuPage() {
           <div className="w-8 h-8 bg-auchu-100 rounded-lg flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-auchu-600" />
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900">Agent contenu</h1>
+          <h1 className="page-title">Agent contenu</h1>
         </div>
         <p className="text-sm text-gray-500">Génère du contenu professionnel pour tes clients en secondes</p>
       </div>
@@ -85,9 +85,9 @@ export default function AgentContenuPage() {
                 <button
                   key={m.id}
                   onClick={() => setMode(m.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm border transition-colors ${
                     mode === m.id
-                      ? 'bg-auchu-50 border-auchu-300 text-auchu-700 font-medium'
+                      ? 'bg-auchu-500 border-auchu-500 text-white font-medium'
                       : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
                   }`}
                 >

@@ -100,7 +100,7 @@ function SignupForm() {
       {step === 'choose' && (
         <div className="card space-y-4">
           <div className="mb-2">
-            <h1 className="text-xl font-semibold text-gray-900">Bienvenue sur AuchuOS</h1>
+            <h1 className="font-display uppercase text-2xl text-ink">Bienvenue sur AuchuOS</h1>
             <p className="text-sm text-gray-500 mt-0.5">Comment souhaitez-vous démarrer ?</p>
           </div>
           <button
@@ -145,7 +145,7 @@ function SignupForm() {
             <ChevronLeft className="w-3.5 h-3.5" /> Retour
           </button>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Code d'invitation</h1>
+            <h1 className="font-display uppercase text-2xl text-ink">Code d'invitation</h1>
             <p className="text-sm text-gray-500 mt-0.5">Entrez le code à 6 caractères reçu de votre agence</p>
           </div>
           <div>
@@ -178,7 +178,7 @@ function SignupForm() {
           <button onClick={() => setStep('choose')} className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition-colors mb-4">
             <ChevronLeft className="w-3.5 h-3.5" /> Retour
           </button>
-          <h1 className="text-xl font-semibold text-gray-900 mb-1">Créer mon agence</h1>
+          <h1 className="font-display uppercase text-2xl text-ink mb-1">Créer mon agence</h1>
           <p className="text-sm text-gray-500 mb-5">Tu seras le propriétaire de l'organisation</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -222,7 +222,7 @@ function SignupForm() {
               <p className="text-xs text-green-700">Rôle : {ROLE_LABELS[inviteInfo.role as OrgRole]?.label ?? inviteInfo.role}</p>
             </div>
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-1">Créer mon compte</h1>
+          <h1 className="font-display uppercase text-2xl text-ink mb-1">Créer mon compte</h1>
           <p className="text-sm text-gray-500 mb-5">Tu rejoindras automatiquement l'équipe après l'inscription</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

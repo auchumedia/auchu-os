@@ -94,8 +94,8 @@ export default function NouveauClientForm() {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Nouveau client</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Ajoute un client à ton portefeuille</p>
+          <h1 className="page-title">Nouveau client</h1>
+          <p className="page-subtitle">Ajoute un client à ton portefeuille</p>
         </div>
       </div>
 

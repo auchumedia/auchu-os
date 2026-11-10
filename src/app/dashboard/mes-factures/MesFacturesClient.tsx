@@ -40,8 +40,8 @@ export default function MesFacturesClient({ initialInvoices, hasBillingConfig }:
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Mes factures</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="page-title">Mes factures</h1>
+          <p className="page-subtitle">
             {invoices.length === 0 ? 'Aucune facture pour l\'instant' : `${invoices.length} facture${invoices.length !== 1 ? 's' : ''}`}
           </p>
         </div>

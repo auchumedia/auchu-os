@@ -96,8 +96,8 @@ export default async function RapportsTempsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Rapports temps</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Temps tracké par l'équipe, par membre, client et tâche</p>
+        <h1 className="page-title">Rapports temps</h1>
+        <p className="page-subtitle">Temps tracké par l'équipe, par membre, client et tâche</p>
       </div>
       <RapportsTempsClient
         entries={entries}

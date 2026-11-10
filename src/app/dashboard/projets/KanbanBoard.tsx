@@ -242,8 +242,8 @@ export default function KanbanBoard({ initialProjects, clients }: KanbanBoardPro
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Projets</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="page-title">Projets</h1>
+          <p className="page-subtitle">
             {projects.length === 0
               ? 'Aucun projet pour l\'instant'
               : `${totalActive} actif${totalActive !== 1 ? 's' : ''} · ${projects.length} au total`}

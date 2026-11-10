@@ -347,8 +347,8 @@ export default function TachesBoard({ view, currentUserId, canCreate, initialTas
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="page-title">{title}</h1>
+          <p className="page-subtitle">
             {tasks.length === 0
               ? 'Aucune tâche pour l\'instant'
               : `${totalActive} active${totalActive !== 1 ? 's' : ''} · ${tasks.length} au total`}

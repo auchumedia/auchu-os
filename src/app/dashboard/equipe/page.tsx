@@ -21,8 +21,8 @@ export default async function EquipePage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Équipe</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gérez les membres de votre organisation</p>
+          <h1 className="page-title">Équipe</h1>
+          <p className="page-subtitle">Gérez les membres de votre organisation</p>
         </div>
         <div className="card text-center py-16 space-y-3">
           <p className="text-gray-400">Vous n'avez pas encore d'organisation.</p>
@@ -137,8 +137,8 @@ export default async function EquipePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Équipe</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Gérez les équipes de {ctx.org.name}</p>
+        <h1 className="page-title">Équipe</h1>
+        <p className="page-subtitle">Gérez les équipes de {ctx.org.name}</p>
       </div>
       <EquipeClient
         role={ctx.role}

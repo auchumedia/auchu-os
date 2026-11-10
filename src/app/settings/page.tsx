@@ -52,8 +52,8 @@ export default async function SettingsPage() {
     <div className="space-y-8 max-w-2xl mx-auto">
 
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Paramètres</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
+        <h1 className="page-title">Paramètres</h1>
+        <p className="page-subtitle">
           Gérez votre profil et votre organisation
         </p>
       </div>

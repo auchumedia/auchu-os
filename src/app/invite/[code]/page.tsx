@@ -89,7 +89,7 @@ export default async function InvitePage({ params }: { params: { code: string } 
         <div className="card text-center space-y-4 py-10">
           <XCircle className="w-12 h-12 text-red-300 mx-auto" />
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">Lien invalide</h1>
+            <h1 className="font-display uppercase text-xl text-ink">Lien invalide</h1>
             <p className="text-sm text-gray-500 mt-1">
               Ce lien d'invitation est expiré, déjà utilisé ou n'existe pas.
             </p>
