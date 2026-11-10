@@ -1,17 +1,16 @@
 import { getOrgContext } from '@/lib/org'
-import { createClient } from '@/lib/supabase/server'
-import { canViewFinance } from '@/lib/roles'
+import { canManageQuickBooksConnection } from '@/lib/roles'
 import { getConnection, clearConnection } from '@/lib/quickbooks/connection'
 import { revokeToken } from '@/lib/quickbooks/oauth'
 import { NextResponse } from 'next/server'
 
+// Réservé au propriétaire — cf. api/quickbooks/connect/route.ts.
 export async function POST() {
   const ctx = await getOrgContext()
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!canViewFinance(ctx.role)) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+  if (!canManageQuickBooksConnection(ctx.role)) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
 
-  const supabase = await createClient()
-  const connection = await getConnection(supabase, ctx.dataOwnerId)
+  const connection = await getConnection(ctx.dataOwnerId)
 
   let revoked = false
   if (connection?.refreshToken) {
@@ -26,7 +25,7 @@ export async function POST() {
     }
   }
 
-  await clearConnection(supabase, ctx.dataOwnerId)
+  await clearConnection(ctx.dataOwnerId)
 
   return NextResponse.json({ success: true, revoked })
 }

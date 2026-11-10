@@ -1,6 +1,5 @@
 import { getOrgContext } from '@/lib/org'
-import { createClient } from '@/lib/supabase/server'
-import { canViewFinance } from '@/lib/roles'
+import { canManageQuickBooksConnection } from '@/lib/roles'
 import { exchangeCodeForTokens, currentEnvironment } from '@/lib/quickbooks/oauth'
 import { saveTokens } from '@/lib/quickbooks/connection'
 import { QUICKBOOKS_STATE_COOKIE } from '@/lib/quickbooks/config'
@@ -39,14 +38,13 @@ export async function GET(req: NextRequest) {
   }
 
   const ctx = await getOrgContext()
-  if (!ctx || !canViewFinance(ctx.role)) {
+  if (!ctx || !canManageQuickBooksConnection(ctx.role)) {
     return redirectToDashboard(req, 'error')
   }
 
   try {
     const tokens = await exchangeCodeForTokens(code)
-    const supabase = await createClient()
-    await saveTokens(supabase, ctx.dataOwnerId, {
+    await saveTokens(ctx.dataOwnerId, {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       accessTokenExpiresAt: tokens.accessTokenExpiresAt,

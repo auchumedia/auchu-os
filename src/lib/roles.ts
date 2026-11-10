@@ -74,3 +74,11 @@ const FINANCE_ROLES: OrgRole[] = ['owner', 'director']
 export function canViewFinance(role: string): boolean {
   return FINANCE_ROLES.includes(role as OrgRole)
 }
+
+// Connecter/déconnecter QuickBooks — propriétaire uniquement (c'est son
+// compte Intuit qui est lié). director/stratege/monteur peuvent voir le
+// statut et lancer une synchro (canViewFinance), jamais créer/révoquer la
+// connexion elle-même.
+export function canManageQuickBooksConnection(role: string): boolean {
+  return role === 'owner'
+}

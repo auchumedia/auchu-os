@@ -1,0 +1,165 @@
+import { qboFetch } from './client'
+import { EXPENSE_CATEGORIES, type ExpenseCategory } from '@/lib/finance'
+import type { createClient } from '@/lib/supabase/server'
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>
+
+const PAGE_SIZE = 100
+
+// ── Mapping catégorie de dépense ← nom de compte QuickBooks (mots-clés) ────────
+const CATEGORY_KEYWORDS: Partial<Record<ExpenseCategory, string[]>> = {
+  'Logiciels':      ['software', 'saas', 'subscription', 'licence', 'license', 'app', 'hosting', 'hébergement', 'adobe', 'workspace', 'microsoft', 'cloud'],
+  'Sous-traitants':  ['contractor', 'freelance', 'pigiste', 'sous-traitant', 'consultant', 'agency', 'outsourc'],
+  'Matériel':       ['equipment', 'hardware', 'matériel', 'materiel', 'computer', 'ordinateur', 'camera', 'caméra', 'gear', 'furniture', 'mobilier'],
+  'Publicité':      ['advertising', 'ads', 'publicité', 'publicite', 'marketing', 'promo'],
+  'Déplacements':   ['travel', 'transport', 'déplacement', 'deplacement', 'mileage', 'uber', 'taxi', 'parking', 'hotel', 'hôtel', 'flight', 'vol', 'essence', 'gas', 'fuel'],
+  'Bureau':         ['office', 'bureau', 'rent', 'loyer', 'supplies', 'fourniture', 'utilities', 'utilit', 'electricity', 'électricité', 'internet'],
+  'Taxes':          ['tax', 'taxe', 'tps', 'tvq', 'gst', 'hst', 'qst', 'impôt', 'impot', 'revenu québec', 'cra', 'irs'],
+}
+
+export function mapExpenseCategory(accountName: string | null | undefined): ExpenseCategory {
+  if (!accountName) return 'Autre'
+  const name = accountName.toLowerCase()
+  for (const category of EXPENSE_CATEGORIES) {
+    const keywords = CATEGORY_KEYWORDS[category]
+    if (keywords?.some(k => name.includes(k))) return category
+  }
+  return 'Autre'
+}
+
+// ── Formes QuickBooks minimales (lecture seule, défensives — tous les champs
+//    optionnels sauf Id/TxnDate/TotalAmt, pour ne jamais planter sur une
+//    variation de forme entre comptes QuickBooks). ──────────────────────────
+interface QboAccountLine {
+  AccountBasedExpenseLineDetail?: { AccountRef?: { name?: string } }
+}
+interface QboInvoice {
+  Id: string
+  DocNumber?: string
+  TxnDate: string
+  TotalAmt: number
+  CustomerRef?: { name?: string }
+}
+interface QboPurchase {
+  Id: string
+  DocNumber?: string
+  TxnDate: string
+  TotalAmt: number
+  EntityRef?: { name?: string }
+  Line?: QboAccountLine[]
+}
+interface QboBill {
+  Id: string
+  DocNumber?: string
+  TxnDate: string
+  TotalAmt: number
+  VendorRef?: { name?: string }
+  Line?: QboAccountLine[]
+}
+
+function twelveMonthsAgoISO(): string {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() - 1)
+  return d.toISOString().split('T')[0]
+}
+function todayISO(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
+// Pagination QuickBooks — STARTPOSITION/MAXRESULTS, boucle jusqu'à une page
+// incomplète (point 3 du questionnaire : "utilise qboFetch() avec pagination").
+async function queryAll<T>(ownerId: string, entity: string, whereClause: string): Promise<T[]> {
+  const results: T[] = []
+  let startPosition = 1
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const q = `SELECT * FROM ${entity} WHERE ${whereClause} ORDERBY TxnDate STARTPOSITION ${startPosition} MAXRESULTS ${PAGE_SIZE}`
+    const data = await qboFetch<{ QueryResponse?: Record<string, T[]> }>(ownerId, `/query?query=${encodeURIComponent(q)}`)
+    const rows = data?.QueryResponse?.[entity] ?? []
+    results.push(...rows)
+    if (rows.length < PAGE_SIZE) break
+    startPosition += PAGE_SIZE
+  }
+  return results
+}
+
+async function buildClientNameMap(supabase: SupabaseClient, ownerId: string): Promise<Map<string, string>> {
+  const { data } = await supabase.from('clients').select('id, name').eq('user_id', ownerId)
+  const map = new Map<string, string>()
+  for (const c of data ?? []) map.set(c.name.toLowerCase().trim(), c.id)
+  return map
+}
+
+// Met à jour une ligne déjà importée (même user_id/source/external_id) ou en
+// insère une nouvelle — ne touche JAMAIS une entrée manuelle : le filtre
+// `source = 'quickbooks'` l'exclut par construction (les entrées manuelles
+// ont source = 'manual' et external_id = null).
+async function upsertSyncedEntry(
+  supabase: SupabaseClient, table: 'revenues' | 'expenses', ownerId: string, externalId: string, row: Record<string, unknown>,
+) {
+  const { data: existing } = await supabase
+    .from(table)
+    .select('id')
+    .eq('user_id', ownerId)
+    .eq('source', 'quickbooks')
+    .eq('external_id', externalId)
+    .maybeSingle()
+
+  if (existing) {
+    const { error } = await supabase.from(table).update(row).eq('id', existing.id)
+    if (error) throw new Error(`[quickbooks/sync] mise à jour ${table} ${externalId} échouée — ${error.message}`)
+  } else {
+    const { error } = await supabase.from(table).insert({ user_id: ownerId, source: 'quickbooks', external_id: externalId, ...row })
+    if (error) throw new Error(`[quickbooks/sync] insertion ${table} ${externalId} échouée — ${error.message}`)
+  }
+}
+
+export interface QuickBooksSyncResult {
+  revenuesSynced: number
+  expensesSynced: number
+}
+
+// Synchronise les 12 derniers mois — Invoice → revenues, Purchase + Bill →
+// expenses. supabase est le client lié à la session (RLS owner/director,
+// migration 047) : jamais le client admin ici, revenues/expenses n'ont pas
+// besoin de service_role.
+export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: string): Promise<QuickBooksSyncResult> {
+  const where = `TxnDate >= '${twelveMonthsAgoISO()}' AND TxnDate <= '${todayISO()}'`
+  const clientByName = await buildClientNameMap(supabase, ownerId)
+
+  const invoices = await queryAll<QboInvoice>(ownerId, 'Invoice', where)
+  for (const inv of invoices) {
+    const customerName = inv.CustomerRef?.name?.toLowerCase().trim()
+    const clientId = customerName ? clientByName.get(customerName) ?? null : null
+    await upsertSyncedEntry(supabase, 'revenues', ownerId, `inv_${inv.Id}`, {
+      amount: inv.TotalAmt,
+      entry_date: inv.TxnDate,
+      description: inv.DocNumber ? `Facture ${inv.DocNumber}` : `Facture QuickBooks ${inv.Id}`,
+      client_id: clientId,
+    })
+  }
+
+  const purchases = await queryAll<QboPurchase>(ownerId, 'Purchase', where)
+  for (const p of purchases) {
+    const accountName = p.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
+    await upsertSyncedEntry(supabase, 'expenses', ownerId, `pur_${p.Id}`, {
+      amount: p.TotalAmt,
+      entry_date: p.TxnDate,
+      category: mapExpenseCategory(accountName),
+      description: p.EntityRef?.name ?? (p.DocNumber ? `Achat ${p.DocNumber}` : `Achat QuickBooks ${p.Id}`),
+    })
+  }
+
+  const bills = await queryAll<QboBill>(ownerId, 'Bill', where)
+  for (const b of bills) {
+    const accountName = b.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
+    await upsertSyncedEntry(supabase, 'expenses', ownerId, `bill_${b.Id}`, {
+      amount: b.TotalAmt,
+      entry_date: b.TxnDate,
+      category: mapExpenseCategory(accountName),
+      description: b.VendorRef?.name ?? (b.DocNumber ? `Facture fournisseur ${b.DocNumber}` : `Facture fournisseur QuickBooks ${b.Id}`),
+    })
+  }
+
+  return { revenuesSynced: invoices.length, expensesSynced: purchases.length + bills.length }
+}

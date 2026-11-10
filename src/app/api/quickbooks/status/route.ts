@@ -1,7 +1,6 @@
 import { getOrgContext } from '@/lib/org'
-import { createClient } from '@/lib/supabase/server'
 import { canViewFinance } from '@/lib/roles'
-import { getConnection } from '@/lib/quickbooks/connection'
+import { getConnection, updateCompanyName } from '@/lib/quickbooks/connection'
 import { fetchCompanyInfo } from '@/lib/quickbooks/client'
 import { QuickBooksReconnectRequiredError } from '@/lib/quickbooks/errors'
 import { NextResponse } from 'next/server'
@@ -14,33 +13,41 @@ export async function GET() {
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!canViewFinance(ctx.role)) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
 
-  const supabase = await createClient()
-  const connection = await getConnection(supabase, ctx.dataOwnerId)
+  const connection = await getConnection(ctx.dataOwnerId)
 
   if (!connection || connection.status === 'disconnected') {
     return NextResponse.json({ connected: false, status: 'disconnected' as const })
   }
 
   if (connection.status === 'reconnect_required') {
-    return NextResponse.json({ connected: false, status: 'reconnect_required' as const, companyName: connection.companyName })
+    return NextResponse.json({
+      connected: false, status: 'reconnect_required' as const,
+      companyName: connection.companyName, environment: connection.environment,
+      lastSyncAt: connection.lastSyncAt, lastSyncStatus: connection.lastSyncStatus,
+    })
   }
 
   // Vérifie que le jeton fonctionne réellement (et pas seulement que la
   // ligne existe) — un appel réel à l'API QuickBooks, via le wrapper qui
   // gère rafraîchissement + retries (client.ts).
   try {
-    const companyName = await fetchCompanyInfo(supabase, ctx.dataOwnerId)
+    const companyName = await fetchCompanyInfo(ctx.dataOwnerId)
     if (companyName && companyName !== connection.companyName) {
-      await supabase.from('quickbooks_connections').update({ company_name: companyName }).eq('user_id', ctx.dataOwnerId)
+      await updateCompanyName(ctx.dataOwnerId, companyName)
     }
     return NextResponse.json({
       connected: true, status: 'connected' as const,
       companyName: companyName ?? connection.companyName,
       environment: connection.environment,
+      lastSyncAt: connection.lastSyncAt, lastSyncStatus: connection.lastSyncStatus,
     })
   } catch (e) {
     if (e instanceof QuickBooksReconnectRequiredError) {
-      return NextResponse.json({ connected: false, status: 'reconnect_required' as const, companyName: connection.companyName })
+      return NextResponse.json({
+        connected: false, status: 'reconnect_required' as const,
+        companyName: connection.companyName, environment: connection.environment,
+        lastSyncAt: connection.lastSyncAt, lastSyncStatus: connection.lastSyncStatus,
+      })
     }
     // Erreur transitoire (réseau, 5xx persistant après retries...) — on ne
     // dégrade PAS le statut en "reconnect_required" pour ça, l'UI reste sur
@@ -50,6 +57,7 @@ export async function GET() {
       connected: true, status: 'connected' as const,
       companyName: connection.companyName,
       environment: connection.environment,
+      lastSyncAt: connection.lastSyncAt, lastSyncStatus: connection.lastSyncStatus,
       degraded: true,
     })
   }

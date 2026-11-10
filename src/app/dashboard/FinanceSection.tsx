@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Wallet, TrendingUp, TrendingDown, Plus, X, Loader2, Trash2, AlertTriangle, CheckCircle2, Link2Off } from 'lucide-react'
-import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Wallet, TrendingUp, TrendingDown, Plus, X, Loader2, Trash2, AlertTriangle, CheckCircle2, Link2Off, RefreshCw } from 'lucide-react'
+import { cn, formatCurrency, formatDate, formatDatetime } from '@/lib/utils'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '@/lib/finance'
 
 interface Revenue {
@@ -11,6 +11,7 @@ interface Revenue {
   amount: number
   entry_date: string
   description: string | null
+  source: string
   client?: { name: string } | { name: string }[] | null
 }
 
@@ -20,6 +21,7 @@ interface Expense {
   amount: number
   entry_date: string
   description: string | null
+  source: string
 }
 
 interface ContactOption { id: string; name: string }
@@ -35,9 +37,17 @@ function currentMonth() {
 }
 
 type QboStatus = 'loading' | 'disconnected' | 'reconnect_required' | 'connected'
-interface QboState { status: QboStatus; companyName: string | null }
+interface QboState {
+  status: QboStatus
+  companyName: string | null
+  environment: 'sandbox' | 'production' | null
+  lastSyncAt: string | null
+  lastSyncStatus: string | null
+}
 
-export default function FinanceSection() {
+const AUTO_SYNC_AFTER_MS = 60 * 60 * 1000 // 1h
+
+export default function FinanceSection({ isOwner }: { isOwner: boolean }) {
   const [month, setMonth]       = useState(currentMonth())
   const [revenues, setRevenues] = useState<Revenue[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -45,38 +55,75 @@ export default function FinanceSection() {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState<'revenue' | 'expense' | null>(null)
-  const [qbo, setQbo]           = useState<QboState>({ status: 'loading', companyName: null })
+  const [qbo, setQbo]           = useState<QboState>({ status: 'loading', companyName: null, environment: null, lastSyncAt: null, lastSyncStatus: null })
+  const [syncing, setSyncing]   = useState(false)
+  const autoSyncTried           = useRef(false)
+
+  function fetchMonthData() {
+    setLoading(true)
+    setError(null)
+    return Promise.all([
+      fetch(`/api/finance/revenus?month=${month}`).then(r => r.json()),
+      fetch(`/api/finance/depenses?month=${month}`).then(r => r.json()),
+    ]).then(([rev, exp]) => {
+      if (rev.error || exp.error) { setError(rev.error || exp.error); return }
+      setRevenues(rev.data ?? [])
+      setExpenses(exp.data ?? [])
+    }).catch(() => setError('Erreur de chargement'))
+      .finally(() => setLoading(false))
+  }
 
   async function refreshQboStatus() {
     try {
       const res = await fetch('/api/quickbooks/status')
       const json = await res.json()
-      if (!res.ok) { setQbo({ status: 'disconnected', companyName: null }); return }
-      setQbo({ status: json.status ?? 'disconnected', companyName: json.companyName ?? null })
+      if (!res.ok) { setQbo(s => ({ ...s, status: 'disconnected' })); return }
+      setQbo({
+        status: json.status ?? 'disconnected',
+        companyName: json.companyName ?? null,
+        environment: json.environment ?? null,
+        lastSyncAt: json.lastSyncAt ?? null,
+        lastSyncStatus: json.lastSyncStatus ?? null,
+      })
     } catch {
       // Panne réseau / route indisponible — jamais planter la section
       // Finances pour ça, on retombe simplement sur "déconnecté".
-      setQbo({ status: 'disconnected', companyName: null })
+      setQbo(s => ({ ...s, status: 'disconnected' }))
+    }
+  }
+
+  async function runSync() {
+    setSyncing(true)
+    try {
+      await fetch('/api/quickbooks/sync', { method: 'POST' })
+    } catch {
+      // Panne réseau — on rafraîchit quand même le statut ci-dessous, qui
+      // reflétera honnêtement l'échec plutôt que de planter.
+    } finally {
+      setSyncing(false)
+      await refreshQboStatus()
+      await fetchMonthData()
     }
   }
 
   useEffect(() => { refreshQboStatus() }, [])
 
+  // Synchro automatique si connecté et dernière synchro absente ou > 1h —
+  // déclenchée en arrière-plan, sans jamais bloquer l'affichage de la page.
+  useEffect(() => {
+    if (autoSyncTried.current) return
+    if (qbo.status !== 'connected') return
+    const last = qbo.lastSyncAt ? new Date(qbo.lastSyncAt).getTime() : 0
+    if (Date.now() - last < AUTO_SYNC_AFTER_MS) return
+    autoSyncTried.current = true
+    runSync()
+  }, [qbo.status, qbo.lastSyncAt])
+
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
-    Promise.all([
-      fetch(`/api/finance/revenus?month=${month}`).then(r => r.json()),
-      fetch(`/api/finance/depenses?month=${month}`).then(r => r.json()),
-    ]).then(([rev, exp]) => {
-      if (cancelled) return
-      if (rev.error || exp.error) { setError(rev.error || exp.error); return }
-      setRevenues(rev.data ?? [])
-      setExpenses(exp.data ?? [])
-    }).catch(() => { if (!cancelled) setError('Erreur de chargement') })
-      .finally(() => { if (!cancelled) setLoading(false) })
+    fetchMonthData().then(() => { if (cancelled) return })
     return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month])
 
   useEffect(() => {
@@ -108,8 +155,14 @@ export default function FinanceSection() {
 
   const recent = useMemo(() => {
     const items = [
-      ...revenues.map(r => ({ kind: 'revenue' as const, id: r.id, amount: r.amount, date: r.entry_date, label: r.description || (Array.isArray(r.client) ? r.client[0]?.name : r.client?.name) || 'Revenu' })),
-      ...expenses.map(e => ({ kind: 'expense' as const, id: e.id, amount: e.amount, date: e.entry_date, label: e.description || e.category })),
+      ...revenues.map(r => ({
+        kind: 'revenue' as const, id: r.id, amount: r.amount, date: r.entry_date, source: r.source,
+        label: r.description || (Array.isArray(r.client) ? r.client[0]?.name : r.client?.name) || 'Revenu',
+      })),
+      ...expenses.map(e => ({
+        kind: 'expense' as const, id: e.id, amount: e.amount, date: e.entry_date, source: e.source,
+        label: e.description || e.category,
+      })),
     ]
     return items.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 10)
   }, [revenues, expenses])
@@ -131,7 +184,7 @@ export default function FinanceSection() {
             onChange={e => setMonth(e.target.value)}
             className="text-sm border border-gray-200 rounded-full px-3 py-1.5 text-gray-700"
           />
-          <QuickBooksControl qbo={qbo} onChange={refreshQboStatus} />
+          <QuickBooksControl qbo={qbo} isOwner={isOwner} syncing={syncing} onChange={refreshQboStatus} onSync={runSync} />
         </div>
       </div>
 
@@ -210,23 +263,39 @@ export default function FinanceSection() {
             <p className="text-sm text-gray-400 text-center py-8">Aucune entrée ce mois-ci.</p>
           ) : (
             <div className="divide-y divide-gray-50">
-              {recent.map(item => (
-                <div key={`${item.kind}-${item.id}`} className="flex items-center gap-3 px-5 py-2.5">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800 truncate">{item.label}</p>
-                    <p className="text-xs text-gray-400">{formatDate(item.date)}</p>
+              {recent.map(item => {
+                const isSynced = item.source === 'quickbooks'
+                return (
+                  <div key={`${item.kind}-${item.id}`} className="flex items-center gap-3 px-5 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm text-gray-800 truncate">{item.label}</p>
+                        {isSynced && (
+                          <span className="text-[9px] font-medium uppercase tracking-wide text-green-700 bg-green-50 rounded-full px-1.5 py-0.5 flex-shrink-0">
+                            QuickBooks
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400">{formatDate(item.date)}</p>
+                    </div>
+                    <span className={cn('text-sm font-medium flex-shrink-0', item.kind === 'revenue' ? 'text-green-600' : 'text-red-500')}>
+                      {item.kind === 'revenue' ? '+' : '−'}{formatCurrency(item.amount)}
+                    </span>
+                    {/* Les entrées importées de QuickBooks ne sont jamais
+                        supprimables à la main — seules les manuelles le sont. */}
+                    {isSynced ? (
+                      <span className="w-[26px] flex-shrink-0" aria-hidden />
+                    ) : (
+                      <button
+                        onClick={() => removeEntry(item.kind, item.id)}
+                        className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
-                  <span className={cn('text-sm font-medium flex-shrink-0', item.kind === 'revenue' ? 'text-green-600' : 'text-red-500')}>
-                    {item.kind === 'revenue' ? '+' : '−'}{formatCurrency(item.amount)}
-                  </span>
-                  <button
-                    onClick={() => removeEntry(item.kind, item.id)}
-                    className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -342,11 +411,21 @@ function EntryForm({
   )
 }
 
-// Contrôle compact dans l'en-tête — connecter / déconnecter / reconnecter.
-// La connexion (consentement Intuit) exige une vraie navigation de page
-// (pas un fetch) : <a href="/api/quickbooks/connect"> suit la redirection
-// vers l'écran de consentement QuickBooks.
-function QuickBooksControl({ qbo, onChange }: { qbo: QboState; onChange: () => void }) {
+// Contrôle compact dans l'en-tête — connecter / synchroniser / déconnecter /
+// reconnecter. La connexion (consentement Intuit) exige une vraie navigation
+// de page (pas un fetch) : <a href="/api/quickbooks/connect"> suit la
+// redirection vers l'écran de consentement QuickBooks. Connecter/déconnecter
+// sont réservés au propriétaire (isOwner) — director voit le statut et peut
+// synchroniser, mais ne gère pas la connexion elle-même.
+function QuickBooksControl({
+  qbo, isOwner, syncing, onChange, onSync,
+}: {
+  qbo: QboState
+  isOwner: boolean
+  syncing: boolean
+  onChange: () => void
+  onSync: () => void
+}) {
   const [disconnecting, setDisconnecting] = useState(false)
 
   async function disconnect() {
@@ -364,6 +443,12 @@ function QuickBooksControl({ qbo, onChange }: { qbo: QboState; onChange: () => v
     }
   }
 
+  const sandboxBadge = qbo.environment === 'sandbox' && (
+    <span className="text-[9px] font-medium uppercase tracking-wide text-amber-700 bg-amber-50 rounded-full px-1.5 py-0.5">
+      Sandbox
+    </span>
+  )
+
   if (qbo.status === 'loading') {
     return <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
   }
@@ -371,24 +456,51 @@ function QuickBooksControl({ qbo, onChange }: { qbo: QboState; onChange: () => v
   if (qbo.status === 'connected') {
     return (
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-full px-3 py-1.5">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          {qbo.companyName ? `Connecté à ${qbo.companyName}` : 'QuickBooks connecté'}
-        </span>
+        <div className="flex flex-col items-end">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-full px-3 py-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            {qbo.companyName ? `Connecté à ${qbo.companyName}` : 'QuickBooks connecté'}
+            {sandboxBadge}
+          </span>
+          <span className="text-[10px] text-gray-400 mt-0.5">
+            {qbo.lastSyncAt ? `Dernière synchro : ${formatDatetime(qbo.lastSyncAt)}` : 'Pas encore synchronisé'}
+          </span>
+        </div>
         <button
-          onClick={disconnect}
-          disabled={disconnecting}
-          title="Déconnecter QuickBooks"
-          className="p-1.5 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+          onClick={onSync}
+          disabled={syncing}
+          title="Synchroniser avec QuickBooks"
+          className="p-1.5 rounded-full text-gray-400 hover:text-auchu-600 hover:bg-auchu-50 transition-colors disabled:opacity-50"
         >
-          {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2Off className="w-3.5 h-3.5" />}
+          <RefreshCw className={cn('w-3.5 h-3.5', syncing && 'animate-spin')} />
         </button>
+        {isOwner && (
+          <button
+            onClick={disconnect}
+            disabled={disconnecting}
+            title="Déconnecter QuickBooks"
+            className="p-1.5 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link2Off className="w-3.5 h-3.5" />}
+          </button>
+        )}
       </div>
     )
   }
 
   // 'disconnected' ou 'reconnect_required' (ce dernier a déjà la bannière
   // pleine largeur ci-dessous — ici on garde juste le bouton d'action).
+  if (!isOwner) {
+    return (
+      <span className="text-xs text-gray-400">
+        {qbo.status === 'reconnect_required'
+          ? 'QuickBooks doit être reconnecté par le propriétaire'
+          : 'Connexion QuickBooks gérée par le propriétaire'}
+        {sandboxBadge}
+      </span>
+    )
+  }
+
   return (
     <a href="/api/quickbooks/connect" className="btn-secondary text-xs py-1.5 px-3">
       {qbo.status === 'reconnect_required' ? 'Reconnecter QuickBooks' : 'Connecter QuickBooks'}

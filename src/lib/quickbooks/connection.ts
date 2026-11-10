@@ -1,8 +1,16 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { encryptToken, decryptToken } from './crypto'
 import type { QuickBooksEnvironment } from './config'
 
+// quickbooks_connections n'a plus aucune policy RLS pour authenticated/anon
+// depuis la migration 049 — tout accès passe par le client admin
+// (service_role, server-only). Jamais de SupabaseClient passé en paramètre
+// ici : ça empêcherait d'utiliser par erreur le client lié à la session de
+// l'utilisateur, qui n'aurait plus aucun droit sur cette table de toute
+// façon depuis la migration 049.
+
 export type QuickBooksStatus = 'connected' | 'reconnect_required' | 'disconnected'
+export type QuickBooksSyncStatus = 'success' | 'error' | 'reconnect_required'
 
 export interface QuickBooksConnection {
   realmId: string
@@ -14,6 +22,8 @@ export interface QuickBooksConnection {
   status: QuickBooksStatus
   companyName: string | null
   lastError: string | null
+  lastSyncAt: string | null
+  lastSyncStatus: QuickBooksSyncStatus | null
 }
 
 type DbRow = {
@@ -26,6 +36,8 @@ type DbRow = {
   status: string
   company_name: string | null
   last_error: string | null
+  last_sync_at: string | null
+  last_sync_status: string | null
 }
 
 function fromRow(row: DbRow): QuickBooksConnection {
@@ -39,15 +51,18 @@ function fromRow(row: DbRow): QuickBooksConnection {
     status: row.status as QuickBooksStatus,
     companyName: row.company_name,
     lastError: row.last_error,
+    lastSyncAt: row.last_sync_at,
+    lastSyncStatus: row.last_sync_status as QuickBooksSyncStatus | null,
   }
 }
 
 // user_id = toujours ownerId (ctx.dataOwnerId), jamais l'id du membre qui
 // clique "Connecter" — même convention que revenues/expenses (migration 047).
-export async function getConnection(supabase: SupabaseClient, ownerId: string): Promise<QuickBooksConnection | null> {
+export async function getConnection(ownerId: string): Promise<QuickBooksConnection | null> {
+  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('quickbooks_connections')
-    .select('realm_id, environment, access_token_encrypted, refresh_token_encrypted, access_token_expires_at, refresh_token_expires_at, status, company_name, last_error')
+    .select('realm_id, environment, access_token_encrypted, refresh_token_encrypted, access_token_expires_at, refresh_token_expires_at, status, company_name, last_error, last_sync_at, last_sync_status')
     .eq('user_id', ownerId)
     .maybeSingle()
 
@@ -56,7 +71,7 @@ export async function getConnection(supabase: SupabaseClient, ownerId: string): 
   return fromRow(data as DbRow)
 }
 
-export async function saveTokens(supabase: SupabaseClient, ownerId: string, params: {
+export async function saveTokens(ownerId: string, params: {
   accessToken: string
   refreshToken: string
   accessTokenExpiresAt: Date
@@ -65,6 +80,7 @@ export async function saveTokens(supabase: SupabaseClient, ownerId: string, para
   environment: QuickBooksEnvironment
   companyName?: string | null
 }) {
+  const supabase = createAdminClient()
   const { error } = await supabase
     .from('quickbooks_connections')
     .upsert({
@@ -85,16 +101,36 @@ export async function saveTokens(supabase: SupabaseClient, ownerId: string, para
   if (error) throw new Error(`[quickbooks] sauvegarde jetons échouée — ${error.message}`)
 }
 
-export async function markReconnectRequired(supabase: SupabaseClient, ownerId: string, reason: string) {
+export async function markReconnectRequired(ownerId: string, reason: string) {
+  const supabase = createAdminClient()
   await supabase
     .from('quickbooks_connections')
     .update({ status: 'reconnect_required', last_error: reason })
     .eq('user_id', ownerId)
 }
 
+export async function updateCompanyName(ownerId: string, companyName: string) {
+  const supabase = createAdminClient()
+  await supabase.from('quickbooks_connections').update({ company_name: companyName }).eq('user_id', ownerId)
+}
+
+// Appelé après chaque tentative de synchro (succès, erreur générique, ou
+// reconnexion requise) — distinct de `status` (connecté/déconnecté) : une
+// synchro peut échouer ponctuellement sans que la connexion elle-même soit
+// perdue (ex: un appel de query a échoué après ses 3 essais).
+export async function updateSyncStatus(ownerId: string, status: QuickBooksSyncStatus) {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('quickbooks_connections')
+    .update({ last_sync_at: new Date().toISOString(), last_sync_status: status })
+    .eq('user_id', ownerId)
+  if (error) throw new Error(`[quickbooks] mise à jour du statut de synchro échouée — ${error.message}`)
+}
+
 // Déconnexion volontaire — nettoie les jetons (après révocation côté Intuit,
 // cf. oauth.ts revokeToken) mais conserve la ligne pour l'historique/audit.
-export async function clearConnection(supabase: SupabaseClient, ownerId: string) {
+export async function clearConnection(ownerId: string) {
+  const supabase = createAdminClient()
   const { error } = await supabase
     .from('quickbooks_connections')
     .update({

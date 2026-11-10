@@ -467,7 +467,7 @@ async function OrgDashboard(
           FinanceSection re-vérifie elle-même via l'API (403 sinon) : la
           donnée financière n'est jamais récupérée ni rendue pour les autres
           rôles, ni côté serveur ni côté client. */}
-      {(ctx.isOwner || ctx.isDirector) && <FinanceSection />}
+      {(ctx.isOwner || ctx.isDirector) && <FinanceSection isOwner={ctx.isOwner} />}
     </>
   )
 }
