@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:quickbooks-errors": "node scripts/test-quickbooks-error-handling.mts"
+    "test:quickbooks-errors": "node scripts/test-quickbooks-error-handling.mts",
+    "test:deliverables": "node scripts/test-deliverables.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",

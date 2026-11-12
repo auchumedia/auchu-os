@@ -109,6 +109,9 @@ export interface Client {
   assigned_partner: string | null
   deliverables_short_form: number
   deliverables_long_form: number
+  // Mois (1er du mois, 'YYYY-MM-DD') à partir duquel les livrables mensuels
+  // sont dus — null = utiliser le mois de created_at (migration 050).
+  deliverables_start_month: string | null
   link_instagram: string | null
   link_facebook: string | null
   link_tiktok: string | null

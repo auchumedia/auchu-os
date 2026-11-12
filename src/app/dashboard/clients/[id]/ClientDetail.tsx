@@ -116,6 +116,9 @@ export default function ClientDetail({
   const [deliverables, setDeliverables] = useState({
     short_form: client.deliverables_short_form,
     long_form:  client.deliverables_long_form,
+    // 'YYYY-MM' pour <input type="month"> — la colonne stocke 'YYYY-MM-DD'
+    // (toujours le 1er du mois, cf. migration 050).
+    start_month: client.deliverables_start_month ? client.deliverables_start_month.slice(0, 7) : '',
   })
   const [savingDeliverables, setSavingDeliverables] = useState(false)
   const deliverablesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -240,6 +243,21 @@ export default function ClientDetail({
           deliverables_short_form: next.short_form,
           deliverables_long_form:  next.long_form,
         })
+        setSavingDeliverables(false)
+      }, 700)
+      return next
+    })
+  }
+
+  // 'YYYY-MM' (input) → 'YYYY-MM-DD' (colonne date, 1er du mois) ; '' → null
+  // (repli sur le mois de created_at côté calcul, cf. deliverablesServer.ts).
+  const handleStartMonthChange = (value: string) => {
+    setDeliverables(prev => {
+      const next = { ...prev, start_month: value }
+      if (deliverablesTimeout.current) clearTimeout(deliverablesTimeout.current)
+      deliverablesTimeout.current = setTimeout(async () => {
+        setSavingDeliverables(true)
+        await patch({ deliverables_start_month: value ? `${value}-01` : null })
         setSavingDeliverables(false)
       }, 700)
       return next
@@ -667,6 +685,30 @@ export default function ClientDetail({
                 Total : <span className="font-semibold text-gray-900">{deliverablesTotal}</span> livrable{deliverablesTotal !== 1 ? 's' : ''} / mois
               </p>
               <p className="text-xs text-gray-400 mt-1">Affiché dans le portail client comme "Contenu du mois"</p>
+
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                {canManageSensitive ? (
+                  <div className="max-w-[200px]">
+                    <label className="label">Mois de début</label>
+                    <input
+                      type="month"
+                      value={deliverables.start_month}
+                      onChange={e => handleStartMonthChange(e.target.value)}
+                      className="input text-sm"
+                    />
+                  </div>
+                ) : (
+                  <InfoRow
+                    label="Mois de début"
+                    value={deliverables.start_month ? formatDate(`${deliverables.start_month}-01`) : null}
+                  />
+                )}
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Mois à partir duquel les livrables sont dus — le retard non livré se reporte
+                  automatiquement sur les mois suivants.
+                  {!deliverables.start_month && ' Par défaut : mois de création du contact.'}
+                </p>
+              </div>
             </div>
 
             {/* ─── Liens plateformes ───────────────────────────────────────── */}
