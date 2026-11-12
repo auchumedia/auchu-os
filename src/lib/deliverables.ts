@@ -86,8 +86,13 @@ export function computeDeliverableTypeState(params: DeliverableTypeParams): Deli
     return { quota: perMonth, due: 0, delivered: 0, balance: 0, late: 0, credit: 0, manualAdjustment }
   }
 
+  // Un contenu livré pour un mois antérieur au départ du client ne compte
+  // ni comme dû, ni comme livré, ni comme crédit — il est simplement ignoré
+  // (ex. ancien contenu produit avant le début officiel du forfait).
+  const isCounted = (month: MonthKey) => compareMonthKeys(month, startMonth) >= 0
+
   const dueCumulative = perMonth * monthsElapsed
-  const deliveredCumulative = deliveredMonths.filter(m => compareMonthKeys(m, targetMonth) <= 0).length
+  const deliveredCumulative = deliveredMonths.filter(m => isCounted(m) && compareMonthKeys(m, targetMonth) <= 0).length
   const balance = dueCumulative - deliveredCumulative + manualAdjustment
 
   const prevMonth = addMonths(targetMonth, -1)
@@ -95,7 +100,7 @@ export function computeDeliverableTypeState(params: DeliverableTypeParams): Deli
   let balancePrev = 0
   if (monthsElapsedPrev > 0) {
     const dueCumulativePrev = perMonth * monthsElapsedPrev
-    const deliveredCumulativePrev = deliveredMonths.filter(m => compareMonthKeys(m, prevMonth) <= 0).length
+    const deliveredCumulativePrev = deliveredMonths.filter(m => isCounted(m) && compareMonthKeys(m, prevMonth) <= 0).length
     balancePrev = dueCumulativePrev - deliveredCumulativePrev + manualAdjustment
   }
 
