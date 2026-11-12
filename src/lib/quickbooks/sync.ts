@@ -1,5 +1,6 @@
 import { qboFetch } from './client'
 import { getConnection } from './connection'
+import { QuickBooksReconnectRequiredError, QuickBooksNotConnectedError } from './errors'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '@/lib/finance'
 import type { createClient } from '@/lib/supabase/server'
 
@@ -149,12 +150,35 @@ async function upsertSyncedEntry(
 export interface QuickBooksSyncResult {
   revenuesSynced: number
   expensesSynced: number
+  // Un message par ressource (Invoice/Purchase/Bill) qui a échoué sans
+  // bloquer le reste de la synchro — ex: "Bill (factures fournisseurs)
+  // indisponible — HTTP 400" quand le forfait QuickBooks n'inclut pas cette
+  // fonctionnalité. Vide si tout a réussi.
+  errors: string[]
+}
+
+// Erreurs de jeton — restent bloquantes : on les relance immédiatement pour
+// que syncQuickBooksData() (et la route appelante) les traite comme avant
+// (statut "reconnect_required", bouton Reconnecter). Toute AUTRE erreur sur
+// une ressource (400/403 "non disponible pour ce forfait", 404, etc.) est
+// non bloquante — cf. isolation par ressource ci-dessous.
+function isBlockingTokenError(e: unknown): boolean {
+  return e instanceof QuickBooksReconnectRequiredError || e instanceof QuickBooksNotConnectedError
+}
+
+function describeResourceFailure(label: string, e: unknown): string {
+  const reason = e instanceof Error ? e.message : String(e)
+  return `${label} indisponible — ${reason}`
 }
 
 // Synchronise les 12 derniers mois — Invoice → finance_revenues, Purchase +
-// Bill → finance_expenses. supabase est le client lié à la session (RLS
-// owner/director, migration 047) : jamais le client admin ici,
-// finance_revenues/finance_expenses n'ont pas besoin de service_role.
+// Bill → finance_expenses. Chaque ressource est lue indépendamment : si
+// l'une échoue (non disponible pour le forfait de l'entreprise, erreur
+// 400/403 ou autre), la synchro continue avec les autres plutôt que de tout
+// annuler — seule une erreur de jeton (reconnexion requise) interrompt tout.
+// supabase est le client lié à la session (RLS owner/director, migration
+// 047) : jamais le client admin ici, finance_revenues/finance_expenses
+// n'ont pas besoin de service_role.
 export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: string): Promise<QuickBooksSyncResult> {
   // Résout le realm_id courant pour (a) détecter un changement d'entreprise/
   // environnement et purger les données de l'ancien realm avant de
@@ -166,39 +190,64 @@ export async function syncQuickBooksData(supabase: SupabaseClient, ownerId: stri
   const where = `TxnDate >= '${twelveMonthsAgoISO()}' AND TxnDate <= '${todayISO()}'`
   const clientByName = await buildClientNameMap(supabase, ownerId)
 
-  const invoices = await queryAll<QboInvoice>(ownerId, 'Invoice', where)
-  for (const inv of invoices) {
-    const customerName = inv.CustomerRef?.name?.toLowerCase().trim()
-    const clientId = customerName ? clientByName.get(customerName) ?? null : null
-    await upsertSyncedEntry(supabase, 'finance_revenues', ownerId, `inv_${realmId}_${inv.Id}`, {
-      amount: inv.TotalAmt,
-      entry_date: inv.TxnDate,
-      description: inv.DocNumber ? `Facture ${inv.DocNumber}` : `Facture QuickBooks ${inv.Id}`,
-      client_id: clientId,
-    })
+  const errors: string[] = []
+  let revenuesSynced = 0
+  let expensesSynced = 0
+
+  // ── Invoice → finance_revenues ────────────────────────────────────────────
+  try {
+    const invoices = await queryAll<QboInvoice>(ownerId, 'Invoice', where)
+    for (const inv of invoices) {
+      const customerName = inv.CustomerRef?.name?.toLowerCase().trim()
+      const clientId = customerName ? clientByName.get(customerName) ?? null : null
+      await upsertSyncedEntry(supabase, 'finance_revenues', ownerId, `inv_${realmId}_${inv.Id}`, {
+        amount: inv.TotalAmt,
+        entry_date: inv.TxnDate,
+        description: inv.DocNumber ? `Facture ${inv.DocNumber}` : `Facture QuickBooks ${inv.Id}`,
+        client_id: clientId,
+      })
+    }
+    revenuesSynced = invoices.length
+  } catch (e) {
+    if (isBlockingTokenError(e)) throw e
+    errors.push(describeResourceFailure('Invoice (factures)', e))
   }
 
-  const purchases = await queryAll<QboPurchase>(ownerId, 'Purchase', where)
-  for (const p of purchases) {
-    const accountName = p.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
-    await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `pur_${realmId}_${p.Id}`, {
-      amount: p.TotalAmt,
-      entry_date: p.TxnDate,
-      category: mapExpenseCategory(accountName),
-      description: p.EntityRef?.name ?? (p.DocNumber ? `Achat ${p.DocNumber}` : `Achat QuickBooks ${p.Id}`),
-    })
+  // ── Purchase → finance_expenses ───────────────────────────────────────────
+  try {
+    const purchases = await queryAll<QboPurchase>(ownerId, 'Purchase', where)
+    for (const p of purchases) {
+      const accountName = p.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
+      await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `pur_${realmId}_${p.Id}`, {
+        amount: p.TotalAmt,
+        entry_date: p.TxnDate,
+        category: mapExpenseCategory(accountName),
+        description: p.EntityRef?.name ?? (p.DocNumber ? `Achat ${p.DocNumber}` : `Achat QuickBooks ${p.Id}`),
+      })
+    }
+    expensesSynced += purchases.length
+  } catch (e) {
+    if (isBlockingTokenError(e)) throw e
+    errors.push(describeResourceFailure('Purchase (achats)', e))
   }
 
-  const bills = await queryAll<QboBill>(ownerId, 'Bill', where)
-  for (const b of bills) {
-    const accountName = b.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
-    await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `bill_${realmId}_${b.Id}`, {
-      amount: b.TotalAmt,
-      entry_date: b.TxnDate,
-      category: mapExpenseCategory(accountName),
-      description: b.VendorRef?.name ?? (b.DocNumber ? `Facture fournisseur ${b.DocNumber}` : `Facture fournisseur QuickBooks ${b.Id}`),
-    })
+  // ── Bill → finance_expenses ────────────────────────────────────────────────
+  try {
+    const bills = await queryAll<QboBill>(ownerId, 'Bill', where)
+    for (const b of bills) {
+      const accountName = b.Line?.find(l => l.AccountBasedExpenseLineDetail?.AccountRef?.name)?.AccountBasedExpenseLineDetail?.AccountRef?.name
+      await upsertSyncedEntry(supabase, 'finance_expenses', ownerId, `bill_${realmId}_${b.Id}`, {
+        amount: b.TotalAmt,
+        entry_date: b.TxnDate,
+        category: mapExpenseCategory(accountName),
+        description: b.VendorRef?.name ?? (b.DocNumber ? `Facture fournisseur ${b.DocNumber}` : `Facture fournisseur QuickBooks ${b.Id}`),
+      })
+    }
+    expensesSynced += bills.length
+  } catch (e) {
+    if (isBlockingTokenError(e)) throw e
+    errors.push(describeResourceFailure('Bill (factures fournisseurs)', e))
   }
 
-  return { revenuesSynced: invoices.length, expensesSynced: purchases.length + bills.length }
+  return { revenuesSynced, expensesSynced, errors }
 }

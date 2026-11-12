@@ -118,12 +118,23 @@ export async function updateCompanyName(ownerId: string, companyName: string) {
 // reconnexion requise) — distinct de `status` (connecté/déconnecté) : une
 // synchro peut échouer ponctuellement sans que la connexion elle-même soit
 // perdue (ex: un appel de query a échoué après ses 3 essais).
-export async function updateSyncStatus(ownerId: string, status: QuickBooksSyncStatus) {
+//
+// `detail` porte un message lisible sur ce qui s'est passé (ex: "Bill
+// indisponible — HTTP 400" quand une ressource précise a échoué mais que le
+// reste de la synchro a continué, cf. syncQuickBooksData) — stocké dans
+// last_error, qui n'a pas de contrainte CHECK contrairement à
+// last_sync_status.
+//
+// `detail` omis (undefined) : last_error n'est PAS touché — utilisé pour
+// 'reconnect_required', où markReconnectRequired() vient déjà d'y écrire le
+// vrai motif (ex: "invalid_grant") juste avant ; on ne veut pas l'effacer.
+// `detail` fourni (y compris null) : écrase last_error — null pour nettoyer
+// un message d'une synchro précédente après un succès complet.
+export async function updateSyncStatus(ownerId: string, status: QuickBooksSyncStatus, detail?: string | null) {
   const supabase = createAdminClient()
-  const { error } = await supabase
-    .from('quickbooks_connections')
-    .update({ last_sync_at: new Date().toISOString(), last_sync_status: status })
-    .eq('user_id', ownerId)
+  const payload: Record<string, unknown> = { last_sync_at: new Date().toISOString(), last_sync_status: status }
+  if (detail !== undefined) payload.last_error = detail
+  const { error } = await supabase.from('quickbooks_connections').update(payload).eq('user_id', ownerId)
   if (error) throw new Error(`[quickbooks] mise à jour du statut de synchro échouée — ${error.message}`)
 }
 
