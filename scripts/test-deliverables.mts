@@ -126,5 +126,105 @@ console.log('\nTest 7 — helpers MonthKey (mois écoulés, addMonths)')
   assertEqual(JSON.stringify(addMonths(m('2026-01'), -1)), JSON.stringify(m('2025-12')), 'addMonths négatif gère le changement d\'année')
 }
 
+console.log('\nTest 8 — ajustement manuel (+2 appliqué uniformément, sur un solde déjà à zéro)')
+{
+  // Oct. à l'équilibre (4 dus, 4 livrées) ; l'ajustement +2 doit se
+  // répercuter intégralement sur le dû de novembre (4 + 2 = 6).
+  const delivered = Array(4).fill(m('2026-10'))
+  const r = computeDeliverableTypeState({
+    perMonth: 4, startMonth: m('2026-10'), targetMonth: m('2026-11'), deliveredMonths: delivered, manualAdjustment: 2,
+  })
+  assertEqual(r.due, 6, 'novembre : dû = 4 (quota) + 2 (ajustement manuel) = 6')
+  assertEqual(r.manualAdjustment, 2, "l'ajustement est répété dans le résultat pour l'affichage")
+}
+
+// ── Cas réels novembre 2026 (vérifiés contre les données live Supabase) ────────
+// Pour chacun : deliverables_start_month corrigé au premier mois de
+// production réelle (pas le mois de created_at, qui inclut le délai
+// d'onboarding) — cf. rapport fourni à l'utilisateur pour le détail des
+// content_pieces comptés/ignorés par client. Le "retard"/"crédit" que
+// l'utilisateur décrit est le solde à la fin du mois PRÉCÉDENT (celui qui
+// est reporté dans le "dû" de novembre) — donc vérifié ici avec
+// targetMonth = octobre, pas novembre (même convention que Test 1/2 :
+// le solde à targetMonth inclut toujours le quota du mois ciblé lui-même).
+
+console.log('\nTest 9 — cas réel : Bâton Rouge Vaudreuil (à jour → nov. dû = 4, retard 0)')
+{
+  // 4 publiées en sept., 4 publiées en oct. — start corrigé à sept. 2026
+  // (au lieu du mois de created_at, août, qui créait un retard fictif).
+  const delivered = [...Array(4).fill(m('2026-09')), ...Array(4).fill(m('2026-10'))]
+  const oct = computeDeliverableTypeState({ perMonth: 4, startMonth: m('2026-09'), targetMonth: m('2026-10'), deliveredMonths: delivered })
+  assertEqual(oct.late, 0, 'Bâton Rouge : aucun retard entrant en novembre')
+  assertEqual(oct.credit, 0, 'Bâton Rouge : aucun crédit non plus — exactement à jour')
+  const nov = computeDeliverableTypeState({ perMonth: 4, startMonth: m('2026-09'), targetMonth: m('2026-11'), deliveredMonths: delivered })
+  assertEqual(nov.due, 4, 'Bâton Rouge : novembre dû = 4')
+}
+
+console.log('\nTest 10 — cas réel : Groupe DDC (à jour → nov. dû = 4)')
+{
+  // 4 pièces statut "filme" en octobre (aucune "publie") — start corrigé à
+  // oct. 2026 (mois de la première production, pas le mois de created_at).
+  const delivered = Array(4).fill(m('2026-10'))
+  const oct = computeDeliverableTypeState({ perMonth: 4, startMonth: m('2026-10'), targetMonth: m('2026-10'), deliveredMonths: delivered })
+  assertEqual(oct.late, 0, 'Groupe DDC : aucun retard entrant en novembre')
+  const nov = computeDeliverableTypeState({ perMonth: 4, startMonth: m('2026-10'), targetMonth: m('2026-11'), deliveredMonths: delivered })
+  assertEqual(nov.due, 4, 'Groupe DDC : novembre dû = 4')
+}
+
+console.log('\nTest 11 — cas réel : Équipe Lemire Filion (2 vidéos d\'avance → nov. dû = 2)')
+{
+  // 6 pièces livrées en octobre (3 "publie" + 3 "filme" — comptées grâce au
+  // correctif de statut) contre un quota de 4 — start corrigé à oct. 2026.
+  const delivered = Array(6).fill(m('2026-10'))
+  const oct = computeDeliverableTypeState({ perMonth: 4, startMonth: m('2026-10'), targetMonth: m('2026-10'), deliveredMonths: delivered })
+  assertEqual(oct.credit, 2, "Lemire Filion : 2 vidéos d'avance entrant en novembre")
+  const nov = computeDeliverableTypeState({ perMonth: 4, startMonth: m('2026-10'), targetMonth: m('2026-11'), deliveredMonths: delivered })
+  assertEqual(nov.due, 2, "Lemire Filion : novembre dû = 4 (quota) − 2 (crédit) = 2")
+}
+
+console.log('\nTest 12 — cas réel : Cardinal Asphalte (3 en retard → nov. dû = 7)')
+{
+  // Livré par mois (start = juillet, premier mois de production) :
+  // juillet 7, août 4, septembre 5, octobre 0 → balance à fin octobre = 0
+  // avec les seuls content_pieces actuels. L'historique réel du client
+  // (retard connu de 5 vidéos, ramené à 3 une fois les 2 déjà tournées
+  // comptées) n'est pas entièrement capturé par les content_pieces
+  // existants — 5 pièces "publie" de Cardinal n'ont pas de month_target
+  // (repli sur leur mois de création, juillet, ce qui gonfle
+  // artificiellement ce mois-là). Ajustement manuel +3 en attendant que ces
+  // 5 pièces soient réassignées au bon mois (cf. rapport).
+  const delivered = [
+    ...Array(7).fill(m('2026-07')), ...Array(4).fill(m('2026-08')), ...Array(5).fill(m('2026-09')),
+  ]
+  const oct = computeDeliverableTypeState({
+    perMonth: 4, startMonth: m('2026-07'), targetMonth: m('2026-10'), deliveredMonths: delivered, manualAdjustment: 3,
+  })
+  assertEqual(oct.late, 3, 'Cardinal Asphalte : 3 en retard entrant en novembre (ajustement manuel inclus)')
+  const nov = computeDeliverableTypeState({
+    perMonth: 4, startMonth: m('2026-07'), targetMonth: m('2026-11'), deliveredMonths: delivered, manualAdjustment: 3,
+  })
+  assertEqual(nov.due, 7, 'Cardinal Asphalte : novembre dû = 3 (retard) + 4 (quota) = 7')
+}
+
+console.log('\nTest 13 — cas réel : Nor-Can (à jour → nov. dû = 4)')
+{
+  // Livré par mois (start = juillet) : juillet 4, août 5, septembre 0
+  // (aucun content_piece assigné à septembre — anomalie signalée dans le
+  // rapport), octobre 4 → retard de 3 à fin octobre sans intervention.
+  // Ajustement manuel -3 en attendant la confirmation de l'utilisateur sur
+  // ce qui s'est passé en septembre (mois sans aucun contenu, livré ou non).
+  const delivered = [
+    ...Array(4).fill(m('2026-07')), ...Array(5).fill(m('2026-08')), ...Array(4).fill(m('2026-10')),
+  ]
+  const oct = computeDeliverableTypeState({
+    perMonth: 4, startMonth: m('2026-07'), targetMonth: m('2026-10'), deliveredMonths: delivered, manualAdjustment: -3,
+  })
+  assertEqual(oct.late, 0, 'Nor-Can : aucun retard entrant en novembre une fois l\'ajustement appliqué')
+  const nov = computeDeliverableTypeState({
+    perMonth: 4, startMonth: m('2026-07'), targetMonth: m('2026-11'), deliveredMonths: delivered, manualAdjustment: -3,
+  })
+  assertEqual(nov.due, 4, 'Nor-Can : novembre dû = 4')
+}
+
 console.log(failures === 0 ? '\n✅ Tous les tests passent.' : `\n❌ ${failures} test(s) en échec.`)
 process.exitCode = failures === 0 ? 0 : 1

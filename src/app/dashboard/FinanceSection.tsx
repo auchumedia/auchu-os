@@ -31,10 +31,11 @@ interface Expense {
 
 interface ContactOption { id: string; name: string }
 
-interface DeliverableTypeState { quota: number; due: number; delivered: number; balance: number; late: number; credit: number }
+interface DeliverableTypeState { quota: number; due: number; delivered: number; balance: number; late: number; credit: number; manualAdjustment: number }
 interface DeliverableRow {
   id: string; name: string; logo_url: string | null
   shortForm: DeliverableTypeState; longForm: DeliverableTypeState
+  shortFormAdjustmentNote: string | null; longFormAdjustmentNote: string | null
   totalDue: number; totalDelivered: number; totalLate: number; totalCredit: number
 }
 interface DeliverablesAggregate { shortDue: number; shortDelivered: number; longDue: number; longDelivered: number }
@@ -545,8 +546,8 @@ function DeliverablesCard({ rows, loading }: { rows: DeliverableRow[]; loading: 
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <DeliverableBar label="Short" state={r.shortForm} />
-                  <DeliverableBar label="Long" state={r.longForm} />
+                  <DeliverableBar label="Short" state={r.shortForm} note={r.shortFormAdjustmentNote} />
+                  <DeliverableBar label="Long" state={r.longForm} note={r.longFormAdjustmentNote} />
                 </div>
               </div>
             </Link>
@@ -557,10 +558,13 @@ function DeliverablesCard({ rows, loading }: { rows: DeliverableRow[]; loading: 
   )
 }
 
-function DeliverableBar({ label, state }: { label: string; state: DeliverableTypeState }) {
+function DeliverableBar({ label, state, note }: { label: string; state: DeliverableTypeState; note?: string | null }) {
   if (state.quota === 0) return null
   const pct = state.due > 0 ? Math.min(100, Math.round((state.delivered / state.due) * 100)) : 100
   const barColor = state.late > 0 ? 'bg-amber-500' : state.delivered >= state.due ? 'bg-green-500' : 'bg-auchu-500'
+  const adjustmentTitle = state.manualAdjustment !== 0
+    ? `Ajustement manuel : ${state.manualAdjustment > 0 ? '+' : ''}${state.manualAdjustment}${note ? ` — ${note}` : ''}`
+    : undefined
   return (
     <div className="flex items-center gap-2">
       <span className="text-[10px] text-gray-400 w-10 flex-shrink-0">{label}</span>
@@ -568,6 +572,14 @@ function DeliverableBar({ label, state }: { label: string; state: DeliverableTyp
         <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-[11px] text-gray-500 w-12 flex-shrink-0 text-right">{state.delivered}/{state.due}</span>
+      {state.manualAdjustment !== 0 && (
+        <span
+          title={adjustmentTitle}
+          className="text-[9px] font-medium text-purple-700 bg-purple-50 rounded-full px-1.5 py-0.5 flex-shrink-0"
+        >
+          {state.manualAdjustment > 0 ? '+' : ''}{state.manualAdjustment}
+        </span>
+      )}
     </div>
   )
 }

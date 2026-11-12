@@ -112,6 +112,13 @@ export interface Client {
   // Mois (1er du mois, 'YYYY-MM-DD') à partir duquel les livrables mensuels
   // sont dus — null = utiliser le mois de created_at (migration 050).
   deliverables_start_month: string | null
+  // Ajustement manuel (+ ou -) ajouté au solde cumulé de chaque type, avec
+  // note optionnelle — corrige les cas où l'historique réel ne colle pas
+  // aux content_pieces, sans en modifier aucun (migration 051).
+  deliverables_short_adjustment: number
+  deliverables_short_adjustment_note: string | null
+  deliverables_long_adjustment: number
+  deliverables_long_adjustment_note: string | null
   link_instagram: string | null
   link_facebook: string | null
   link_tiktok: string | null

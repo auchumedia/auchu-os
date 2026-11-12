@@ -119,6 +119,10 @@ export default function ClientDetail({
     // 'YYYY-MM' pour <input type="month"> — la colonne stocke 'YYYY-MM-DD'
     // (toujours le 1er du mois, cf. migration 050).
     start_month: client.deliverables_start_month ? client.deliverables_start_month.slice(0, 7) : '',
+    short_adjustment:      client.deliverables_short_adjustment,
+    short_adjustment_note: client.deliverables_short_adjustment_note ?? '',
+    long_adjustment:       client.deliverables_long_adjustment,
+    long_adjustment_note:  client.deliverables_long_adjustment_note ?? '',
   })
   const [savingDeliverables, setSavingDeliverables] = useState(false)
   const deliverablesTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -258,6 +262,31 @@ export default function ClientDetail({
       deliverablesTimeout.current = setTimeout(async () => {
         setSavingDeliverables(true)
         await patch({ deliverables_start_month: value ? `${value}-01` : null })
+        setSavingDeliverables(false)
+      }, 700)
+      return next
+    })
+  }
+
+  // Ajustement manuel (+ ou -) par type, avec note optionnelle — s'ajoute au
+  // solde cumulé calculé à partir des content_pieces (migration 051). Note
+  // sauvegardée avec le même debounce que la valeur pour éviter un PATCH par
+  // caractère tapé.
+  const handleAdjustmentChange = (
+    field: 'short_adjustment' | 'long_adjustment' | 'short_adjustment_note' | 'long_adjustment_note',
+    value: number | string,
+  ) => {
+    setDeliverables(prev => {
+      const next = { ...prev, [field]: value }
+      if (deliverablesTimeout.current) clearTimeout(deliverablesTimeout.current)
+      deliverablesTimeout.current = setTimeout(async () => {
+        setSavingDeliverables(true)
+        await patch({
+          deliverables_short_adjustment:      next.short_adjustment,
+          deliverables_short_adjustment_note: next.short_adjustment_note || null,
+          deliverables_long_adjustment:       next.long_adjustment,
+          deliverables_long_adjustment_note:  next.long_adjustment_note || null,
+        })
         setSavingDeliverables(false)
       }, 700)
       return next
@@ -708,6 +737,66 @@ export default function ClientDetail({
                   automatiquement sur les mois suivants.
                   {!deliverables.start_month && ' Par défaut : mois de création du contact.'}
                 </p>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <h3 className="label mb-2">Ajustement manuel</h3>
+                <p className="text-xs text-gray-400 mb-3">
+                  Un nombre positif (retard) ou négatif (crédit) ajouté au solde cumulé, sans toucher aux
+                  contenus — pour corriger à la main un cas où l'historique réel ne colle pas exactement
+                  (ex. changement de forfait en cours de route).
+                </p>
+                {canManageSensitive ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="label">Short form</label>
+                      <input
+                        type="number"
+                        value={deliverables.short_adjustment}
+                        onChange={e => handleAdjustmentChange('short_adjustment', Number(e.target.value) || 0)}
+                        className="input text-sm"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Note (optionnel)"
+                        value={deliverables.short_adjustment_note}
+                        onChange={e => handleAdjustmentChange('short_adjustment_note', e.target.value)}
+                        className="input text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="label">Long form</label>
+                      <input
+                        type="number"
+                        value={deliverables.long_adjustment}
+                        onChange={e => handleAdjustmentChange('long_adjustment', Number(e.target.value) || 0)}
+                        className="input text-sm"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Note (optionnel)"
+                        value={deliverables.long_adjustment_note}
+                        onChange={e => handleAdjustmentChange('long_adjustment_note', e.target.value)}
+                        className="input text-sm"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <InfoRow
+                      label="Short form"
+                      value={deliverables.short_adjustment !== 0
+                        ? `${deliverables.short_adjustment > 0 ? '+' : ''}${deliverables.short_adjustment}${deliverables.short_adjustment_note ? ` — ${deliverables.short_adjustment_note}` : ''}`
+                        : null}
+                    />
+                    <InfoRow
+                      label="Long form"
+                      value={deliverables.long_adjustment !== 0
+                        ? `${deliverables.long_adjustment > 0 ? '+' : ''}${deliverables.long_adjustment}${deliverables.long_adjustment_note ? ` — ${deliverables.long_adjustment_note}` : ''}`
+                        : null}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

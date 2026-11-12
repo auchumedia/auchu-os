@@ -9,6 +9,8 @@ export interface ClientDeliverableRow {
   logo_url: string | null
   shortForm: ReturnType<typeof computeClientDeliverables>['shortForm']
   longForm: ReturnType<typeof computeClientDeliverables>['longForm']
+  shortFormAdjustmentNote: string | null
+  longFormAdjustmentNote: string | null
   totalDue: number
   totalDelivered: number
   totalLate: number
@@ -27,9 +29,10 @@ export interface DeliverablesResult {
   aggregate: DeliverablesAggregate
 }
 
-// Livré = statut "publie" ; mois assigné = month_target (choisi à la
-// création de l'idée), avec repli sur created_at pour les lignes
-// antérieures à l'ajout de cette colonne (migration 042).
+// Livré = statut "filme" OU "publie" (une vidéo déjà tournée mais pas
+// encore publiée compte quand même comme livrée) ; mois assigné =
+// month_target (choisi à la création de l'idée), avec repli sur created_at
+// pour les lignes antérieures à l'ajout de cette colonne (migration 042).
 function assignedMonth(piece: { month_target: string | null; created_at: string }): MonthKey {
   return piece.month_target ? monthKeyFromString(piece.month_target) : monthKeyFromDate(piece.created_at)
 }
@@ -53,7 +56,7 @@ export async function fetchClientDeliverableRows(
 ): Promise<DeliverablesResult> {
   let clientsQuery = supabase
     .from('clients')
-    .select('id, name, logo_url, deliverables_short_form, deliverables_long_form, deliverables_start_month, created_at')
+    .select('id, name, logo_url, deliverables_short_form, deliverables_long_form, deliverables_start_month, created_at, deliverables_short_adjustment, deliverables_short_adjustment_note, deliverables_long_adjustment, deliverables_long_adjustment_note')
     .eq('user_id', ownerId)
     .eq('status', 'actif')
     .order('name')
@@ -76,7 +79,7 @@ export async function fetchClientDeliverableRows(
     .from('content_pieces')
     .select('client_id, type, month_target, created_at')
     .eq('user_id', ownerId)
-    .eq('status', 'publie')
+    .in('status', ['filme', 'publie'])
     .in('client_id', ids)
 
   const deliveredByClient = new Map<string, { short: MonthKey[]; long: MonthKey[] }>()
@@ -100,6 +103,8 @@ export async function fetchClientDeliverableRows(
       targetMonth,
       deliveredShortFormMonths: delivered.short,
       deliveredLongFormMonths: delivered.long,
+      shortFormAdjustment: c.deliverables_short_adjustment,
+      longFormAdjustment: c.deliverables_long_adjustment,
     })
 
     aggregate.shortDue += result.shortForm.due
@@ -110,6 +115,8 @@ export async function fetchClientDeliverableRows(
     return {
       id: c.id, name: c.name, logo_url: c.logo_url,
       shortForm: result.shortForm, longForm: result.longForm,
+      shortFormAdjustmentNote: c.deliverables_short_adjustment_note,
+      longFormAdjustmentNote: c.deliverables_long_adjustment_note,
       totalDue: result.totalDue, totalDelivered: result.totalDelivered,
       totalLate: result.totalLate, totalCredit: result.totalCredit,
     }
