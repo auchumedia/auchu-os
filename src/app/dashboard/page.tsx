@@ -140,7 +140,7 @@ async function ToDoColumn({
   const [pendingApprovalRes, readyToShootRes, deliverables] = await Promise.all([
     pendingApprovalQuery,
     readyToShootQuery,
-    fetchClientDeliverableRows(supabase, ownerId, clientIds, monthKeyFromDate(now)),
+    fetchClientDeliverableRows(supabase, ownerId, clientIds, monthKeyFromDate(now), monthKeyFromDate(now)),
   ])
 
   const lateClients = deliverables.rows.filter(r => r.totalLate > 0).slice(0, 6)

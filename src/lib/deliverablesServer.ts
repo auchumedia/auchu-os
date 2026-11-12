@@ -14,7 +14,6 @@ export interface ClientDeliverableRow {
   totalDue: number
   totalDelivered: number
   totalLate: number
-  totalCredit: number
 }
 
 export interface DeliverablesAggregate {
@@ -49,10 +48,16 @@ function clientStartMonth(client: { deliverables_start_month: string | null; cre
 // clientIds === [...] : scopé à une équipe (stratege/monteur) — même
 // convention que fetchClientCards/fetchUpcomingEvents (dashboard/page.tsx).
 //
+// currentMonth = mois réel "aujourd'hui", distinct de targetMonth (le mois
+// affiché, que l'utilisateur peut faire défiler) — nécessaire pour que le
+// calcul sache si targetMonth est entièrement passé (cf. deliverables.ts,
+// règles 1 et 5 : le quota d'un mois en cours ou futur n'est jamais "en
+// retard").
+//
 // Triées par retard total décroissant (les clients les plus en retard en
 // premier), puis par nom.
 export async function fetchClientDeliverableRows(
-  supabase: SupabaseClient, ownerId: string, clientIds: string[] | null, targetMonth: MonthKey,
+  supabase: SupabaseClient, ownerId: string, clientIds: string[] | null, targetMonth: MonthKey, currentMonth: MonthKey,
 ): Promise<DeliverablesResult> {
   let clientsQuery = supabase
     .from('clients')
@@ -101,6 +106,7 @@ export async function fetchClientDeliverableRows(
       deliverablesLongForm: c.deliverables_long_form,
       startMonth: clientStartMonth(c),
       targetMonth,
+      currentMonth,
       deliveredShortFormMonths: delivered.short,
       deliveredLongFormMonths: delivered.long,
       shortFormAdjustment: c.deliverables_short_adjustment,
@@ -118,7 +124,7 @@ export async function fetchClientDeliverableRows(
       shortFormAdjustmentNote: c.deliverables_short_adjustment_note,
       longFormAdjustmentNote: c.deliverables_long_adjustment_note,
       totalDue: result.totalDue, totalDelivered: result.totalDelivered,
-      totalLate: result.totalLate, totalCredit: result.totalCredit,
+      totalLate: result.totalLate,
     }
   })
 

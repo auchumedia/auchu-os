@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
 import { fetchClientDeliverableRows } from '@/lib/deliverablesServer'
-import { monthKeyFromString } from '@/lib/deliverables'
+import { monthKeyFromDate, monthKeyFromString } from '@/lib/deliverables'
 import { NextResponse } from 'next/server'
 
 // Visible à tous les rôles connectés (pas seulement finance) — scope par
@@ -30,7 +30,12 @@ export async function GET(req: Request) {
   }
 
   try {
-    const result = await fetchClientDeliverableRows(supabase, ctx.dataOwnerId, clientIds, monthKeyFromString(month))
+    // currentMonth = mois réel "aujourd'hui", pas le mois demandé — même si
+    // l'utilisateur consulte un mois passé ou futur via le sélecteur, c'est
+    // toujours la vraie date du jour qui détermine si ce mois est terminé.
+    const result = await fetchClientDeliverableRows(
+      supabase, ctx.dataOwnerId, clientIds, monthKeyFromString(month), monthKeyFromDate(new Date()),
+    )
     return NextResponse.json(result)
   } catch (e) {
     console.error('[api/deliverables] échec —', e instanceof Error ? e.message : e)

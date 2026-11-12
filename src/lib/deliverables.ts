@@ -1,14 +1,32 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // Report automatique des livrables — fonctions PURES et testables (aucune
 // dépendance : pas de Supabase, pas de Date.now(), pas d'horloge système ;
-// tout ce qui varie dans le temps est passé en paramètre).
+// tout ce qui varie dans le temps est passé en paramètre, y compris le mois
+// "aujourd'hui" (currentMonth) nécessaire pour distinguer un mois entièrement
+// passé d'un mois en cours/futur).
 //
-// Règle : les livrables non livrés un mois s'accumulent sur les mois
-// suivants. Appliquée séparément pour short_form et long_form (cf.
-// computeDeliverableTypeState) — un client a donc deux soldes indépendants.
+// Règles métier (vérité business, cf. historique de ce fichier) :
+//  1. Le quota du mois ciblé n'est JAMAIS du retard tant que ce mois n'est
+//     pas terminé — en novembre, les livrables de novembre sont "à faire",
+//     pas "en retard".
+//  2. Retard = ce qui manquait à la fin des mois PASSÉS (backlog B), diminué
+//     de ce qui a été livré depuis. Crédit (C) = avance livrée au-delà du dû
+//     des mois passés — B et C sont mutuellement exclusifs. L'ajustement
+//     manuel s'ajoute au backlog (+ = dû en plus, − = crédit).
+//  3. "Livré" = statut filme OU publie.
+//  4. À livrer (mois M) = quota(M) + B. Livré affiché (mois M) = livrés
+//     dans M + C — jamais le due diminué du crédit : le crédit vient
+//     gonfler ce qui est déjà considéré comme livré pour M.
+//  5. Badge "N en retard" = max(0, B − livrés dans M) pour un mois en cours
+//     ou futur (le quota de M n'y entre jamais). Pour un mois entièrement
+//     passé, retard = à livrer − livré (le quota de ce mois compte, il ne
+//     reviendra plus).
+//  6. Le badge ne s'affiche que s'il est > 0.
+//  7. Mêmes règles pour short_form et long_form (soldes indépendants). Tout
+//     contenu livré avant le mois de départ du client est ignoré (ni dû, ni
+//     livré, ni crédit).
 //
-// Testé par scripts/test-deliverables.mts (retard simple, surplus/crédit,
-// client démarré en cours d'année, mois sans livrable, short/long séparés).
+// Testé par scripts/test-deliverables.mts.
 // ══════════════════════════════════════════════════════════════════════════════
 
 export interface MonthKey {
@@ -51,39 +69,32 @@ export function monthsBetweenInclusive(start: MonthKey, end: MonthKey): number {
 }
 
 export interface DeliverableTypeResult {
-  quota: number       // livrables/mois pour ce type (deliverables_short_form ou _long_form)
-  due: number          // "Y" affiché pour le mois ciblé = quota + retard reporté du mois précédent
-  delivered: number    // "X" affiché = livré PENDANT le mois ciblé seulement
-  balance: number      // dû cumulé − livré cumulé + ajustement manuel, jusqu'au mois ciblé inclus (>0 retard, <0 crédit)
-  late: number         // max(0, balance) — retard cumulé à la fin du mois ciblé
-  credit: number       // max(0, -balance) — avance/crédit cumulé à la fin du mois ciblé
+  quota: number            // livrables/mois pour ce type (deliverables_short_form ou _long_form)
+  due: number              // "à livrer" affiché = quota(M) + backlog — jamais réduit par le crédit
+  delivered: number        // "livré" affiché = livrés dans M + crédit
+  backlog: number          // B — retard hérité des mois avant M (inclut l'ajustement manuel positif)
+  credit: number           // C — avance héritée des mois avant M (inclut l'ajustement manuel négatif)
+  late: number             // badge "N en retard" — 0 si rien à signaler (règle 6)
   manualAdjustment: number // tel que passé en paramètre — répété ici pour l'affichage ("ajustement manuel : +2")
 }
 
 export interface DeliverableTypeParams {
   perMonth: number              // deliverables_short_form ou deliverables_long_form
   startMonth: MonthKey          // mois de départ du client pour ce calcul
-  targetMonth: MonthKey         // mois affiché (peut être un mois passé)
+  targetMonth: MonthKey         // mois affiché (peut être un mois passé ou futur)
+  currentMonth: MonthKey        // mois réel "aujourd'hui" — distingue un mois de targetMonth entièrement passé d'un mois en cours/futur (règles 1 et 5)
   deliveredMonths: MonthKey[]   // un élément par contenu "filme" ou "publie" de ce type, son mois assigné
-  manualAdjustment?: number     // + ou - ajouté au solde cumulé (deliverables_short/long_adjustment, migration 051) — corrige les cas où l'historique réel ne colle pas aux content_pieces, sans en modifier aucun. Défaut 0.
+  manualAdjustment?: number     // + ou - ajouté au backlog (deliverables_short/long_adjustment, migration 051) — corrige les cas où l'historique réel ne colle pas aux content_pieces, sans en modifier aucun. Défaut 0.
 }
 
-// Calcule due_cumulé(M) = quota × mois_écoulés(M), livré_cumulé(M) = nombre
-// de deliveredMonths ≤ M, puis balance(M) = due_cumulé − livré_cumulé +
-// manualAdjustment (constant, s'applique à tous les mois également — c'est
-// une correction permanente du solde, pas un ajustement ponctuel d'un mois).
-// Le "dû affiché" pour M ajoute seulement le retard (positif) du mois
-// précédent au quota du mois ; un crédit du mois précédent réduit le dû du
-// mois courant (jusqu'à 0, jamais négatif).
 export function computeDeliverableTypeState(params: DeliverableTypeParams): DeliverableTypeResult {
-  const { perMonth, startMonth, targetMonth, deliveredMonths, manualAdjustment = 0 } = params
+  const { perMonth, startMonth, targetMonth, currentMonth, deliveredMonths, manualAdjustment = 0 } = params
 
   const monthsElapsed = monthsBetweenInclusive(startMonth, targetMonth)
   if (monthsElapsed <= 0) {
     // Mois antérieur au départ du client — rien n'est dû, rien n'est compté
     // comme livré pour ce calcul (pas de retard "fictif" avant le départ).
-    // L'ajustement manuel ne s'applique pas non plus avant le départ.
-    return { quota: perMonth, due: 0, delivered: 0, balance: 0, late: 0, credit: 0, manualAdjustment }
+    return { quota: perMonth, due: 0, delivered: 0, backlog: 0, credit: 0, late: 0, manualAdjustment }
   }
 
   // Un contenu livré pour un mois antérieur au départ du client ne compte
@@ -91,10 +102,12 @@ export function computeDeliverableTypeState(params: DeliverableTypeParams): Deli
   // (ex. ancien contenu produit avant le début officiel du forfait).
   const isCounted = (month: MonthKey) => compareMonthKeys(month, startMonth) >= 0
 
-  const dueCumulative = perMonth * monthsElapsed
-  const deliveredCumulative = deliveredMonths.filter(m => isCounted(m) && compareMonthKeys(m, targetMonth) <= 0).length
-  const balance = dueCumulative - deliveredCumulative + manualAdjustment
+  const deliveredInTargetMonth = deliveredMonths.filter(m => isCounted(m) && compareMonthKeys(m, targetMonth) === 0).length
 
+  // Backlog (B) / crédit (C) hérités des mois STRICTEMENT avant M — mutuellement
+  // exclusifs. C'est le solde cumulé (dû − livré + ajustement manuel) à la
+  // fin du mois précédent M, jamais celui de M lui-même (règle 1 : le quota
+  // de M n'est jamais inclus dans ce qui précède M).
   const prevMonth = addMonths(targetMonth, -1)
   const monthsElapsedPrev = monthsBetweenInclusive(startMonth, prevMonth)
   let balancePrev = 0
@@ -103,19 +116,26 @@ export function computeDeliverableTypeState(params: DeliverableTypeParams): Deli
     const deliveredCumulativePrev = deliveredMonths.filter(m => isCounted(m) && compareMonthKeys(m, prevMonth) <= 0).length
     balancePrev = dueCumulativePrev - deliveredCumulativePrev + manualAdjustment
   }
+  const backlog = Math.max(0, balancePrev)
+  const credit = Math.max(0, -balancePrev)
 
-  const due = Math.max(0, perMonth + balancePrev)
-  const deliveredInTargetMonth = deliveredMonths.filter(m => compareMonthKeys(m, targetMonth) === 0).length
+  // Règle 4 : "à livrer" ajoute le backlog au quota (jamais réduit par le
+  // crédit) ; "livré" affiché ajoute le crédit à ce qui a été livré ce mois.
+  const due = perMonth + backlog
+  const delivered = deliveredInTargetMonth + credit
 
-  return {
-    quota: perMonth,
-    due,
-    delivered: deliveredInTargetMonth,
-    balance,
-    late: Math.max(0, balance),
-    credit: Math.max(0, -balance),
-    manualAdjustment,
-  }
+  // Règles 1/5 : tant que M n'est pas terminé (en cours ou futur), le quota
+  // de M n'est jamais du retard — seul le backlog hérité, diminué de ce qui
+  // a déjà été livré CE mois, compte (le crédit n'entre pas non plus : B et
+  // C sont mutuellement exclusifs, C vaut 0 dès que B > 0). Pour un mois
+  // entièrement passé, le retard est la différence simple à livrer − livré
+  // (le quota de ce mois ne reviendra plus, donc il compte pleinement).
+  const monthIsOver = compareMonthKeys(targetMonth, currentMonth) < 0
+  const late = monthIsOver
+    ? Math.max(0, due - delivered)
+    : Math.max(0, backlog - deliveredInTargetMonth)
+
+  return { quota: perMonth, due, delivered, backlog, credit, late, manualAdjustment }
 }
 
 export interface ClientDeliverablesResult {
@@ -124,7 +144,6 @@ export interface ClientDeliverablesResult {
   totalDue: number
   totalDelivered: number
   totalLate: number
-  totalCredit: number
 }
 
 export interface ClientDeliverablesParams {
@@ -132,6 +151,7 @@ export interface ClientDeliverablesParams {
   deliverablesLongForm: number
   startMonth: MonthKey
   targetMonth: MonthKey
+  currentMonth: MonthKey
   deliveredShortFormMonths: MonthKey[]
   deliveredLongFormMonths: MonthKey[]
   shortFormAdjustment?: number // deliverables_short_adjustment (migration 051)
@@ -145,6 +165,7 @@ export function computeClientDeliverables(params: ClientDeliverablesParams): Cli
     perMonth: params.deliverablesShortForm,
     startMonth: params.startMonth,
     targetMonth: params.targetMonth,
+    currentMonth: params.currentMonth,
     deliveredMonths: params.deliveredShortFormMonths,
     manualAdjustment: params.shortFormAdjustment,
   })
@@ -152,6 +173,7 @@ export function computeClientDeliverables(params: ClientDeliverablesParams): Cli
     perMonth: params.deliverablesLongForm,
     startMonth: params.startMonth,
     targetMonth: params.targetMonth,
+    currentMonth: params.currentMonth,
     deliveredMonths: params.deliveredLongFormMonths,
     manualAdjustment: params.longFormAdjustment,
   })
@@ -162,6 +184,5 @@ export function computeClientDeliverables(params: ClientDeliverablesParams): Cli
     totalDue: shortForm.due + longForm.due,
     totalDelivered: shortForm.delivered + longForm.delivered,
     totalLate: shortForm.late + longForm.late,
-    totalCredit: shortForm.credit + longForm.credit,
   }
 }

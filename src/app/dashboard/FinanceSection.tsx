@@ -31,12 +31,12 @@ interface Expense {
 
 interface ContactOption { id: string; name: string }
 
-interface DeliverableTypeState { quota: number; due: number; delivered: number; balance: number; late: number; credit: number; manualAdjustment: number }
+interface DeliverableTypeState { quota: number; due: number; delivered: number; backlog: number; credit: number; late: number; manualAdjustment: number }
 interface DeliverableRow {
   id: string; name: string; logo_url: string | null
   shortForm: DeliverableTypeState; longForm: DeliverableTypeState
   shortFormAdjustmentNote: string | null; longFormAdjustmentNote: string | null
-  totalDue: number; totalDelivered: number; totalLate: number; totalCredit: number
+  totalDue: number; totalDelivered: number; totalLate: number
 }
 interface DeliverablesAggregate { shortDue: number; shortDelivered: number; longDue: number; longDelivered: number }
 
