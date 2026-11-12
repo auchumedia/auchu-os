@@ -1,7 +1,10 @@
 import { getConnection, saveTokens, markReconnectRequired } from './connection'
 import { refreshTokens } from './oauth'
 import { qboApiBaseUrl, qboEnvironment } from './config'
-import { QuickBooksReconnectRequiredError, QuickBooksNotConnectedError } from './errors'
+import {
+  QuickBooksReconnectRequiredError, QuickBooksNotConnectedError,
+  parseQuickBooksApiError, logQuickBooksApiError,
+} from './errors'
 
 // Marge de sécurité avant l'expiration réelle de l'access_token — on
 // rafraîchit PENDANT cette fenêtre, jamais après coup.
@@ -88,7 +91,9 @@ export async function qboFetch<T = unknown>(ownerId: string, path: string, init:
     token = await forceRefresh(ownerId, connection.refreshToken, realmId, companyName)
     res = await requestOnce(url, token, init)
     if (res.status === 401) {
-      await markReconnectRequired(ownerId, 'HTTP 401 persistant après rafraîchissement du jeton')
+      const apiError = await parseQuickBooksApiError(path, res)
+      logQuickBooksApiError(apiError)
+      await markReconnectRequired(ownerId, `HTTP 401 persistant après rafraîchissement du jeton (intuit_tid: ${apiError.intuitTid ?? 'n/a'})`)
       throw new QuickBooksReconnectRequiredError()
     }
   }
@@ -100,8 +105,15 @@ export async function qboFetch<T = unknown>(ownerId: string, path: string, init:
     attempt++
   }
 
+  // Requête invalide (erreur de syntaxe), ressource non disponible pour le
+  // forfait de l'entreprise, Id inexistant, etc. — jamais de jeton planté
+  // ici : on journalise un objet structuré (endpoint/statut/code
+  // Intuit/intuit_tid) et on relance une erreur typée que les appelants
+  // (sync.ts, routes API) savent gérer sans planter l'app.
   if (!res.ok) {
-    throw new Error(`Appel QuickBooks ${path} a échoué après retries — HTTP ${res.status}`)
+    const apiError = await parseQuickBooksApiError(path, res)
+    logQuickBooksApiError(apiError)
+    throw apiError
   }
 
   return res.json() as Promise<T>

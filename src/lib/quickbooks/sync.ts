@@ -1,6 +1,6 @@
 import { qboFetch } from './client'
 import { getConnection } from './connection'
-import { QuickBooksReconnectRequiredError, QuickBooksNotConnectedError } from './errors'
+import { QuickBooksReconnectRequiredError, QuickBooksNotConnectedError, QuickBooksApiError } from './errors'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '@/lib/finance'
 import type { createClient } from '@/lib/supabase/server'
 
@@ -166,7 +166,16 @@ function isBlockingTokenError(e: unknown): boolean {
   return e instanceof QuickBooksReconnectRequiredError || e instanceof QuickBooksNotConnectedError
 }
 
+// L'erreur est déjà journalisée en détail par logQuickBooksApiError() au
+// moment où qboFetch() l'a levée — ce message ne fait que résumer l'essentiel
+// (statut, code Intuit, intuit_tid) pour last_error, afin de pouvoir donner
+// l'intuit_tid au support sans avoir à aller chercher dans les logs serveur.
 function describeResourceFailure(label: string, e: unknown): string {
+  if (e instanceof QuickBooksApiError) {
+    const codePart = e.intuitCode ? ` [code ${e.intuitCode}]` : ''
+    const tidPart = e.intuitTid ? ` (intuit_tid: ${e.intuitTid})` : ''
+    return `${label} indisponible — HTTP ${e.status}${codePart}: ${e.message}${tidPart}`
+  }
   const reason = e instanceof Error ? e.message : String(e)
   return `${label} indisponible — ${reason}`
 }

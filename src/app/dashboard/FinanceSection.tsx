@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Wallet, TrendingUp, TrendingDown, Plus, X, Loader2, Trash2, AlertTriangle, CheckCircle2, Link2Off, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, Plus, X, Loader2, Trash2, AlertTriangle, CheckCircle2, Link2Off, RefreshCw, ChevronLeft, ChevronRight, LifeBuoy } from 'lucide-react'
 import { cn, formatCurrency, formatDate, formatDatetime } from '@/lib/utils'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '@/lib/finance'
 
@@ -106,15 +106,28 @@ export default function FinanceSection({ isOwner }: { isOwner: boolean }) {
 
   async function runSync() {
     setSyncing(true)
+    // reconnect_required est déjà couvert par la bannière dédiée (dès que
+    // refreshQboStatus() ci-dessous a rafraîchi qbo.status) — message
+    // d'erreur générique seulement pour les échecs qui n'ont pas déjà leur
+    // propre affichage, pour qu'une synchro ratée ne reste jamais silencieuse.
+    let syncErrorMessage: string | null = null
     try {
-      await fetch('/api/quickbooks/sync', { method: 'POST' })
+      const res = await fetch('/api/quickbooks/sync', { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok && json.error !== 'reconnect_required') {
+        syncErrorMessage = json.error === 'not_connected'
+          ? 'QuickBooks ne semble plus connecté.'
+          : 'La synchronisation QuickBooks a rencontré une erreur. Réessayez dans quelques minutes.'
+      }
     } catch {
-      // Panne réseau — on rafraîchit quand même le statut ci-dessous, qui
-      // reflétera honnêtement l'échec plutôt que de planter.
+      syncErrorMessage = 'La synchronisation QuickBooks a échoué (panne réseau). Réessayez dans quelques minutes.'
     } finally {
       setSyncing(false)
       await refreshQboStatus()
       await fetchMonthData()
+      // Après fetchMonthData(), qui efface error au démarrage de son propre
+      // appel — sinon ce message serait aussitôt effacé.
+      if (syncErrorMessage) setError(syncErrorMessage)
     }
   }
 
@@ -218,6 +231,19 @@ export default function FinanceSection({ isOwner }: { isOwner: boolean }) {
           />
         </div>
       </div>
+
+      {/* Visible dès que QuickBooks a été connecté au moins une fois —
+          connecté, en erreur (lastSyncStatus/degraded) ou à reconnecter —
+          jamais avant la première connexion. */}
+      {(qbo.status === 'connected' || qbo.status === 'reconnect_required') && (
+        <a
+          href="mailto:raphael@auchumedia.com?subject=Support%20AuchuOS%20%2F%20QuickBooks"
+          className="text-xs text-gray-400 hover:text-auchu-600 hover:underline inline-flex items-center gap-1.5 -mt-2"
+        >
+          <LifeBuoy className="w-3.5 h-3.5" />
+          Besoin d'aide ? Contacter le support
+        </a>
+      )}
 
       {qbo.status === 'reconnect_required' && <QuickBooksReconnectBanner />}
 

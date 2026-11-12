@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto'
 import { getDiscoveryDocument } from './discovery'
 import { qboClientId, qboClientSecret, qboRedirectUri, qboEnvironment, QUICKBOOKS_SCOPE } from './config'
+import { QuickBooksApiError, logQuickBooksApiError } from './errors'
 
 function basicAuthHeader(): string {
   return 'Basic ' + Buffer.from(`${qboClientId()}:${qboClientSecret()}`).toString('base64')
@@ -47,7 +48,7 @@ function fromTokenResponse(json: TokenResponse): ExchangedTokens {
   }
 }
 
-async function postToken(body: Record<string, string>): Promise<TokenResponse> {
+async function postToken(body: Record<string, string>, endpointLabel: string): Promise<TokenResponse> {
   const discovery = await getDiscoveryDocument()
   const res = await fetch(discovery.token_endpoint, {
     method: 'POST',
@@ -60,13 +61,21 @@ async function postToken(body: Record<string, string>): Promise<TokenResponse> {
     cache: 'no-store',
   })
 
+  const intuitTid = res.headers.get('intuit_tid')
   const json = await res.json().catch(() => ({}))
 
   if (!res.ok) {
     // invalid_grant = refresh token expiré/révoqué/déjà utilisé — le code
     // appelant (client.ts) transforme ça en QuickBooksReconnectRequiredError.
+    // Le corps OAuth d'Intuit est {error, error_description} (pas Fault,
+    // contrairement à l'API Accounting) — journalisé ici avec le même
+    // format structuré pour que le support Intuit retrouve l'intuit_tid.
     const code = json?.error || `http_${res.status}`
-    throw new Error(code)
+    logQuickBooksApiError(new QuickBooksApiError({
+      endpoint: endpointLabel, status: res.status, intuitCode: code, intuitTid,
+      message: json?.error_description || code,
+    }))
+    throw new Error(intuitTid ? `${code} (intuit_tid: ${intuitTid})` : code)
   }
 
   return json as TokenResponse
@@ -77,7 +86,7 @@ export async function exchangeCodeForTokens(code: string): Promise<ExchangedToke
     grant_type: 'authorization_code',
     code,
     redirect_uri: qboRedirectUri(),
-  })
+  }, 'oauth2/token (authorization_code)')
   return fromTokenResponse(json)
 }
 
@@ -88,7 +97,7 @@ export async function refreshTokens(refreshToken: string): Promise<ExchangedToke
   const json = await postToken({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
-  })
+  }, 'oauth2/token (refresh_token)')
   return fromTokenResponse(json)
 }
 
@@ -108,8 +117,14 @@ export async function revokeToken(refreshToken: string): Promise<void> {
 
   // 200 = révoqué. Un jeton déjà invalide/expiré renvoie une erreur côté
   // Intuit — sans conséquence puisqu'on nettoie notre état localement dans
-  // tous les cas (cf. api/quickbooks/disconnect/route.ts).
+  // tous les cas (cf. api/quickbooks/disconnect/route.ts) ; on journalise
+  // quand même pour garder l'intuit_tid en cas de besoin d'investigation.
   if (!res.ok && res.status !== 400) {
+    const intuitTid = res.headers.get('intuit_tid')
+    logQuickBooksApiError(new QuickBooksApiError({
+      endpoint: 'oauth2/revoke', status: res.status, intuitTid,
+      message: `Révocation QuickBooks échouée — HTTP ${res.status}`,
+    }))
     throw new Error(`Révocation QuickBooks échouée — HTTP ${res.status}`)
   }
 }
