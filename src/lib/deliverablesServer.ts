@@ -1,4 +1,4 @@
-import { computeClientDeliverables, monthKeyFromDate, monthKeyFromString, type MonthKey } from './deliverables'
+import { computeClientDeliverables, contentPieceMonth, monthKeyFromString, type MonthKey } from './deliverables'
 import type { createClient } from '@/lib/supabase/server'
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
@@ -29,19 +29,17 @@ export interface DeliverablesResult {
 }
 
 // Livré = statut "filme" OU "publie" (une vidéo déjà tournée mais pas
-// encore publiée compte quand même comme livrée) ; mois assigné =
-// month_target (choisi à la création de l'idée), avec repli sur created_at
-// pour les lignes antérieures à l'ajout de cette colonne (migration 042).
-function assignedMonth(piece: { month_target: string | null; created_at: string }): MonthKey {
-  return piece.month_target ? monthKeyFromString(piece.month_target) : monthKeyFromDate(piece.created_at)
-}
+// encore publiée compte quand même comme livrée) ; mois assigné = règle
+// partagée contentPieceMonth (month_target, sinon scheduled_at, sinon
+// created_at — identique à ProjetsTab.tsx, cf. deliverables.ts).
 
 // Mois de départ du client : deliverables_start_month si renseigné, sinon
-// le mois de created_at (migration 050).
+// le mois de created_at (migration 050). monthKeyFromString (pas
+// monthKeyFromDate) pour created_at aussi : lit les chiffres Y/M directement
+// dans la chaîne, jamais via un objet Date dont les getters locaux peuvent
+// faire basculer la date selon le fuseau horaire du serveur.
 function clientStartMonth(client: { deliverables_start_month: string | null; created_at: string }): MonthKey {
-  return client.deliverables_start_month
-    ? monthKeyFromString(client.deliverables_start_month)
-    : monthKeyFromDate(client.created_at)
+  return monthKeyFromString(client.deliverables_start_month ?? client.created_at)
 }
 
 // clientIds === null : pas de filtrage (owner/director, toute l'org).
@@ -82,7 +80,7 @@ export async function fetchClientDeliverableRows(
   // et correcte plutôt que d'optimiser prématurément.
   const { data: pieces } = await supabase
     .from('content_pieces')
-    .select('client_id, type, month_target, created_at')
+    .select('client_id, type, month_target, scheduled_at, created_at')
     .eq('user_id', ownerId)
     .in('status', ['filme', 'publie'])
     .in('client_id', ids)
@@ -91,7 +89,7 @@ export async function fetchClientDeliverableRows(
   for (const p of pieces ?? []) {
     if (!p.client_id) continue
     const bucket = deliveredByClient.get(p.client_id) ?? { short: [], long: [] }
-    const month = assignedMonth(p)
+    const month = contentPieceMonth(p)
     if (p.type === 'long_form') bucket.long.push(month)
     else bucket.short.push(month)
     deliveredByClient.set(p.client_id, bucket)

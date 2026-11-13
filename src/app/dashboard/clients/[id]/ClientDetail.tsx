@@ -1083,7 +1083,11 @@ export default function ClientDetail({
           initialContent={content}
           initialEvents={events}
           clientId={client.id}
-          deliverablesTotal={deliverablesTotal}
+          deliverablesShortForm={deliverables.short_form}
+          deliverablesLongForm={deliverables.long_form}
+          deliverablesStartMonth={deliverables.start_month ? `${deliverables.start_month}-01` : client.created_at}
+          shortFormAdjustment={deliverables.short_adjustment}
+          longFormAdjustment={deliverables.long_adjustment}
         />
       )}
 

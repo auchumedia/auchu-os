@@ -5,7 +5,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import {
-  computeDeliverableTypeState, computeClientDeliverables,
+  computeDeliverableTypeState, computeClientDeliverables, contentPieceMonth,
   monthKeyFromString, addMonths, monthsBetweenInclusive,
   type MonthKey,
 } from '../src/lib/deliverables.ts'
@@ -259,6 +259,48 @@ console.log('\nTest 18 — cas réel : Raf & Steve Maher (laissé tel quel → 1
   assertEqual(r.due, 4, 'Maher : novembre à livrer = 4')
   assertEqual(r.delivered, 1, 'Maher : 1 déjà livrée en novembre → affichage 1/4')
   assertEqual(r.late, 0, 'Maher : aucun badge de retard')
+}
+
+console.log('\nTest 19 — contentPieceMonth : règle partagée dashboard/fiche contact (month_target, sinon scheduled_at, sinon created_at)')
+{
+  // "Étape 2 Speed dating | Partie 1" (Maher) — month_target et scheduled_at
+  // en désaccord (créé le 21 oct, programmé le 1er nov) : month_target
+  // gagne toujours, qu'on soit sur le dashboard ou sur la fiche contact.
+  assertEqual(
+    JSON.stringify(contentPieceMonth({
+      month_target: '2026-10-01', scheduled_at: '2026-11-01T00:00:00+00:00', created_at: '2026-10-21T15:49:54+00:00',
+    })),
+    JSON.stringify(m('2026-10')),
+    "Partie 1 : month_target (octobre) gagne sur scheduled_at (novembre)",
+  )
+
+  // "Étape 2 Speed dating | Partie 2" — les deux s'accordent déjà sur novembre.
+  assertEqual(
+    JSON.stringify(contentPieceMonth({
+      month_target: '2026-11-01', scheduled_at: '2026-11-01T00:00:00+00:00', created_at: '2026-11-12T16:06:48+00:00',
+    })),
+    JSON.stringify(m('2026-11')),
+    'Partie 2 : month_target et scheduled_at concordent déjà sur novembre',
+  )
+
+  // Pas de month_target du tout : repli sur scheduled_at.
+  assertEqual(
+    JSON.stringify(contentPieceMonth({
+      month_target: null, scheduled_at: '2026-12-15T00:00:00+00:00', created_at: '2026-10-01T00:00:00+00:00',
+    })),
+    JSON.stringify(m('2026-12')),
+    "sans month_target : repli sur scheduled_at (décembre), pas created_at (octobre)",
+  )
+
+  // Ni month_target ni scheduled_at : repli sur created_at (contenu
+  // antérieur à la migration 042, avant l'ajout de month_target).
+  assertEqual(
+    JSON.stringify(contentPieceMonth({
+      month_target: null, scheduled_at: null, created_at: '2026-07-15T00:00:00+00:00',
+    })),
+    JSON.stringify(m('2026-07')),
+    'sans aucune date explicite : repli sur le mois de création',
+  )
 }
 
 console.log(failures === 0 ? '\n✅ Tous les tests passent.' : `\n❌ ${failures} test(s) en échec.`)

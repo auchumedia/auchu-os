@@ -47,6 +47,21 @@ export function monthKeyFromString(s: string): MonthKey {
   return { year: Number(yearStr), month: Number(monthStr) }
 }
 
+// Mois effectif d'un contenu — règle UNIQUE partagée par le dashboard
+// (deliverablesServer.ts) et la fiche contact (ProjetsTab.tsx) : month_target
+// (ciblage explicite choisi à la création), sinon scheduled_at (date de
+// tournage/publication fixée), sinon le mois de création. Avant ce helper,
+// les deux surfaces utilisaient des priorités différentes (la fiche
+// contact lisait scheduled_at en premier), ce qui pouvait faire apparaître
+// un contenu dans un mois sur la fiche et dans un autre sur le dashboard.
+export function contentPieceMonth(piece: {
+  month_target: string | null
+  scheduled_at?: string | null
+  created_at: string
+}): MonthKey {
+  return monthKeyFromString(piece.month_target ?? piece.scheduled_at ?? piece.created_at)
+}
+
 export function monthKeyToParam(k: MonthKey): string {
   return `${k.year}-${String(k.month).padStart(2, '0')}`
 }

@@ -13,6 +13,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { ContentPiece, ContentStatus, CalendarEvent, ReferenceLink } from '@/types'
 import { cn } from '@/lib/utils'
 import RichTextEditor from '@/components/RichTextEditor'
+import { computeClientDeliverables, contentPieceMonth, monthKeyFromDate, monthKeyFromString, type MonthKey } from '@/lib/deliverables'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -109,14 +110,15 @@ function formatDateOnly(dateStr: string): string {
 }
 
 // ─── Mois effectif d'une idée ───────────────────────────────────────────────
-// scheduled_at prime, puis month_target (ciblage explicite d'un mois futur/
-// passé sans date précise), puis à défaut le mois de création.
-function getEffectiveDateStr(item: ContentPiece): string {
-  return item.scheduled_at ?? item.month_target ?? item.created_at
-}
-
+// Règle partagée avec le dashboard (contentPieceMonth, src/lib/deliverables.ts) :
+// month_target prime (ciblage explicite choisi à la création), sinon
+// scheduled_at, sinon le mois de création. `month` ici est 0-indexé (JS
+// Date) ; MonthKey.month est 1-indexé.
 function filterByMonth(list: ContentPiece[], year: number, month: number): ContentPiece[] {
-  return list.filter(i => isSameYearMonth(getEffectiveDateStr(i), year, month))
+  return list.filter(i => {
+    const mk = contentPieceMonth(i)
+    return mk.year === year && mk.month === month + 1
+  })
 }
 
 function monthStartISO(year: number, month: number): string {
@@ -169,12 +171,22 @@ interface Props {
   initialContent: ContentPiece[]
   initialEvents:  CalendarEvent[]
   clientId: string
-  deliverablesTotal: number
+  deliverablesShortForm: number
+  deliverablesLongForm: number
+  // 'YYYY-MM-DD' — toujours renseigné : l'appelant (ClientDetail.tsx) résout
+  // déjà le repli sur created_at si deliverables_start_month est vide.
+  deliverablesStartMonth: string
+  shortFormAdjustment: number
+  longFormAdjustment: number
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ProjetsTab({ initialContent, initialEvents, clientId, deliverablesTotal }: Props) {
+export default function ProjetsTab({
+  initialContent, initialEvents, clientId,
+  deliverablesShortForm, deliverablesLongForm, deliverablesStartMonth,
+  shortFormAdjustment, longFormAdjustment,
+}: Props) {
   const [items, setItems]       = useState<ContentPiece[]>(initialContent)
   const [events, setEvents]     = useState<CalendarEvent[]>(initialEvents)
   const [selected, setSelected] = useState<ContentPiece | null>(null)
@@ -189,19 +201,27 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, de
 
   const monthItems = filterByMonth(items, year, month)
 
-  // ── Compteur de livrables ────────────────────────────────────────────────
-  // Y (deliverablesTotal) est la cible mensuelle fixée dans Vue d'ensemble.
-  // X ne compte que les contenus filmés ou publiés ce mois — idée/en
-  // rédaction/prêt/approuvé ne sont pas encore un livrable produit. Comme
-  // monthItems est scopé à year+month, le compteur repart naturellement de
-  // zéro à chaque nouveau mois (donc automatiquement au 1er janvier de
-  // chaque année) — les contenus des mois/années passés restent consultables
-  // en y naviguant, sans jamais entrer dans le calcul du mois actif. Dérivé
-  // directement de l'état `items` à chaque rendu, donc se met à jour en
-  // temps réel dès qu'un statut change (patchItem → setItems).
-  const doneCount = monthItems.filter(i => DONE_STATUSES.includes(i.status)).length
-  const remaining = Math.max(deliverablesTotal - doneCount, 0)
-  const pct = deliverablesTotal > 0 ? Math.min(100, Math.round((doneCount / deliverablesTotal) * 100)) : 0
+  // ── Progression livrables — MÊME calcul que le dashboard (règles 1-7,
+  // src/lib/deliverables.ts) : livré/à livrer avec retard reporté des mois
+  // passés, pas un simple compteur "X idées ce mois". Dérivé directement de
+  // `items` à chaque rendu, donc se met à jour dès qu'un statut change.
+  const deliverablesTotal = deliverablesShortForm + deliverablesLongForm
+  const currentMonth: MonthKey = monthKeyFromDate(now)
+  const targetMonth: MonthKey = { year, month: month + 1 }
+  const startMonth = monthKeyFromString(deliverablesStartMonth)
+  const deliveredShortMonths = items.filter(i => i.type === 'short_form' && DONE_STATUSES.includes(i.status)).map(contentPieceMonth)
+  const deliveredLongMonths  = items.filter(i => i.type === 'long_form'  && DONE_STATUSES.includes(i.status)).map(contentPieceMonth)
+  const deliverablesResult = computeClientDeliverables({
+    deliverablesShortForm, deliverablesLongForm, startMonth, targetMonth, currentMonth,
+    deliveredShortFormMonths: deliveredShortMonths,
+    deliveredLongFormMonths: deliveredLongMonths,
+    shortFormAdjustment, longFormAdjustment,
+  })
+  const remaining = Math.max(deliverablesResult.totalDue - deliverablesResult.totalDelivered, 0)
+  const pct = deliverablesResult.totalDue > 0
+    ? Math.min(100, Math.round((deliverablesResult.totalDelivered / deliverablesResult.totalDue) * 100))
+    : 0
+  const isPastMonth = year * 12 + month < now.getFullYear() * 12 + now.getMonth()
 
   const openItem   = (item: ContentPiece) => setSelected(item)
   const closePanel = () => setSelected(null)
@@ -349,7 +369,7 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, de
           <div className="card">
             <div className="flex items-baseline justify-between mb-2">
               <p className="text-sm font-medium text-gray-700">
-                {doneCount}/{deliverablesTotal} contenu{deliverablesTotal !== 1 ? 's' : ''} ce mois
+                {deliverablesResult.totalDelivered}/{deliverablesResult.totalDue} livré{deliverablesResult.totalDue !== 1 ? 's' : ''}
               </p>
               <span className="text-xs text-gray-400">{pct}%</span>
             </div>
@@ -357,9 +377,12 @@ export default function ProjetsTab({ initialContent, initialEvents, clientId, de
               <div className="h-full rounded-full bg-auchu-500 transition-all" style={{ width: `${pct}%` }} />
             </div>
             <p className="text-xs text-gray-400 mt-2">
-              {remaining > 0
-                ? `Il reste ${remaining} contenu${remaining !== 1 ? 's' : ''} à créer`
-                : 'Objectif du mois atteint 🎉'}
+              {remaining === 0
+                ? 'À jour ✓'
+                : `${remaining} à livrer ${isPastMonth ? 'non livrés' : "d'ici la fin du mois"}`}
+              {deliverablesResult.totalLate > 0 && (
+                <span className="text-red-600 font-medium"> · {deliverablesResult.totalLate} en retard</span>
+              )}
             </p>
           </div>
         )}
@@ -661,7 +684,18 @@ function ContentPanel({
   const changeScheduledAt = async (v: string) => {
     setScheduledAt(v)
     setScheduleStatus('saving')
-    const ok = await onPatch({ scheduled_at: v || null })
+    // Déplacer la date planifiée vers un autre mois doit aussi déplacer
+    // month_target — sinon le dashboard (qui ne lit jamais scheduled_at en
+    // premier) et la fiche contact finissent par afficher deux mois
+    // différents pour le même contenu (cf. règle contentPieceMonth). On ne
+    // touche jamais month_target quand la date est effacée : il doit
+    // toujours rester renseigné.
+    const fields: Partial<ContentPiece> = { scheduled_at: v || null }
+    if (v) {
+      const { year, month } = parseISODateParts(v)
+      fields.month_target = monthStartISO(year, month)
+    }
+    const ok = await onPatch(fields)
     setScheduleStatus(ok ? 'saved' : 'error')
     if (ok) setTimeout(() => setScheduleStatus('idle'), 2000)
   }
