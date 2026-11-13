@@ -82,3 +82,13 @@ export function canViewFinance(role: string): boolean {
 export function canManageQuickBooksConnection(role: string): boolean {
   return role === 'owner'
 }
+
+// Qui voit/modifie l'onglet Insight (statistiques sociales mensuelles) —
+// owner/director/stratège (le stratège scopé à son équipe via team_clients,
+// appliqué par la RLS). monteur n'a NI lecture NI écriture — mirroir exact
+// des policies "client_insights: *" (supabase/migrations/054_client_insights.sql).
+const INSIGHT_ROLES: OrgRole[] = ['owner', 'director', 'stratege']
+
+export function canAccessInsight(role: string): boolean {
+  return INSIGHT_ROLES.includes(role as OrgRole)
+}

@@ -127,6 +127,35 @@ export interface Client {
   updated_at: string
 }
 
+// ─── Insight (statistiques sociales mensuelles, saisie manuelle) ─────────────
+// Accès : owner/director/stratège en voir+modifier (stratège scopé à son
+// équipe via team_clients) — monteur n'a aucun accès (RLS, migration 054).
+// Jamais exposé au portail client.
+export type InsightPlatform = 'instagram' | 'facebook' | 'tiktok'
+
+export interface ClientInsight {
+  id: string
+  user_id: string
+  client_id: string
+  platform: InsightPlatform
+  month: string // 'YYYY-MM-DD', toujours le 1er du mois
+  followers: number | null
+  followers_gained: number | null
+  views: number | null
+  reach: number | null
+  likes: number | null
+  comments: number | null
+  shares: number | null
+  saves: number | null
+  profile_visits: number | null
+  posts_published: number | null
+  top_post_title: string | null
+  top_post_url: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ─── Accès plateformes (sensible — owner/director uniquement) ────────────────
 export interface ClientPlatformAccess {
   id: string

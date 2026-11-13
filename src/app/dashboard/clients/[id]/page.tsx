@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { getOrgContext } from '@/lib/org'
-import { canCreateTasks } from '@/lib/roles'
+import { canCreateTasks, canAccessInsight } from '@/lib/roles'
 import { notFound } from 'next/navigation'
+import type { ClientInsight } from '@/types'
 import ClientDetail from './ClientDetail'
 
 export const dynamic = 'force-dynamic'
@@ -133,6 +134,21 @@ export default async function ClientPage({ params }: { params: { id: string } })
     }
   }
 
+  // ── Insight (statistiques sociales) — chargé uniquement pour owner/
+  //    director/stratège (monteur n'y a RLS aucun accès, migration 054) ;
+  //    jamais présent dans les props d'un monteur. ────────────────────────────
+  const hasInsightAccess = canAccessInsight(ctx.role)
+  let insights: ClientInsight[] = []
+  if (hasInsightAccess) {
+    const { data } = await supabase
+      .from('client_insights')
+      .select('*')
+      .eq('client_id', params.id)
+      .eq('user_id', ownerId)
+      .order('month', { ascending: true })
+    insights = data ?? []
+  }
+
   return (
     <ClientDetail
       client={client}
@@ -146,6 +162,8 @@ export default async function ClientPage({ params }: { params: { id: string } })
       currentUserId={ctx.userId}
       platformAccess={platformAccess}
       clientTimeThisMonth={clientTimeThisMonth}
+      canAccessInsight={hasInsightAccess}
+      initialInsights={insights ?? []}
     />
   )
 }

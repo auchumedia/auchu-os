@@ -4,18 +4,19 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, Camera, ExternalLink, Copy, Check, Loader2,
-  Calendar, FileText, Globe, Pencil, ListTodo,
+  Calendar, FileText, Globe, Pencil, ListTodo, LineChart,
   Save, X, CheckCircle, Eye, EyeOff, Upload, Download, Trash2,
   Instagram, Facebook, Linkedin, Clock,
 } from 'lucide-react'
-import { Client, Invoice, ContentPiece, CalendarEvent, ClientPlatformAccess, ClientDocument, Task } from '@/types'
+import { Client, Invoice, ContentPiece, CalendarEvent, ClientPlatformAccess, ClientDocument, Task, ClientInsight } from '@/types'
 import ProjetsTab from './ProjetsTab'
 import ClientTasksTab from './ClientTasksTab'
+import InsightTab from './InsightTab'
 import { cn, formatCurrency, formatDate, formatDuration, getInitials } from '@/lib/utils'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'projects' | 'tasks' | 'portal'
+type Tab = 'overview' | 'projects' | 'tasks' | 'insight' | 'portal'
 
 const PLATFORMS = ['instagram', 'facebook', 'tiktok']
 
@@ -67,6 +68,8 @@ interface Props {
   currentUserId: string
   platformAccess: ClientPlatformAccess | null
   clientTimeThisMonth: { totalSeconds: number; byMember: { name: string; seconds: number }[] } | null
+  canAccessInsight: boolean
+  initialInsights: ClientInsight[]
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -74,7 +77,7 @@ interface Props {
 export default function ClientDetail({
   client: initial, invoices, content, events, tasks, teamMembers,
   canManageSensitive, canCreateTasks, currentUserId, platformAccess: initialPlatformAccess,
-  clientTimeThisMonth,
+  clientTimeThisMonth, canAccessInsight, initialInsights,
 }: Props) {
   const [tab, setTab]       = useState<Tab>('overview')
   const [client, setClient] = useState(initial)
@@ -413,6 +416,7 @@ export default function ClientDetail({
     { id: 'overview',  label: 'Vue d\'ensemble',                     icon: FileText  },
     { id: 'projects',  label: `Projets (${activeContentCount})`,     icon: Calendar  },
     { id: 'tasks',     label: `Tâches (${tasks.length})`,     icon: ListTodo  },
+    ...(canAccessInsight ? [{ id: 'insight' as Tab, label: 'Insight', icon: LineChart }] : []),
     { id: 'portal',    label: 'Portail',                      icon: Globe     },
   ]
 
@@ -1101,6 +1105,11 @@ export default function ClientDetail({
           currentUserId={currentUserId}
           isOwnerOrDirector={canManageSensitive}
         />
+      )}
+
+      {/* ─── Tab: Insight (statistiques sociales mensuelles) ────────────────── */}
+      {tab === 'insight' && canAccessInsight && (
+        <InsightTab clientId={client.id} clientName={client.name} initialInsights={initialInsights} />
       )}
 
       {/* ─── Tab: Portail ────────────────────────────────────────────────────── */}

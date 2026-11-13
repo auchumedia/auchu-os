@@ -8,13 +8,15 @@
     "start": "next start",
     "lint": "next lint",
     "test:quickbooks-errors": "node scripts/test-quickbooks-error-handling.mts",
-    "test:deliverables": "node scripts/test-deliverables.mts"
+    "test:deliverables": "node scripts/test-deliverables.mts",
+    "test:insights": "node scripts/test-insights.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@react-pdf/renderer": "^3.4.5",
     "@supabase/ssr": "^0.4.0",
     "@supabase/supabase-js": "^2.44.0",
     "@tiptap/extension-placeholder": "^3.27.1",
