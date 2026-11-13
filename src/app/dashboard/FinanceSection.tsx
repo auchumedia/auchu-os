@@ -35,7 +35,6 @@ interface DeliverableTypeState { quota: number; due: number; delivered: number; 
 interface DeliverableRow {
   id: string; name: string; logo_url: string | null
   shortForm: DeliverableTypeState; longForm: DeliverableTypeState
-  shortFormAdjustmentNote: string | null; longFormAdjustmentNote: string | null
   totalDue: number; totalDelivered: number; totalLate: number
 }
 interface DeliverablesAggregate { shortDue: number; shortDelivered: number; longDue: number; longDelivered: number }
@@ -57,6 +56,13 @@ function toMonthParam(d: Date) {
 function monthLabel(d: Date) {
   const label = d.toLocaleDateString('fr-CA', { month: 'long', year: 'numeric' })
   return label.charAt(0).toUpperCase() + label.slice(1)
+}
+// Mois affiché strictement avant le mois réel actuel — pas de dépendance au
+// calcul (purement pour choisir le libellé "non livrés" vs "d'ici la fin du
+// mois" dans la carte Livrables).
+function isMonthInPast(d: Date) {
+  const now = new Date()
+  return d.getFullYear() * 12 + d.getMonth() < now.getFullYear() * 12 + now.getMonth()
 }
 
 type QboStatus = 'loading' | 'disconnected' | 'reconnect_required' | 'connected'
@@ -331,7 +337,7 @@ export default function FinanceSection({
       )}
 
       {/* ── 2) Carte "Livrables du mois" ─────────────────────────────────────── */}
-      <DeliverablesCard rows={deliverableRows} loading={deliverablesLoading} />
+      <DeliverablesCard rows={deliverableRows} loading={deliverablesLoading} isPastMonth={isMonthInPast(monthDate)} />
 
       {/* ── 3) Colonne "À faire maintenant" (rendue côté serveur) ────────────── */}
       {children}
@@ -497,7 +503,7 @@ function KpiBandSkeleton({ showFinance }: { showFinance: boolean }) {
 
 // ── 2) Carte "Livrables du mois" — une ligne par contact actif, triée par
 //      retard décroissant, barres short/long séparées, clic → fiche contact.
-function DeliverablesCard({ rows, loading }: { rows: DeliverableRow[]; loading: boolean }) {
+function DeliverablesCard({ rows, loading, isPastMonth }: { rows: DeliverableRow[]; loading: boolean; isPastMonth: boolean }) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-4">
@@ -537,7 +543,7 @@ function DeliverablesCard({ rows, loading }: { rows: DeliverableRow[]; loading: 
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
                   <p className="text-sm font-medium text-gray-900 truncate">{r.name}</p>
                   {r.totalLate > 0 && (
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-red-700 bg-red-50 rounded-full px-2 py-0.5 flex-shrink-0">
@@ -545,9 +551,10 @@ function DeliverablesCard({ rows, loading }: { rows: DeliverableRow[]; loading: 
                     </span>
                   )}
                 </div>
-                <div className="space-y-1.5">
-                  <DeliverableBar label="Short" state={r.shortForm} note={r.shortFormAdjustmentNote} />
-                  <DeliverableBar label="Long" state={r.longForm} note={r.longFormAdjustmentNote} />
+                <RemainingLine row={r} isPastMonth={isPastMonth} />
+                <div className="space-y-1.5 mt-1.5">
+                  <DeliverableBar label="Short" state={r.shortForm} />
+                  <DeliverableBar label="Long" state={r.longForm} />
                 </div>
               </div>
             </Link>
@@ -558,13 +565,29 @@ function DeliverablesCard({ rows, loading }: { rows: DeliverableRow[]; loading: 
   )
 }
 
-function DeliverableBar({ label, state, note }: { label: string; state: DeliverableTypeState; note?: string | null }) {
+// Phrase courte sous le nom du contact — résume le reste à faire pour le
+// mois (tous types confondus). L'ajustement manuel reste appliqué dans
+// r.totalDue/totalDelivered/totalLate (calcul inchangé) ; il n'est plus
+// affiché explicitement sur le dashboard — seulement dans la fiche contact
+// (ClientDetail.tsx), avec sa note.
+function RemainingLine({ row, isPastMonth }: { row: DeliverableRow; isPastMonth: boolean }) {
+  const remaining = Math.max(0, row.totalDue - row.totalDelivered)
+  if (remaining === 0) {
+    return <p className="text-xs text-green-600">À jour ✓</p>
+  }
+  const suffix = isPastMonth ? 'non livrés' : "d'ici la fin du mois"
+  return (
+    <p className="text-xs text-gray-500">
+      {remaining} à livrer {suffix}
+      {row.totalLate > 0 && <span className="text-red-600 font-medium"> · {row.totalLate} en retard</span>}
+    </p>
+  )
+}
+
+function DeliverableBar({ label, state }: { label: string; state: DeliverableTypeState }) {
   if (state.quota === 0) return null
   const pct = state.due > 0 ? Math.min(100, Math.round((state.delivered / state.due) * 100)) : 100
   const barColor = state.late > 0 ? 'bg-amber-500' : state.delivered >= state.due ? 'bg-green-500' : 'bg-auchu-500'
-  const adjustmentTitle = state.manualAdjustment !== 0
-    ? `Ajustement manuel : ${state.manualAdjustment > 0 ? '+' : ''}${state.manualAdjustment}${note ? ` — ${note}` : ''}`
-    : undefined
   return (
     <div className="flex items-center gap-2">
       <span className="text-[10px] text-gray-400 w-10 flex-shrink-0">{label}</span>
@@ -572,14 +595,6 @@ function DeliverableBar({ label, state, note }: { label: string; state: Delivera
         <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-[11px] text-gray-500 w-12 flex-shrink-0 text-right">{state.delivered}/{state.due}</span>
-      {state.manualAdjustment !== 0 && (
-        <span
-          title={adjustmentTitle}
-          className="text-[9px] font-medium text-purple-700 bg-purple-50 rounded-full px-1.5 py-0.5 flex-shrink-0"
-        >
-          {state.manualAdjustment > 0 ? '+' : ''}{state.manualAdjustment}
-        </span>
-      )}
     </div>
   )
 }
